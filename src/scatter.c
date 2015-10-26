@@ -1,15 +1,18 @@
-#include "scatter.h"
-#include "ksubset.h"
-#include "alloc.h"
-#include "heap.h"
+#include <math.h>
+#include <assert.h>
+#include "wct.h"
 
 static int select_parrent( GRand *Rand, int counter, int *sum, int totsum );
-inline int minimum_partition( solution *sol, int lowerbound );
+static int minimum_partition( solution *sol, int lowerbound );
 
 int sort_vertices( const void *a, const void *b, void *data );
 
 static int nodepair_ref_key( int v1, int v2 );
 static void inodepair_ref_key( int *v1, int *v2, int index );
+
+void print_totalweightcomptime( void *data, void *user_data );
+int order_totalweightcomptime( const void *a, const void *b, void *data );
+int order_totalweightcomptime_list( const void *a, const void *b );
 
 
 /** compute row-index v1 and column-index v2 from array-index.*/
@@ -25,6 +28,25 @@ static int nodepair_ref_key( int v1, int v2 )
      njobs x njobs matrix. */
     assert( v1 <= v2 );
     return v2 * ( v2 + 1 ) / 2 + v1;
+}
+
+static int minimum_partition( solution *sol, int lowerbound )
+{
+    int val = 0;
+
+    for ( int i = 1; i < sol->nmachines; ++i ) {
+        if ( sol->part[i].completiontime - lowerbound <= 0 ) {
+            if ( ( CC_OURABS( sol->part[i].completiontime - lowerbound ) <
+                    CC_OURABS( sol->part[val].completiontime - lowerbound ) )
+                    || ( ( CC_OURABS( sol->part[i].completiontime - lowerbound ) ==
+                           CC_OURABS( sol->part[val].completiontime - lowerbound ) &&
+                           g_queue_get_length( sol->part[i].list ) > g_queue_get_length(
+                               sol->part[val].list ) ) ) ) {
+                val = i;
+            }
+        }
+    }
+    return val;
 }
 /*
 For each functions
@@ -348,7 +370,7 @@ int solution_in_pool( SS *scatter_search, solution *new_sol )
 {
     int val = 1;
     GList *it = scatter_search->p->list;
-    int njobs;
+    int njobs = new_sol->njobs;
 
     if ( it == ( GList * ) NULL || g_list_length( it ) == 0 ) {
         val = 0;
@@ -898,7 +920,7 @@ int combine_GPX( SS *scatter_search, GQueue *queue, int *subsetsol,
             for ( GList *it = new_sol->part[new_sol->nmachines].list->head; it ;
                     it = it->next ) {
                 for ( j = 0; j < nbelements; j++ ) {
-                    partlist_delete_custom( ( sol + j )->vlist, ( ( Job * )it->data ) );
+                    partlist_delete_custom( ( sol + j )->vlist, ( ( Job * )it->data ), njobs );
                 }
             }
 
@@ -925,7 +947,6 @@ int combine_GPX( SS *scatter_search, GQueue *queue, int *subsetsol,
     if ( new_sol->njobs != njobs ) {
         pmcheap *heap = ( pmcheap * )NULL;
         partlist *temp = (partlist*) NULL;
-        int counter = 0;
         GQueue *list = g_queue_new();
 
         for ( i = 0; i < njobs; ++i ) {
@@ -954,10 +975,10 @@ int combine_GPX( SS *scatter_search, GQueue *queue, int *subsetsol,
 
         while ( it ) {
             temp = pmcheap_min( heap );
-            Job *node = ( Job * )it->data;
+            Job *job = ( Job * )it->data;
 
 
-            partlist_insert( temp, new_sol->vlist, ( Job * )it->data );
+            partlist_insert( temp, new_sol->vlist, job);
             new_sol->njobs++;
             pmcheap_insert( heap, temp->completiontime, temp );
 
@@ -1089,8 +1110,6 @@ int combine_PM( SS *scatter_search, GQueue *queue, int *subsetsol,
         temp[counter] = pmcheap_min( heap );
         Job *node1 = *( scatter_search->joblist + i );
         Job *node2 = *( scatter_search->joblist + j );
-        int color = 0;
-        int failed;
 
 
     
@@ -1147,7 +1166,6 @@ int combine_PM( SS *scatter_search, GQueue *queue, int *subsetsol,
             CCcheck_NULL_2( node, "Failed pmcheap_min" );
             int counter = 0;
             temp[counter] = pmcheap_min( heap );
-            int color = 0;
 
 
             partlist_insert( temp[counter], new_sol->vlist, node );

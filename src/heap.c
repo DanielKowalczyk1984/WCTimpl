@@ -8,8 +8,9 @@
 //                                                            //
 ////////////////////////////////////////////////////////////////
 
-#include "heap.h"
-#include "alloc.h"
+#include <assert.h>
+#include "defs.h"
+#include "util.h"
 
 /* #define HEAP_INTEGRITY_CHECKS 1 */
 
@@ -20,6 +21,7 @@ static int pmcheap_empty( pmcheap *heap )
     return !( heap->end );
 }
 
+MAYBE_UNUSED
 static int pmcheap_integrity( pmcheap *heap )
 {
     int val = 0;
@@ -163,9 +165,9 @@ void pmcheap_reset( pmcheap *heap )
         heap->perm[i] = heap->iperm[i] = i;
     }
 
-    #ifdef HEAP_INTEGRITY_CHECKS
+#ifdef HEAP_INTEGRITY_CHECKS
     assert( !pmcheap_integrity( heap ) );
-    #endif
+#endif
 }
 
 static int pmcheap_liftup( pmcheap *heap,
@@ -259,9 +261,9 @@ int pmcheap_insert ( pmcheap *heap, int key, void *obj )
             heap->perm[i] = heap->iperm[i] = i;
         }
 
-        #ifdef HEAP_INTEGRITY_CHECKS
+#ifdef HEAP_INTEGRITY_CHECKS
         assert( !pmcheap_integrity( heap ) );
-        #endif
+#endif
     }
 
     heap->elms[heap->perm[heap->end]].obj  = obj;
@@ -313,9 +315,9 @@ void *pmcheap_min( pmcheap *heap )
 {
     int href;
     void *obj;
-    #ifdef HEAP_INTEGRITY_CHECKS
+#ifdef HEAP_INTEGRITY_CHECKS
     assert( !pmcheap_integrity( heap ) );
-    #endif
+#endif
 
     if ( pmcheap_empty( heap ) ) {
         return ( void * ) NULL;
@@ -334,9 +336,9 @@ void *pmcheap_min( pmcheap *heap )
     ( heap->end )--;
     /* Move down elm at index 1. */
     pmcheap_siftdown( heap, 1 );
-    #ifdef HEAP_INTEGRITY_CHECKS
+#ifdef HEAP_INTEGRITY_CHECKS
     assert( !pmcheap_integrity( heap ) );
-    #endif
+#endif
     return obj;
 }
 
@@ -390,8 +392,8 @@ int pmcheap_relabel ( pmcheap *heap, int href, int new_key )
     }
 
     HEAP_INTEGRITY( rval, heap, "pmcheap_integrity failed in pmcheap_relabel." );
-    #ifdef HEAP_INTEGRITY_CHECKS
+#ifdef HEAP_INTEGRITY_CHECKS
 CLEANUP:
-    #endif
+#endif
     return rval;
 }

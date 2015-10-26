@@ -1,4 +1,6 @@
-#include "ksubset.h"
+#include "util.h"
+#include "defs.h"
+#include <sys/utsname.h>
 
 int bin_coef(int n, int r){
     int i,b;
@@ -258,6 +260,39 @@ void ksubset_next_rec(void *data,ksubset_rec *set,ulong d){
     }
     PCOND(3);
 #undef PCOND
+}
+
+void dump_uname()
+{
+   struct utsname  uts;
+
+   uname( &uts );
+   printf( "Init: uts.sysname: %s\n", uts.sysname );
+   printf( "Init: uts.nodename: %s\n", uts.nodename );
+   printf( "Init: uts.release: %s\n", uts.release );
+   printf( "Init: uts.version: %s\n", uts.version );
+   printf( "Init: uts.machine: %s\n", uts.machine );
+   puts("");
+}
+
+int program_header(int ac, char **av){
+    int val = 0;
+    time_t starttime;
+    int i;
 
 
+    printf("########################################################################################################\n");
+    printf("Running: ");
+    for (i = 0; i < ac; ++i){
+        printf(" %s",av[i]);
+    }
+
+    printf("\n");
+
+    dump_uname();
+
+    (void) time(&starttime);
+
+    printf("########################################################################################################\n");
+    return val;
 }

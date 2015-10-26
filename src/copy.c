@@ -1,5 +1,4 @@
-#include "alloc.h"
-
+#include "util.h"
 
 void fill_int( int *dst, int n, int v )
 {
