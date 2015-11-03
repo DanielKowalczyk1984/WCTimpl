@@ -58,12 +58,10 @@ int lowerbound_cw(Job *array,int njobs, int nmachines){
     double *durationsubjobs = (double *) NULL;
     double *ratio = (double *) NULL;
     MACHINE* machine = (MACHINE *) NULL;
-    pmcheap *heap = (pmcheap *) NULL;
     BinomialHeap *heapdbl;
 
     heapdbl = binomial_heap_new(BINOMIAL_HEAP_TYPE_MIN, compare_cw);
 
-    pmcheap_init(&heap, nmachines);
     
     nbsubjobs =  CC_SAFE_MALLOC(njobs, int);
     perm = CC_SAFE_MALLOC(njobs, int);
@@ -110,7 +108,6 @@ int lowerbound_cw(Job *array,int njobs, int nmachines){
     CC_IFFREE(machine, MACHINE);
     CC_IFFREE(perm, int);
     CC_IFFREE(nbsubjobs, int);
-    pmcheap_free(heap);
     binomial_heap_free(heapdbl);
 
     return val;
@@ -147,7 +144,7 @@ int lowerbound_cp(Job *array,int njobs, int nmachines){
     for( i = 0; i < njobs; ++i) {
         nbsubjobs[i] = array[i].processingime/p;
         weightsubjobs[i] = (double)array[i].weight/(double)nbsubjobs[i];
-        ratio[i] = p/weightsubjobs[i];
+        ratio[i] = (double)p/weightsubjobs[i];
         perm[i] = i;
     }
 
@@ -157,8 +154,8 @@ int lowerbound_cp(Job *array,int njobs, int nmachines){
         temp = weightsubjobs[perm[i]];
         for(j = 0; j < nbsubjobs[perm[i]]; ++j) {
             int *temp_machine = pmcheap_min(heap);
-            totweight += temp*(*temp_machine + p);
             *temp_machine += p;
+            totweight += temp*(*temp_machine );
             pmcheap_insert(heap, *temp_machine, temp_machine);
         }
     }

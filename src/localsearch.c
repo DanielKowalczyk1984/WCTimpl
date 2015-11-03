@@ -11,7 +11,6 @@ int sort_jobs(gconstpointer a, gconstpointer b){
 }
 
 int move(Job *j, partlist* m_j, partlist* m_i){
-
     int nb_job = j->job;
 
     return j->processingime*(m_j->sumweights[nb_job] - m_i->sumweights[nb_job])
@@ -91,7 +90,8 @@ int local_search_machine_general_best(solution *sol,int lowerbound, int k, int l
     int nbiter = 0;
     int njobs = sol->njobs;
     int nmachines = sol->nmachines;
-    partlist* L_max,*K_max;
+    partlist* L_max = (partlist *) NULL;
+    partlist* K_max = (partlist *) NULL;
     int max;
 
     Job **K_jobs = (Job**) NULL;
@@ -254,7 +254,7 @@ int local_search_machine_general_best(solution *sol,int lowerbound, int k, int l
                     partlist_move_order(K_max, sol->vlist, L_jobs_max[it1], njobs);
                 }
             }
-            solution_wct(sol);
+            sol->totalweightcomptime -= max;
         }
     };
 
@@ -275,7 +275,8 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
     int nbiter = 0;
     int njobs = sol->njobs;
     int nmachines = sol->nmachines;
-    partlist* L_max,*K_max;
+    partlist* L_max = (partlist *) NULL;
+    partlist* K_max = (partlist *) NULL;
     int max;
 
     Job **K_jobs = (Job**) NULL;
@@ -317,7 +318,7 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
                 n1 = g_queue_get_length(temp_m1->list);
                 if (k > n1) continue;
                 k_subset_init(n1, k, K_subset, &K_flag);
-                while(K_flag && !moved) {
+                while(K_flag && !moved ) {
                     for(it1 = 0; it1 < k; ++it1){
                         K_jobs[it1] = ((Job*)g_queue_peek_nth(temp_m1->list, K_subset[it1 + 1] - 1));
                     }
@@ -336,10 +337,10 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
                     } else if (l > 0)
                     {
                         n2 = g_queue_get_length(temp_m2->list);
-                        if (l > n2) continue;
                         k_subset_init(n2, l, L_subset, &L_flag);
+                        if (l > n2) {K_flag = 0; continue;};
                         while(L_flag && !moved)
-                        {
+                        {   
                             for(it2 = 0; it2 < l; ++it2)
                             {
                                 L_jobs[it2] = ((Job*)g_queue_peek_nth(temp_m2->list, L_subset[it2 + 1] - 1));
@@ -365,58 +366,60 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
                     }
                     k_subset_lex_successor(n1, k, K_subset, &K_flag);
                 }
-                temp_m1 = sol->part + j;
-                temp_m2 = sol->part + i;
-                n1 = g_queue_get_length(temp_m1->list);
-                if (k > n1) continue;
-                k_subset_init(n1, k, K_subset, &K_flag);
-                while(K_flag && !moved) {
-                    for(it1 = 0; it1 < k; ++it1){
-                        K_jobs[it1] = ((Job*)g_queue_peek_nth(temp_m1->list, K_subset[it1 + 1] - 1));
-                    }
-                    if(l == 0)
-                    {
-                        temp = k_l_move_general(K_jobs, L_jobs,temp_m1,temp_m2, sol, k, l);
-                        if(temp > max) {
-                            for ( it1 = 0; it1 < k; ++it1)
-                            {
-                                K_jobs_max[it1] = K_jobs[it1];
-                            }
-                            L_max = temp_m2;
-                            moved = 1;
-                            max = temp;
+                if(k != l) {
+                    temp_m1 = sol->part + j;
+                    temp_m2 = sol->part + i;
+                    n1 = g_queue_get_length(temp_m1->list);
+                    if (k > n1) continue;
+                    k_subset_init(n1, k, K_subset, &K_flag);
+                    while(K_flag && !moved ) {
+                        for(it1 = 0; it1 < k; ++it1){
+                            K_jobs[it1] = ((Job*)g_queue_peek_nth(temp_m1->list, K_subset[it1 + 1] - 1));
                         }
-                    } else if (l > 0)
-                    {
-                        n2 = g_queue_get_length(temp_m2->list);
-                        if (l > n2) continue;
-                        k_subset_init(n2, l, L_subset, &L_flag);
-                        while(L_flag && !moved)
+                        if(l == 0)
                         {
-                            for(it2 = 0; it2 < l; ++it2)
-                            {
-                                L_jobs[it2] = ((Job*)g_queue_peek_nth(temp_m2->list, L_subset[it2 + 1] - 1));
-                            }
                             temp = k_l_move_general(K_jobs, L_jobs,temp_m1,temp_m2, sol, k, l);
-                            if(temp > max)
-                            {   
+                            if(temp > max) {
                                 for ( it1 = 0; it1 < k; ++it1)
                                 {
                                     K_jobs_max[it1] = K_jobs[it1];
                                 }
-                                for ( it1 = 0; it1 < l; ++it1)
-                                {
-                                    L_jobs_max[it1] = L_jobs[it1];
-                                }
                                 L_max = temp_m2;
-                                K_max = temp_m1;
-                                max = temp;
                                 moved = 1;
+                                max = temp;
                             }
-                            k_subset_lex_successor(n2, l, L_subset, &L_flag);
+                        } else if (l > 0)
+                        {
+                            n2 = g_queue_get_length(temp_m2->list);
+                            if (l > n2) {K_flag = 0; continue;};
+                            k_subset_init(n2, l, L_subset, &L_flag);
+                            while(L_flag && !moved)
+                            {
+                                for(it2 = 0; it2 < l; ++it2)
+                                {
+                                    L_jobs[it2] = ((Job*)g_queue_peek_nth(temp_m2->list, L_subset[it2 + 1] - 1));
+                                }
+                                temp = k_l_move_general(K_jobs, L_jobs,temp_m1,temp_m2, sol, k, l);
+                                if(temp > max)
+                                {   
+                                    for ( it1 = 0; it1 < k; ++it1)
+                                    {
+                                        K_jobs_max[it1] = K_jobs[it1];
+                                    }
+                                    for ( it1 = 0; it1 < l; ++it1)
+                                    {
+                                        L_jobs_max[it1] = L_jobs[it1];
+                                    }
+                                    L_max = temp_m2;
+                                    K_max = temp_m1;
+                                    max = temp;
+                                    moved = 1;
+                                }
+                                k_subset_lex_successor(n2, l, L_subset, &L_flag);
+                            }
                         }
+                        k_subset_lex_successor(n1, k, K_subset, &K_flag);
                     }
-                    k_subset_lex_successor(n1, k, K_subset, &K_flag);
                 }
             }
         }
@@ -438,10 +441,9 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
                     partlist_move_order(K_max, sol->vlist, L_jobs_max[it1], njobs);
                 }
             }
-            solution_wct(sol);
+            sol->totalweightcomptime -= max;
         }
     };
-
 
     // printf("local search %d  - %d -> number of iterations = %d,  running time = %f and objective = %d\n",k,l, --nbiter,0.0,sol->totalweightcomptime);
 
@@ -469,7 +471,6 @@ void localsearch_random_k(solution *sol, int lowerbound, int nb){
     k = g_random_int_range(1, nb);
     l = g_random_int_range(0, k + 1);
     local_search_machine_general_first(sol, lowerbound, k, l);
-    solution_max(sol);
     matrix[k][l] = 1;
     for(i = 0; i < tot && !(sol->totalweightcomptime == lowerbound); ++i) {
         while(matrix[k][l] != 0){

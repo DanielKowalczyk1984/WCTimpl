@@ -247,6 +247,11 @@ void wctdata_init( wctdata *pd )
     
     pd->duration = ( int *)NULL;
     pd->weights = ( int *)NULL;
+    pd->jobarray = (Job *)NULL;
+    pd->H_max = 0;
+    pd->H_min = 0;
+
+
     pd->upper_bound = INT_MAX;
     pd->lower_bound = 1;
     pd->dbl_safe_lower_bound = 0.0;
@@ -354,10 +359,171 @@ void temporary_data_free( wctdata *pd )
 void wctdata_free( wctdata *pd )
 {
     temporary_data_free( pd );
-    CC_IFFREE( pd->duration, int );
-    CC_IFFREE( pd->orig_node_ids, int );
-    CC_IFFREE( pd->weights, int );
     Schedulesets_free( &( pd->bestcolors ), &( pd->nbestcolors ) );
+    CC_IFFREE( pd->duration, int );
+    CC_IFFREE( pd->weights, int );
+    CC_IFFREE( pd->orig_node_ids, int );
+    CC_IFFREE(pd->jobarray, Job);
+}
+
+/** Preprocess data*/
+gint compare_readytime(gconstpointer a, gconstpointer b){
+    const int *x = &(((const Job*)a)->processingime);
+    const int *y = &(((const Job*)b)->processingime);
+
+    return *x - *y;
+}
+int calculate_ready_due_times(Job* jobarray,int njobs, int nmachines, int Hmin){
+    int i,j,val = 0;
+    int *sumleft = (int*) NULL;
+    int *sumright = (int *) NULL;
+    int temp_duration, temp_weight;
+
+    sumleft = CC_SAFE_MALLOC(njobs, int);
+    CCcheck_NULL_2(sumleft, "Failed to, allocate memory");
+    sumright = CC_SAFE_MALLOC(njobs, int);
+    CCcheck_NULL_2(sumright, "Failed to allocate memory");
+    
+    sumleft[0] = 0;
+    for( i = 1; i < njobs; ++i) {
+        sumleft[i] = sumleft[i - 1] + jobarray[i].processingime;
+    }
+
+    sumright[njobs - 1] = jobarray[njobs - 1].processingime;
+    for(i = njobs - 2 ; i >= 0; --i) {
+        sumright[i] = sumleft[i + 1] + jobarray[i].processingime;
+    }
+
+
+    for( i = nmachines  ; i < njobs; ++i) {
+        temp_duration = jobarray[i].processingime;
+        temp_weight = jobarray[i].weight;
+        GList *temp_list = (GList*) NULL;
+        for( j = 0; j < i; ++j) {
+            if((jobarray[j].processingime <= temp_duration && jobarray[i].weight >= temp_weight)
+                || (sumleft[j] <= Hmin - sumright[i])) {
+                temp_list = g_list_append(temp_list, jobarray + j);
+            }
+        }
+
+        if(g_list_length(temp_list) > (guint)nmachines - 1) {
+            temp_list = g_list_sort(temp_list, compare_readytime);
+            GList *it;
+            int len = g_list_length(temp_list);
+            int counter = 0;
+            for(it = temp_list;it && counter < len - nmachines + 1; it = it->next) {
+                jobarray[i].releasetime += ((Job *)it->data)->processingime;
+                counter++;
+            }
+            jobarray[i].releasetime = (int) ceil((double) jobarray[i].releasetime/(double) nmachines);
+        }
+        g_list_free(temp_list);
+    }
+
+    for( i = 0; i < njobs - 1; ++i) {
+        temp_duration = jobarray[i].processingime;
+        temp_weight = jobarray[i].weight;
+        int sum = jobarray[i].processingime;
+        for( j = i + 1; j < njobs; ++j) {
+            if((jobarray[j].processingime >= temp_duration && jobarray[i].weight <= temp_weight)
+                || (sumleft[j] >= Hmin - sumright[i])) {
+                sum += jobarray[j].processingime;
+            }
+        }
+        int delta = (int)((double)jobarray[i].duetime - ceil((double)sum/(double) nmachines)) + jobarray[i].processingime;
+        if(delta < jobarray[i].duetime){
+            jobarray[i].duetime = delta;
+        }
+    }
+
+    CLEAN:
+    CC_IFFREE(sumleft, int);
+    CC_IFFREE(sumright,int);
+    return val; 
+}
+
+int calculate_Hmax(int *durations, int nmachines,int njobs){
+    int i,max = 0,val = 0;
+    double temp;
+
+    for( i = 0; i < njobs; ++i) {
+        val += durations[i];
+        if(max < durations[i]) {
+            max = durations[i];
+        }
+    }
+
+    val += (nmachines - 1)*max;
+    temp = (double) val;
+    temp = temp/(double)nmachines;
+    val = (int) ceil(temp);
+    return val;
+}
+
+int calculate_Hmin(int *durations, int nmachines,int njobs, int *perm){
+    int i,val = 0;
+    double temp;
+
+    for(i = 0; i < njobs; ++i) {
+        val += durations[i];
+    }
+
+    for( i = 0; i < nmachines - 1; ++i) {
+        val += durations[perm[i]];
+    }
+
+    temp = (double) val;
+    temp = temp/(double)nmachines;
+    val = (int) ceil(temp);
+
+    return val;
+}
+
+int Preprocessdata(wctdata *pd){
+    int i,val = 0;
+    int njobs = pd->njobs;
+    int nmachines = pd->nmachines;
+    Job *jobarray = (Job *) NULL;
+    int *perm = (int *) NULL;
+
+    jobarray = CC_SAFE_MALLOC(pd->njobs, Job);
+    CCcheck_NULL_2(jobarray, "Failed to allocate memory");
+    perm = CC_SAFE_MALLOC(njobs, int);
+    CCcheck_NULL_2(perm, "Failed to allocate memory");
+
+
+
+    /** Initialize jobarray of rootnode */
+    for( i = 0; i < njobs; ++i) {
+        jobarray[i].weight = pd->weights[i];
+        jobarray[i].processingime = pd->duration[i];
+        jobarray[i].releasetime = 0;
+        jobarray[i].job = i;
+        perm[i] = i;
+    }
+    CCutil_int_perm_quicksort_0(perm, pd->duration, njobs);
+
+    /** Calculate H_max */
+    pd->H_max = calculate_Hmax(pd->duration, pd->nmachines, njobs);
+    for(i = 0; i < njobs; ++i) {
+        jobarray[i].duetime = pd->H_max;
+    }
+
+    /** Calculate H_min */
+    pd->H_min = calculate_Hmin(pd->duration, pd->nmachines, njobs, perm);
+
+    /** Calculate ready times and due times */
+    calculate_ready_due_times(jobarray, njobs, nmachines, pd->H_min);
+
+    pd->jobarray = jobarray;
+
+
+    CLEAN:
+    if(val) {
+        CC_IFFREE(jobarray, Job);
+    }
+    CC_IFFREE(perm, int);
+    return val;
 }
 
 /** Help function for column generation */

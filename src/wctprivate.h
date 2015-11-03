@@ -14,8 +14,10 @@
 
 typedef struct _REFSET{ 
     int newsol;
-    GQueue *list1;
-    GQueue *list2;
+    GPtrArray *list1;
+    int nb1;
+    GPtrArray *list2;
+    int nb2;
 } REFSET;
 
 typedef struct _P{
@@ -30,7 +32,7 @@ typedef struct _SS{
     int b1;
     int b2;
     
-    Job **joblist;
+    Job **jobarray;
     int njobs;
     int nmachines;
     int lowerbound; 
@@ -83,11 +85,16 @@ struct wctdata {
         finished                = 4,
     }status;
     
-    // The graph information
+    // The job information
     int njobs;
+    int nmachines;
     int *duration;
     int *weights;
     int *orig_node_ids;
+    //data for meta heuristic
+    Job* jobarray;
+    int H_max;
+    int H_min;
     
     //The column generation lp information
     wctlp *LP;

@@ -19,10 +19,14 @@ int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution* new
 int construct_wspt(Job* jobarray, int njobs, int  nmachines, solution*  new_sol);
 int random_assignment( Job *jobarray, int njobs, int nmachines, solution *new_sol, GRand *rand_ );
 
+void update_bestschedule( wctproblem *problem, solution *new_sol );
+solution *new_sol_init( int nmachines, int vcount );
+int construct_feasible_solutions(wctproblem *problem);
+
 /*
 compare_functions
  */
-gint compare_func1(const void *a, const void *b, void *user_data);
+gint compare_func1(gconstpointer a, gconstpointer b, void *user_data);
 
 
 /**
@@ -75,7 +79,7 @@ void free_list2(REFSET *rs);
 
 int order_refset(const void *a,const void *b);
 int order_makespan(const void *a, const void *b,void *data);
-int order_distance(const void *a,const void *b,void *data);
+int order_distance(const void *a,const void *b);
 int order_makespan_list(const void *a, const void *b);
 
 
@@ -134,8 +138,9 @@ int update_distance(SS *scatter_search,solution *sol);
 /**
  * Combination functions
  */
-int combine_GPX(SS *scatter_search, GQueue *queue, int *subsetsol,int nbelements, solution *new_sol);
-int combine_PM(SS *scatter_search,GQueue *queue,int* subsetsol,int nbelements,solution *new_sol);
+int combine_GPX(SS *scatter_search, GPtrArray *list, int *subsetsol,int nbelements, solution *new_sol);
+int combine_PM(SS *scatter_search,GPtrArray *list,int* subsetsol,int nbelements,solution *new_sol);
+int combinePathRelinking(SS *scatter_search, GPtrArray *array, int *subsetsol, int *found);
  
 
 int SSCreate_refset(SS *scatter_search);
@@ -145,10 +150,11 @@ int add_solution_refset(SS *scatter_search);
  * Update functions
  */
 int static_update(SS *scatter_search);
-int dynamic_update(SS *scatter_search, GQueue *list, solution *new_sol);
+int dynamic_update(SS *scatter_search, GPtrArray *list, solution *new_sol);
 int diversification_update(SS *scatter_search);
 
 int SSrun_scatter_search(SS *scatter_search);
+int SSrun_scatter_searchPR( SS *scatter_search);
 
 void print_pool_totalweightcomptime( SS *scatter_search );
 void print_refset_totalweightcomptime( SS *scatter_search );
@@ -158,6 +164,7 @@ void print_refset_totalweightcomptime( SS *scatter_search );
  */
 
 int compute_fitness(SS *scatter_search);
+int moveSS(Job *j, partlist* m_j, partlist* m_i);
 
 /**
  * localsearch.c
@@ -175,6 +182,7 @@ int compare_max(const void *, const void *);
 int compare_min(const void *, const void *);
 LS_data *construct_data(void *data,int key);
 void free_LS(void *data);
+int k_l_move_general(Job** K_jobs, Job** L_jobs, partlist*m_k,partlist *m_l, solution *sol,int k, int l);
 
 /**
  * localsearch functions
@@ -259,6 +267,14 @@ int backup_wctdata(wctdata* pd, wctproblem* problem);
  */
 
 int read_problem(char *f, int *njobs, int **duration, int **weights);
+
+/** Preprocess data */
+gint compare_readytime(gconstpointer a, gconstpointer b);
+int calculate_ready_due_times(Job* jobarray,int njobs, int nmachines, int Hmin);
+int calculate_Hmax(int *durations, int nmachines,int njobs);
+int calculate_Hmin(int *durations, int nmachines,int njobs, int *perm);
+int Preprocessdata(wctdata *pd);
+
 
 /**
  * heurdiving.c

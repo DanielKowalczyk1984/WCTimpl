@@ -11,14 +11,11 @@
 #include "wctparms.h"
 #include "wctprivate.h"
 #include "wct.h"
+#include "defs.h"
 
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-
-
-
 
 static void usage(char* f){
     fprintf(stderr, "Usage %s: [-see below-] adjlist_file NrMachines\n",f);
@@ -241,14 +238,15 @@ int main(int ac, char **av){
     int val = 0;
     int i;
     wctproblem problem;
+    wctproblem_init(&problem);
+    CCcheck_val(val,"Failed in wctproblem_init");
+    
     wctparms *parms = &(problem.parms);
     wctdata *pd = &(problem.root_pd);
 
     val = program_header(ac,av);
     CCcheck_val(val,"Failed in programheader");
 
-    wctproblem_init(&problem);
-    CCcheck_val(val,"Failed in wctproblem_init");
 
     CCutil_start_timer(&(problem.tot_cputime));
     double start_time = CCutil_zeit();
@@ -267,27 +265,31 @@ int main(int ac, char **av){
     }
     fflush(stdout);
 
+    /** Reading and preprocessing the data */
     val  = read_problem(parms->jobfile,&(pd->njobs),&(pd->duration),&(pd->weights));
+    pd->nmachines = parms->nmachines;
     CCcheck_val(val,"read_adjlist failed");
-    printf("Reading the adjlist took %f\n", CCutil_zeit()-start_time );
-    srand((unsigned int) time(NULL));
-
-
     pd->orig_node_ids = (int *)CC_SAFE_MALLOC(pd->njobs,int);
     CCcheck_NULL_2(pd->orig_node_ids,"No memory to allocated orig_node_ids\n");
     for(i = 0; i < pd->njobs;i++){
         pd->orig_node_ids[i] = i;
     }
+    Preprocessdata(pd);
+    printf("Reading and preprocessing the data took %f\n", CCutil_zeit()-start_time );
 
  
+    /** Computing initial lowerbound */
     CCutil_start_timer(&problem.tot_lb);
-            
-    CCutil_suspend_timer(&problem.tot_lb);
+    problem.global_lower_bound = lowerbound_eei(pd->jobarray, pd->njobs, pd->nmachines);
+    problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cp(pd->jobarray, pd->njobs, pd->nmachines));
+    problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cw(pd->jobarray, pd->njobs, pd->nmachines));
 
-    printf("Searching for an optimal solution :\n");
+    CCutil_stop_timer(&problem.tot_lb, 0);
+    printf("Computing lowerbound took %f\n", problem.tot_lb.cum_zeit);
 
-    print_to_csv(&problem);
-    print_to_screen(&problem);
+    /** Construct Feasible solutions */
+    construct_feasible_solutions(&problem);
+
     
 
 

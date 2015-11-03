@@ -1,19 +1,18 @@
 #include "wct.h"
 
+static int add_feasible_solution( wctproblem *problem, solution *new_sol);
+
 /**
  * greedy constructions
  */
 
 int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution* new_sol, GRand *rand_) {
   int i;
-  int machine_max;
-  int job_max;
-  int machine_min;
-  int job_min;
   double max;
   double min;
   double lb, ub;
   double temp_dbl;
+
 
   partlist *temp = (partlist *) NULL;
   Job* temp_job = (Job *) NULL;
@@ -29,11 +28,7 @@ int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution* new
 
   while (!g_queue_is_empty(to_do_list)) {
     temp_job = (Job *)to_do_list->head->data;
-    machine_max = 0;
-    job_max = (temp_job)->job;
     max = ((double)temp[0].completiontime + (double)temp_job->processingime) / ((double) temp_job->weight);
-    machine_min = 0;
-    job_min = temp_job->job;
     min = max;
     GArray *rcl = g_array_new(FALSE, FALSE, sizeof(pair_job_machine));
     /** Compute min and max */
@@ -45,14 +40,10 @@ int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution* new
         temp_dbl = ((double)temp[i].completiontime + (double)temp_job->processingime) / ((double) temp_job->weight);
         if (max < temp_dbl)
         {
-          machine_max = i;
-          job_max = temp_job->job;
           max = temp_dbl;
         }
         if (min > temp_dbl)
         {
-          machine_min = i;
-          job_min = temp_job->job;
           min = temp_dbl;
         }
       }
@@ -93,25 +84,25 @@ int random_assignment( Job *jobarray, int njobs, int nmachines, solution *new_so
 {
   int i, val = 0;
   double n;
-  GQueue *queue     = ( GQueue * ) NULL;
   partlist *temp = ( partlist * ) NULL;
   Job *j = (Job *) NULL;
-  
+  GQueue *queue = (GQueue *) NULL;
+
   queue = g_queue_new();
 
-  for ( i = 0; i < nmachines; i++ ) {
-    g_queue_push_head( queue, new_sol->part + i );
+  for ( i = 0; i < nmachines; ++i) {
+    g_queue_push_head(queue, new_sol->part + i);
   }
 
   for (i = 0; i < njobs; ++i) {
     j = jobarray + i;
     n = g_rand_double_range(rand_, 0.0, 1.0);
     if (n < 0.8) {
-      temp = ( partlist * ) g_queue_pop_head(queue);
+      temp = (partlist *) g_queue_pop_head(queue);
     } else if ( n >= 0.8 && n < 0.95) {
-      temp = (partlist *) g_queue_pop_nth(queue, 1);
+      temp = g_queue_pop_nth(queue, 1);
     } else {
-      temp = (partlist *) g_queue_pop_nth(queue, 2);
+      temp = g_queue_pop_nth(queue, 2);
     }
     val = partlist_insert( temp, new_sol->vlist, j );
     CCcheck_val_2( val, "Failed in partlist_insert_order" );
@@ -119,7 +110,7 @@ int random_assignment( Job *jobarray, int njobs, int nmachines, solution *new_so
   }
 
 CLEAN:
-  g_queue_free( queue );
+  g_queue_free(queue);
   return val;
 }
 
@@ -127,7 +118,7 @@ int construct_wspt(Job* jobarray, int njobs, int  nmachines, solution*  new_sol)
   int i, val = 0;
   pmcheap *heap = ( pmcheap * ) NULL;
   partlist *temp = (partlist *) NULL;
-  Job *j = (Job *) NULL; 
+  Job *j = (Job *) NULL;
   pmcheap_init( &heap, nmachines );
   CCcheck_NULL_2( heap, "Failed to initialize heap" );
 
@@ -156,12 +147,11 @@ CLEAN:
  * comparefunctions
  */
 
-gint compare_func1(const void *a, const void *b, void *user_data) {
+int compare_func1(gconstpointer a, gconstpointer b, void *user_data) {
   const int *v = &(((const partlist*)a)->completiontime);
   const int *w = &(((const partlist*)b)->completiontime);
 
   user_data = NULL;
-
   if (*v != *w) {
     return *v - *w;
   } else {
@@ -173,3 +163,114 @@ gint compare_func1(const void *a, const void *b, void *user_data) {
     return *vv - *ww;
   }
 }
+
+/** Construct feasible solutions */
+
+void update_bestschedule( wctproblem *problem, solution *new_sol )
+{
+  if ( new_sol == NULL ) {
+    return;
+  }
+
+  if ( new_sol->totalweightcomptime < problem->global_upper_bound ) {
+    problem->global_upper_bound = new_sol->totalweightcomptime;
+    problem->rel_error = ( double )( problem->global_upper_bound -
+                                     problem->global_lower_bound ) / ( problem->global_lower_bound );
+  }
+
+  if ( problem->global_upper_bound == problem->global_lower_bound ) {
+    problem->status = optimal;
+  }
+}
+
+static int add_feasible_solution( wctproblem *problem, solution *new_sol)
+{
+  int val = 0;
+  wctdata *root_pd = &( problem->root_pd );
+  SS *scatter_search = &( problem->scatter_search );
+
+  if ( problem->status < feasible ) {
+    problem->status = feasible;
+  }
+
+  solution_calc(new_sol, root_pd->jobarray);
+  localsearch_random_k(new_sol, problem->global_lower_bound, 2);
+  solution_unique( new_sol );
+
+  if ( !solution_in_pool( scatter_search, new_sol ) ) {
+    add_solution_pool( scatter_search, new_sol );
+    update_bestschedule( problem, new_sol );
+    scatter_search->p->PSize++;
+  } else {
+    solution_free( new_sol );
+    CC_IFFREE( new_sol, solution );
+  }
+
+  return val;
+}
+
+solution *new_sol_init( int nmachines, int vcount )
+{
+  int val = 0;
+  solution *sol = ( solution * ) NULL;
+  sol = CC_SAFE_MALLOC( 1, solution );
+  CCcheck_NULL_2( sol, "Failed to allocate memory" )
+  solution_init( sol );
+  val = solution_alloc( sol, nmachines, vcount );
+  CCcheck_val_2( val, "Failed in solution_alloc" );
+CLEAN:
+
+  if ( val ) {
+    solution_free( sol );
+  }
+
+  return sol;
+}
+
+int construct_feasible_solutions(wctproblem *problem) {
+  int val = 0;
+  wctparms *parms = &(problem->parms) ;
+  wctdata *pd = &(problem->root_pd);
+  SS *scatter_search = &(problem->scatter_search);
+
+  CCutil_start_timer( &(problem->tot_scatter_search));
+
+  GRand *rand1 = g_rand_new_with_seed(1984);
+  GRand *rand2 = g_rand_new_with_seed(1654651);
+  
+  val = SSproblem_definition(scatter_search, 8, 8, 5.0, parms->combine_method,
+                             pd->njobs, pd->nmachines, pd->jobarray, problem->global_lower_bound);
+  CCcheck_val_2(val, "Failed in SSproblem_definition");
+
+  while (scatter_search->p->PSize < parms->nb_feas_sol) {
+    solution *new_sol = (solution *) NULL;
+    new_sol = new_sol_init(pd->nmachines, pd->njobs);
+    if (problem->status == no_sol) {
+      construct_wspt(pd->jobarray, pd->njobs, pd->nmachines, new_sol);
+    }
+    else {
+      if (g_rand_boolean(rand1)) {
+        random_assignment(pd->jobarray, pd->njobs, pd->nmachines, new_sol, rand2);
+      }
+      else {
+        random_rcl_assignment(pd->jobarray, pd->njobs, pd->nmachines, new_sol, rand2);
+      }
+    }
+
+    val = add_feasible_solution(problem, new_sol);
+    CCcheck_val(val, "Failed in add_feasible_solution");
+  }
+
+  SSCreate_refset(scatter_search);
+  scatter_search->upperbound = problem->global_upper_bound;
+  printf("upperbound = %d, lowerbound = %d\n", problem->global_upper_bound, problem->global_lower_bound);
+  SSrun_scatter_searchPR(scatter_search);
+
+CLEAN:
+  g_rand_free(rand1);
+  g_rand_free(rand2);
+  CCutil_stop_timer(&(problem->tot_scatter_search), 0);
+  printf("test scatter %f\n", problem->tot_scatter_search.cum_zeit);
+  return val;
+}
+

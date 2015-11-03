@@ -1,8 +1,6 @@
 #include <glib.h>
 
 typedef struct _Job{
-    GList *before;
-    GList *after;
     int job;
     int weight;
     int processingime;
@@ -61,6 +59,10 @@ void partlist_move(partlist *part, joblist *vlist,struct _Job *job);
 void partlist_move_order(partlist *part, joblist *vlist,struct _Job *job,int jobs);
 int partition_order(const void *a,const void *b,void *data);
 int find_vertex(const void *a,const void *b);
+
+void partlist_permquicksort( int *perm, partlist *part, int nbpart,
+                             int ( *functionPtr )( partlist *, partlist * ) );
+int partlist_more_totweight( partlist *c1, partlist *c2 );
 
 
 ////////////////////////////////////////
