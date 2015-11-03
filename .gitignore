@@ -1,0 +1,62 @@
+18
+18
+27
+### https://raw.github.com/github/gitignore/e27b4277e2cd2f2e91ab343419df65f7192ab4dd/C++.gitignore
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+
+### https://raw.github.com/github/gitignore/e27b4277e2cd2f2e91ab343419df65f7192ab4dd/Global/SublimeText.gitignore
+
+# cache files for sublime text
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+
+# workspace files are user-specific
+*.sublime-workspace
+
+# project files should be checked into the repository, unless a significant
+# proportion of contributors will probably not be using SublimeText
+# *.sublime-project
+
+# sftp configuration file
+sftp-config.json
+
+
+### https://raw.github.com/github/gitignore/e27b4277e2cd2f2e91ab343419df65f7192ab4dd/CMake.gitignore
+
+CMakeCache.txt
+CMakeFiles
+Makefile
+cmake_install.cmake
+install_manifest.txt
+
+
