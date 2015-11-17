@@ -1,3 +1,8 @@
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <glib.h>
 
 typedef struct _Job{
@@ -18,6 +23,7 @@ typedef struct _partlist{
     int* sumtimes;
     int* sumweights;
     int completiontime;
+    int totcompweight;
     int key;
 } partlist;
 
@@ -92,6 +98,8 @@ typedef struct Scheduleset{
     int size;
     int age;
     int totweight;
+    int totwct;
+    GHashTable *completiontime;
     int *members;
 } Scheduleset;
 
@@ -122,3 +130,7 @@ int add_Schedulesets( Scheduleset **dst, int *ndst, Scheduleset *src, int nsrc )
 int Scheduleset_less_totweight( Scheduleset *c1, Scheduleset *c2 );
 int Scheduleset_more_totweight( Scheduleset *c1, Scheduleset *c2 );
 int partlist_to_Scheduleset( partlist *part, int nbpart, Scheduleset **classes, int *ccount );
+
+#ifdef __cplusplus
+}
+#endif

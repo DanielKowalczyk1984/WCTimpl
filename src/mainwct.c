@@ -24,11 +24,11 @@ static void usage(char* f){
     fprintf(stderr, "   -o f    write coloring to file f\n");
     fprintf(stderr, "   -f n    Number of feasible solutions that have to be constructed\n");
     fprintf(stderr, "   -u int  initial upper bound\n");
-    fprintf(stderr, "   -s int  Branching strategy: 0= none, 1= minimum lower bound(default),"
-            "2 = DFS\n");
+    fprintf(stderr, "   -s int  Branching strategy: 0= none, 1= minimum lower bound(default), 2 = DFS\n");
     fprintf(stderr, "   -l dbl  cpu time limiet for branching\n");
+    fprintf(stderr, "    L dbl  cpu time limiet for scatter search\n");
     fprintf(stderr, "   -R int  Rounding Strategy: 0 = neighbor_rounding(default), 1 = neighbor rounding, 2 = no_rounding\n");
-    fprintf(stderr, "   -C int  Combine Method: 0 = PM(default), 1 = PathRelinking\n");
+    fprintf(stderr, "   -C int  Combine Method: 0 = Pathrelinking, 1 = PM\n");
     fprintf(stderr, "   -r int Scatter Search use: 0 = no scatter search(default), 1 = scatter search\n");
     fprintf(stderr, "   -B int Branch and Bound use: 0 = no branch and bound(default), 1 = use branch and bound\n");
 }
@@ -38,7 +38,7 @@ static int parseargs(int ac, char **av, wctparms* parms){
     int val = 0;
     int debug = dbg_lvl();
 
-    while((c = getopt(ac,av,"db:o:r:f:u:s:l:R:C:B:")) != EOF){
+    while((c = getopt(ac,av,"db:o:r:f:u:s:l:L:R:C:B:")) != EOF){
         switch(c){
             case 'd':
                 ++(debug);
@@ -83,6 +83,10 @@ static int parseargs(int ac, char **av, wctparms* parms){
             case 'l':
                 val = wctparms_set_branching_cpu_limit(parms,atof(optarg));
                 CCcheck_val(val,"Failed wctparms_set_branching_cpu_limit");
+                break;
+            case 'L':
+                val = wctparms_set_scatter_search_cpu_limit(parms, atof(optarg));
+                CCcheck_val(val,"Failed wctparms_set_scatter_search_cpu_limit");
                 break;
             case 'C':
                 val = wctparms_set_combine_method(parms, atoi(optarg));
@@ -146,10 +150,10 @@ static int get_problem_name(char* pname,const char* efname)
     return rval;
 }
 
+MAYBE_UNUSED
 static int print_to_csv(wctproblem *problem){
     int val = 0;
     wctdata *pd = &(problem->root_pd);
-    wctparms *parms = &(problem->parms);
     FILE *file = (FILE*)NULL;
     char filenm[128];
     GDate date;
@@ -200,8 +204,7 @@ static int print_to_csv(wctproblem *problem){
     return val;
 }
 
-
-
+MAYBE_UNUSED
 static int print_to_screen(wctproblem *problem){
     int val = 0;
     switch(problem->status){
@@ -275,26 +278,28 @@ int main(int ac, char **av){
         pd->orig_node_ids[i] = i;
     }
     Preprocessdata(pd);
-    printf("Reading and preprocessing the data took %f\n", CCutil_zeit()-start_time );
-
- 
-    /** Computing initial lowerbound */
+    printf("Reading and preprocessing of the data took %f\n", CCutil_zeit()-start_time );
     CCutil_start_timer(&problem.tot_lb);
+    pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs,pd->H_min,pd->H_max);
+    CCutil_stop_timer(&problem.tot_lb, 0);
+
+    /** Computing initial lowerbound */
     problem.global_lower_bound = lowerbound_eei(pd->jobarray, pd->njobs, pd->nmachines);
     problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cp(pd->jobarray, pd->njobs, pd->nmachines));
     problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cw(pd->jobarray, pd->njobs, pd->nmachines));
-
-    CCutil_stop_timer(&problem.tot_lb, 0);
     printf("Computing lowerbound took %f\n", problem.tot_lb.cum_zeit);
 
     /** Construct Feasible solutions */
-    construct_feasible_solutions(&problem);
+    //construct_feasible_solutions(&problem);
+
+
+    /** Compute Schedule with Branch and Price */
+
 
     
 
 
 CLEAN:
-
     wctproblem_free(&problem);
     return val;
 }

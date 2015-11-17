@@ -21,6 +21,9 @@
 /*                                                                          */
 /****************************************************************************/
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Define if your compiler is missing the appropriate function prototype */
 
@@ -141,7 +144,9 @@
 /* This happens under Irix 6 */
 #define CC_PROTO___VFORK
 
-
+#ifdef __cplusplus
+}
+#endif
 
 
 

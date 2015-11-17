@@ -165,7 +165,8 @@ void solution_print(solution *sol) {
         for (GList *it = sol->part[i].list->head; it; it = it->next) {
             printf("%d ", ((Job*)it->data)->job);
         }
-        printf("with completiontime %d and %d jobs\n", sol->part[i].completiontime, g_queue_get_length(sol->part[i].list));
+        printf("with C =  %d, wC = %d and %d jobs\n", sol->part[i].completiontime, sol->part[i].totcompweight
+            , g_queue_get_length(sol->part[i].list));
     }
 }
 
@@ -197,10 +198,13 @@ int solution_copy(solution *dest, solution src) {
     CCcheck_val_2(val, "Failed in  solution_alloc");
 
     for (int i = 0; i < dest->nmachines; i++) {
+        dest->part[i].key = src.part[i].key;
+        dest->part[i].totcompweight = src.part[i].totcompweight;
         g_queue_free(dest->part[i].list);
         dest->part[i].list = (GQueue *) NULL;
         dest->part[i].list = g_queue_copy(src.part[i].list);
-        CCcheck_NULL_2(dest->part[i].list, "Failed to copy list");
+        memcpy(dest->part[i].sumtimes, src.part[i].sumtimes, sizeof(int)*dest->njobs);
+        memcpy(dest->part[i].sumweights, src.part[i].sumweights, sizeof(int)*dest->njobs);
         dest->part[i].completiontime = src.part[i].completiontime;
         for (GList *it = dest->part[i].list->head; it; it = it->next) {
             dest->perm[counter] = ((Job *)it->data)->job;
@@ -232,6 +236,7 @@ int solution_update(solution *dest, solution src) {
 
     for (int i = 0; i < dest->nmachines; i++) {
         g_queue_free(dest->part[i].list);
+        dest->part[i].totcompweight = src.part[i].totcompweight;
         dest->part[i].list = g_queue_copy(src.part[i].list);
         dest->part[i].completiontime = src.part[i].completiontime;
         memcpy(dest->part[i].sumtimes, src.part[i].sumtimes, sizeof(int)*dest->njobs);
@@ -263,7 +268,8 @@ void solution_calc(solution* sol, Job* jobarray) {
         for (it = temp_partlist->list->head; it; it = g_list_next(it))
         {
             temp_job = ((Job *)it->data);
-            temp_partlist->completiontime += temp_job->processingime;
+            temp_partlist->completiontime += temp_job->processingime ;
+            temp_partlist->totcompweight += temp_job->weight * temp_partlist->completiontime;
             sol->totalweightcomptime += temp_partlist->completiontime * temp_job->weight;
         }
     }

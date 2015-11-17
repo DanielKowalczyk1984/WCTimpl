@@ -1,6 +1,3 @@
-18
-18
-27
 ### https://raw.github.com/github/gitignore/e27b4277e2cd2f2e91ab343419df65f7192ab4dd/C++.gitignore
 
 # Compiled Object files
@@ -58,5 +55,9 @@ CMakeFiles
 Makefile
 cmake_install.cmake
 install_manifest.txt
-
+*.txt
+*.png
+*.dot
+*.pdf
+*.ps
 

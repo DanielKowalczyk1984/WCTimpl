@@ -267,12 +267,11 @@ void dump_uname()
    struct utsname  uts;
 
    uname( &uts );
-   printf( "Init: uts.sysname: %s\n", uts.sysname );
-   printf( "Init: uts.nodename: %s\n", uts.nodename );
-   printf( "Init: uts.release: %s\n", uts.release );
-   printf( "Init: uts.version: %s\n", uts.version );
-   printf( "Init: uts.machine: %s\n", uts.machine );
-   puts("");
+   printf( "sysname: %s\n", uts.sysname );
+   printf( "nodename: %s\n", uts.nodename );
+   printf( "release: %s\n", uts.release );
+   printf( "version: %s\n", uts.version );
+   printf( "machine: %s\n", uts.machine );
 }
 
 int program_header(int ac, char **av){
@@ -286,8 +285,6 @@ int program_header(int ac, char **av){
     for (i = 0; i < ac; ++i){
         printf(" %s",av[i]);
     }
-
-    printf("\n");
 
     dump_uname();
 

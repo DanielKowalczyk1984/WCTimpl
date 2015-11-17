@@ -8,10 +8,10 @@
 			"path": "~/tool/TdZdd"
 		},
 		{
-			"path": "~/tool/scipoptsuite-3.2.0/scip-3.2.0/applications/Coloring"
+			"path": "/Dropbox/NewPMCProject2.0"
 		},
 		{
-			"path": "~/Dropbox/NewPMCProject2.0"
+			"path": "/home/daniel/tool/exactcolors-49be7ba0a2c6"
 		}
 	],
 	"settings":
@@ -42,34 +42,31 @@
 		],
 		"sublimeclang_options":
 		[
-			"-I~/tool/scipoptsuite-3.2.0/scip-3.2.0/src/",
 			"-I~/Dropbox/WCTimpl/src/",
-			"-isystem/usr/include/x86_64-linux-gnu/c++/4.8/",
 			"-I/usr/lib/x86_64-linux-gnu/glib-2.0/include",
+			"-I/Users/Daniel/tool/googletest/googletest/include",
+			"-I/Users/Daniel/tool/TdZdd/include",
 			"-I/usr/include/glib-2.0",
-			"-I/usr/local/Cellar/glib/2.46.1/include/glib-2.0", 
-			"-I/usr/local/Cellar/glib/2.46.1/lib/glib-2.0/include",
+			"-I/usr/local/Cellar/glib/2.46.2/include/glib-2.0",
+			"-I/usr/local/Cellar/glib/2.46.2/lib/glib-2.0/include",
 			"-I/usr/local/opt/gettext/include",
 			"-I/Library/gurobi604/mac64/include/",
 			"-I/opt/gurobi600/linux64/include/",
-			"-ferror-limit=0",
-			"-Wsign-compare",
-			"-Wunused-variable",
-			"-Wunused-parameter",
-			"-std=c99",
-			"-D_XOPEN_SOURCE=500",
-			"-pedantic",
-			"-Wall",
-			"-Wshadow",
-			"-Wstrict-prototypes",
-			"-Wmissing-prototypes",
-			"-Wmissing-declarations",
-			"-Wpointer-arith",
-			"-Wnested-externs",
-			"-Wundef",
-			"-Wcast-qual",
-			"-Wcast-align",
-			"-Wwrite-strings"
+			"-ferror-limit=0"
+			//"-Wsign-compare",
+			//"-Wno-string-plus-int",
+			//"-Wall",
+			 // "-Wshadow"
+			 // "-W",
+			 // "-Wstrict-prototypes",
+			 // "-Wmissing-prototypes",
+			 // "-Wmissing-declarations",
+			 // " -Wpointer-arith",
+			 // "-Wnested-externs",
+			 // "-Wundef",
+			 // "-Wcast-qual",
+			 // "-Wcast-align",
+			 // "-Wwrite-strings"
 		],
 		"tab_size": 4,
 		"translate_tabs_to_spaces": true

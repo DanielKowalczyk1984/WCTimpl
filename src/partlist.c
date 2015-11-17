@@ -26,6 +26,7 @@ void partlist_init(partlist *part){
         part->sumtimes = (int *) NULL;
         part->sumweights = (int *) NULL;
         part->completiontime = 0;
+        part->totcompweight = 0;
     }
 }
 
@@ -63,13 +64,15 @@ int partlist_insert_order(partlist *part,joblist *jlist,Job *job,int njobs){
     jlist[job->job].part = part;
 
     g_queue_insert_sorted(part->list, job, (GCompareDataFunc)partition_order,NULL);
-    part->completiontime += job->processingime;
     for(i = job->job; i < njobs; ++i) {
         part->sumtimes[i] += job->processingime;
     }
     for( i = 0; i < job->job; ++i) {
         part->sumweights[i] += job->weight;
     }
+    part->totcompweight += job->weight*part->sumtimes[job->job] + job->processingime*part->sumweights[job->job];
+    part->completiontime += job->processingime;
+
 
     CLEAN:
     return val;
@@ -106,6 +109,7 @@ int partlist_delete_custom(joblist *jlist, Job *job,int njobs){
     p = (jlist + job->job)->part;
     if(g_queue_remove(p->list, job)){
         jlist[job->job].part = (partlist*)NULL;
+        p->totcompweight -= job->weight*p->sumtimes[job->job] + job->processingime*p->sumweights[job->job];
         p->completiontime -= job->processingime;
         for(i = job->job; i < njobs; ++i) {
             p->sumtimes[i] -= job->processingime;

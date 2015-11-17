@@ -1,6 +1,11 @@
 #ifndef __HEUR_DIVING_H
 #define __HEUR_DIVING_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #include "wctparms.h"
 #include "wct.h"
 #include "lp.h"
@@ -41,3 +46,7 @@ void WCTbranchcand_free(WCTbranchcand *branchcand);
 
 
 #endif // __HEUR_DIVING_H
+
+#ifdef __cplusplus
+}
+#endif

@@ -499,7 +499,7 @@ int constructsolution( wctdata *pd, int nmachines, int *success )
             GList *it;
             int counter = 0;
             fill_int( covered, pd->njobs, 0 );
-            Schedulesets_free( &( pd->bestcolors ), &( pd->nbestcolors ) );
+            Schedulesets_free( &( pd->bestcolors ), &( pd->nbbest ) );
             pd->bestcolors = ( Scheduleset * ) realloc( pd->bestcolors,
                              nmachines * sizeof( Scheduleset ) );
             CCcheck_NULL_2( pd->bestcolors, "Failed to realloc pd->bestcolors" );
@@ -508,12 +508,12 @@ int constructsolution( wctdata *pd, int nmachines, int *success )
                 Scheduleset_init( pd->bestcolors + i );
             }
 
-            pd->nbestcolors = 0;
+            pd->nbbest = 0;
 
             int tmp = 0;
             for ( it = list; it && counter < pd->njobs; it = it->next ) {
                 i = GPOINTER_TO_INT( it->data );
-                tmp = pd->nbestcolors;
+                tmp = pd->nbbest;
                 pd->bestcolors[tmp].members = CC_SAFE_MALLOC( pd->cclasses[i].count, int );
 
                 for ( k = 0; k < pd->cclasses[i].count; ++k ) {
@@ -525,10 +525,10 @@ int constructsolution( wctdata *pd, int nmachines, int *success )
                         counter++;
                     }
                 }
-                pd->nbestcolors++;
+                pd->nbbest++;
             }
 
-            pd->nbestcolors = nmachines;
+            pd->nbbest = nmachines;
 
             /** Check if solution is feasible */
         } else {

@@ -24,6 +24,10 @@
 #ifndef __MACHDEFS_H
 #define __MACHDEFS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define NDEBUG
 
 #ifdef __GNUC__
@@ -192,6 +196,10 @@ __vfork (void);
 #define SIG_DFL ((void(*)(int))0)
 #define SIG_IGN ((void(*)(int))1)
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif  /* __MACHDEFS_H */

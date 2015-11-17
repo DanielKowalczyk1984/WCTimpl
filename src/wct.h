@@ -4,15 +4,21 @@
 
 #include "wctprivate.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * greedy.c
  */
 
-typedef struct _pair_job_machine
+struct _pair_job_machine
 {
     int job;
     int machine;
-} pair_job_machine;
+} ;
+
+typedef struct _pair_job_machine pair_job_machine;
 
 
 int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution* new_sol, GRand *rand_);
@@ -42,6 +48,7 @@ typedef struct _MACHINE {
 int lowerbound_cw(Job *array, int njobs, int nmachines);
 int lowerbound_cp(Job *array, int njobs, int nmachines);
 int lowerbound_eei(Job* array, int njobs, int nmachines);
+int lowerbound_ak(Job *array, int njobs, int nmachines);
 
 /**
  * compare_functions
@@ -153,8 +160,8 @@ int static_update(SS *scatter_search);
 int dynamic_update(SS *scatter_search, GPtrArray *list, solution *new_sol);
 int diversification_update(SS *scatter_search);
 
-int SSrun_scatter_search(SS *scatter_search);
-int SSrun_scatter_searchPR( SS *scatter_search);
+int SSrun_scatter_search(SS *scatter_search, CCutil_timer *timer);
+int SSrun_scatter_searchPR( SS *scatter_search, CCutil_timer *timer);
 
 void print_pool_totalweightcomptime( SS *scatter_search );
 void print_refset_totalweightcomptime( SS *scatter_search );
@@ -191,6 +198,7 @@ int k_l_move_general(Job** K_jobs, Job** L_jobs, partlist*m_k,partlist *m_l, sol
 int k_l_move_general(Job** K_jobs, Job** L_jobs, partlist*m_k,partlist *m_l, solution *sol,int k, int l);
 int local_search_machine_general_best( solution *sol,int lowerbound, int k, int l);
 int local_search_machine_general_first( solution *sol,int lowerbound, int k, int l);
+void localsearch_wrap(solution *sol, int lowerbound,int best);
 
 /**
  * compare_functions
@@ -217,30 +225,20 @@ void wctproblem_free(wctproblem *problem);
 int compute_schedule(wctproblem *problem);
 
 /*Computation functions*/
-int compute_BPPC(wctproblem *problem);
-int compute_lower_bound_BPPC(wctproblem *problem,wctdata *pd,int compute_lb);
-int sequential_branching_BPPC(wctproblem *problem);
+int compute_lower_bound(wctproblem *problem,wctdata *pd);
+int sequential_branching(wctproblem *problem);
 int create_branches(wctdata* pd,wctproblem* problem);
 int check_integrality(wctdata *pd,int nmachine,int *result);
-int build_lp_BPPC(wctdata* pd);
+int build_lp(wctdata* pd);
 void make_pi_feasible(wctdata *pd);
 int heur_colors_with_stable_sets( wctdata *pd );
-
-int compute_PMCD(wctproblem *problem);
-int compute_lower_bound_PMCD(wctproblem *problem, wctdata *pd);
-int sequential_branching_PMCD(wctproblem *problem);
-int create_branches_PMCD(wctdata *pd,wctproblem *problem);
-int check_integrality_PMCD(wctdata *pd,int nmachines);
-int build_lp_PMCD(wctdata *pd,int nmachines);
-void make_pi_feasible_PMCD(wctdata* pd);
-int compute_objective(wctdata *pd);
+int compute_objective( wctdata *pd );
 
 
 /*Help functions for branching*/
 int insert_into_branching_heap(wctdata* pd,wctproblem* problem);
 int skip_wctdata(wctdata* pd, wctproblem* problem);
 int branching_msg(wctdata* pd, wctproblem* problem);
-int recover_elist(wctdata *pd);
 int collect_same_children(wctdata* pd);
 int collect_diff_children(wctdata* pd);
 void temporary_data_free(wctdata *pd);
@@ -248,8 +246,6 @@ int new_eindex(int v, int v1, int v2);
 int prune_duplicated_sets (wctdata* pd);
 int double2int(int *kpc_pi,int *scalef,const double *pi, int vcount);
 double safe_lower_dbl(int numerator,int denominator);
-int reset_root_pd(wctproblem *problem,wctdata *pd);
-int reset_root_pd1(wctproblem *problem,wctdata *pd);
 int add_newsets(wctdata *pd);
 int add_to_init(wctproblem *problem,Scheduleset *sets,int nbsets);
 int delete_to_bigcclasses(wctdata *pd, int capacity);
@@ -284,5 +280,8 @@ int heur_exec(wctproblem *problem,wctdata * pd,int *result);
 void heur_init(wctdata * pd);
 void heur_free(wctdata * pd);
 
+#ifdef __cplusplus
+}
 #endif
 
+#endif

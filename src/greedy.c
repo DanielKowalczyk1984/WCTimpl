@@ -3,6 +3,27 @@
 static int add_feasible_solution( wctproblem *problem, solution *new_sol);
 
 /**
+ * comparefunctions
+ */
+
+int compare_func1(gconstpointer a, gconstpointer b, void *user_data) {
+  const int *v = &(((const partlist*)a)->completiontime);
+  const int *w = &(((const partlist*)b)->completiontime);
+
+  user_data = NULL;
+  if (*v != *w) {
+    return *v - *w;
+  } else {
+    if (*v == 0 || *w == 0) {
+      return *v - *w;
+    }
+    const int *vv = &(((Job*)((const partlist *)a)->list->head->data)->job);
+    const int *ww = &(((Job*)((const partlist *)b)->list->head->data)->job);
+    return *vv - *ww;
+  }
+}
+
+/**
  * greedy constructions
  */
 
@@ -52,7 +73,7 @@ int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution* new
     /** Compute RCL */
     pair_job_machine temp_job_machine;
     lb = min;
-    ub = min + 0.05 * (max - lb);
+    ub = min + 0.25 * (max - lb);
     for (i = 0; i < nmachines; ++i)
     {
       for (it = to_do_list->head; it; it = g_list_next(it))
@@ -143,27 +164,6 @@ CLEAN:
   return 0;
 }
 
-/**
- * comparefunctions
- */
-
-int compare_func1(gconstpointer a, gconstpointer b, void *user_data) {
-  const int *v = &(((const partlist*)a)->completiontime);
-  const int *w = &(((const partlist*)b)->completiontime);
-
-  user_data = NULL;
-  if (*v != *w) {
-    return *v - *w;
-  } else {
-    if (*v == 0 || *w == 0) {
-      return *v - *w;
-    }
-    const int *vv = &(((Job*)((const partlist *)a)->list->head->data)->job);
-    const int *ww = &(((Job*)((const partlist *)b)->list->head->data)->job);
-    return *vv - *ww;
-  }
-}
-
 /** Construct feasible solutions */
 
 void update_bestschedule( wctproblem *problem, solution *new_sol )
@@ -189,12 +189,8 @@ static int add_feasible_solution( wctproblem *problem, solution *new_sol)
   wctdata *root_pd = &( problem->root_pd );
   SS *scatter_search = &( problem->scatter_search );
 
-  if ( problem->status < feasible ) {
-    problem->status = feasible;
-  }
-
   solution_calc(new_sol, root_pd->jobarray);
-  localsearch_random_k(new_sol, problem->global_lower_bound, 2);
+  localsearch_wrap(new_sol, problem->global_lower_bound, 0);
   solution_unique( new_sol );
 
   if ( !solution_in_pool( scatter_search, new_sol ) ) {
@@ -222,6 +218,7 @@ CLEAN:
 
   if ( val ) {
     solution_free( sol );
+    CC_IFFREE(sol, solution);
   }
 
   return sol;
@@ -232,21 +229,24 @@ int construct_feasible_solutions(wctproblem *problem) {
   wctparms *parms = &(problem->parms) ;
   wctdata *pd = &(problem->root_pd);
   SS *scatter_search = &(problem->scatter_search);
+  CCutil_timer *timer = &(problem->tot_scatter_search);
 
-  CCutil_start_timer( &(problem->tot_scatter_search));
+  CCutil_start_timer(timer);
 
   GRand *rand1 = g_rand_new_with_seed(1984);
   GRand *rand2 = g_rand_new_with_seed(1654651);
   
-  val = SSproblem_definition(scatter_search, 8, 8, 5.0, parms->combine_method,
+  val = SSproblem_definition(scatter_search, 10, 8, parms->scatter_search_cpu_limit, parms->combine_method,
                              pd->njobs, pd->nmachines, pd->jobarray, problem->global_lower_bound);
   CCcheck_val_2(val, "Failed in SSproblem_definition");
 
   while (scatter_search->p->PSize < parms->nb_feas_sol) {
     solution *new_sol = (solution *) NULL;
     new_sol = new_sol_init(pd->nmachines, pd->njobs);
+    CCcheck_NULL(new_sol, "Failed to allocate")
     if (problem->status == no_sol) {
       construct_wspt(pd->jobarray, pd->njobs, pd->nmachines, new_sol);
+      problem->status = feasible;
     }
     else {
       if (g_rand_boolean(rand1)) {
@@ -261,10 +261,17 @@ int construct_feasible_solutions(wctproblem *problem) {
     CCcheck_val(val, "Failed in add_feasible_solution");
   }
 
+  CCutil_suspend_timer(timer);
+  CCutil_resume_timer(timer);
+  printf("We needed %f seconds to construct %d solutions\n", timer->cum_zeit, parms->nb_feas_sol);
   SSCreate_refset(scatter_search);
   scatter_search->upperbound = problem->global_upper_bound;
   printf("upperbound = %d, lowerbound = %d\n", problem->global_upper_bound, problem->global_lower_bound);
-  SSrun_scatter_searchPR(scatter_search);
+  if(parms->combine_method) {
+    SSrun_scatter_search(scatter_search, &(problem->tot_scatter_search) );
+  } else {
+    SSrun_scatter_searchPR(scatter_search, & (problem->tot_scatter_search));
+  }
 
 CLEAN:
   g_rand_free(rand1);

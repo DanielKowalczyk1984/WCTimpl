@@ -23,7 +23,7 @@ static int permute_nodes ( int *invorder, int vcount, int *duration,
                            int *weight, int **durationlist, int **weightlist );
 int read_problem( char *f, int *njobs, int **durationlist, int **weightlist )
 {
-    int i,val = 0;
+    int i, val = 0;
     int nbjobs = 0,  prob = 0;
     int curduration, curweight, curjob = 0;
     int *duration = ( int * ) NULL;
@@ -74,8 +74,8 @@ int read_problem( char *f, int *njobs, int **durationlist, int **weightlist )
             goto CLEAN;
         }
     } else {
-      val = 1;
-      goto CLEAN;
+        val = 1;
+        goto CLEAN;
     }
 
     while ( fgets( buf2, bufsize, in ) != ( char * )NULL ) {
@@ -87,25 +87,24 @@ int read_problem( char *f, int *njobs, int **durationlist, int **weightlist )
                 val = 1;
                 goto CLEAN;
             }
-        } else
-            if ( p[0] == 'n' ) {
-                if ( !prob ) {
-                    fprintf( stderr, "ERROR n before p in file\n" );
-                    val = 1;
-                    goto CLEAN;
-                }
-
-                strtok( p, delim );
-                data = strtok( NULL, delim );
-                sscanf( data, "%d", &curweight);
-                data = strtok( NULL, delim );
-                sscanf( data, "%d", &curduration);
-                weight[curjob] = curweight;
-                duration[curjob] = curduration;
-                data = strtok( NULL, delim );
-                curjob++;
-
+        } else if ( p[0] == 'n' ) {
+            if ( !prob ) {
+                fprintf( stderr, "ERROR n before p in file\n" );
+                val = 1;
+                goto CLEAN;
             }
+
+            strtok( p, delim );
+            data = strtok( NULL, delim );
+            sscanf( data, "%d", &curweight);
+            data = strtok( NULL, delim );
+            sscanf( data, "%d", &curduration);
+            weight[curjob] = curweight;
+            duration[curjob] = curduration;
+            data = strtok( NULL, delim );
+            curjob++;
+
+        }
     }
 
     perm = CC_SAFE_MALLOC( nbjobs, int );
@@ -113,9 +112,9 @@ int read_problem( char *f, int *njobs, int **durationlist, int **weightlist )
 
     for (  i = 0; i < nbjobs; i++ ) {
         perm[i] = i;
-        ratio[i] = (double) duration[i]/(double) weight[i];
+        ratio[i] = (double) duration[i] / (double) weight[i];
     }
-    
+
 
 
     CCutil_double_perm_quicksort(perm, ratio, nbjobs);
@@ -201,12 +200,12 @@ void wctproblem_init( wctproblem *problem )
     wctdata_init( &( problem->root_pd ) );
     /*parms of the problem*/
     wctparms_init( &( problem->parms ) );
-    
+
     /*heap initialization*/
     problem->br_heap = ( pmcheap *) NULL;
     pmcheap_init( &( problem->br_heap ), 1000 );
     problem->found = 0;
-    
+
     /*CPU timer initialisation*/
     CCutil_init_timer( &( problem->tot_branching_cputime ),
                        "tot_branching_cputime" );
@@ -215,7 +214,7 @@ void wctproblem_init( wctproblem *problem )
     CCutil_init_timer( &( problem->tot_lb ), "tot_lb" );
     CCutil_init_timer( &( problem->tot_scatter_search ), "tot_scatter_search" );
     CCutil_init_timer( &( problem->tot_pricing ), "tot_pricing" );
-    
+
     /* Scatter sear init*/
     SS_init( &problem->scatter_search, 15, 10, 0.1 );
 }
@@ -224,6 +223,8 @@ void wctproblem_free( wctproblem *problem )
 {
     /*free the parameters*/
     wctparms_free( &( problem->parms ) );
+    CC_IFFREE(problem->root_pd.duration, int);
+    CC_IFFREE(problem->root_pd.weights, int);
     wctdata_free( &( problem->root_pd ) );
     /*free the heap*/
     pmcheap_free( problem->br_heap );
@@ -244,16 +245,18 @@ void wctdata_init( wctdata *pd )
     /*Initialization graph data*/
     pd->njobs = 0;
     pd->orig_node_ids = ( int *) NULL;
-    
+
     pd->duration = ( int *)NULL;
     pd->weights = ( int *)NULL;
+    pd->duetime = (int *) NULL;
+    pd->releasetime = (int *) NULL;
     pd->jobarray = (Job *)NULL;
     pd->H_max = 0;
     pd->H_min = 0;
 
 
     pd->upper_bound = INT_MAX;
-    pd->lower_bound = 1;
+    pd->lower_bound = 0;
     pd->dbl_safe_lower_bound = 0.0;
     pd->dbl_est_lower_bound = 0.0;
     pd->lower_scaled_bound = 1;
@@ -266,6 +269,7 @@ void wctdata_init( wctdata *pd )
     pd->pi = ( double *) NULL;
     pd->kpc_pi = ( int *)NULL;
     /*Initialization pricing_problem*/
+    pd->solver = (PricerSolver*) NULL;
 
     /*Initialization of Scheduleset*/
     pd->ccount = 0;
@@ -275,7 +279,7 @@ void wctdata_init( wctdata *pd )
     pd->newsets = ( Scheduleset *)NULL;
     pd->nnewsets = 0;
     pd->bestcolors = ( Scheduleset *) NULL;
-    pd->nbestcolors = 0;
+    pd->nbbest = 0;
     pd->debugcolors = ( Scheduleset *) NULL;
     pd->ndebugcolors = 0;
     pd->opt_track = 0;
@@ -283,11 +287,11 @@ void wctdata_init( wctdata *pd )
     pd->maxiterations = 1000000;
     pd->retirementage = 1000000;
     /*initialization of branches*/
-    pd->v1 = pd->v2 = -1;
+    pd->branch_job = -1;
     pd->parent = ( wctdata *) NULL;
-    pd->same_children = ( wctdata *) NULL;
+    pd->duetime_child = ( wctdata *) NULL;
     pd->nsame = 0;
-    pd->diff_children = ( wctdata *) NULL;
+    pd->releasetime_child = ( wctdata *) NULL;
     pd->ndiff = 0;
     heur_init( pd );
 }
@@ -324,6 +328,11 @@ void lpwctdata_free( wctdata *pd )
         pd->kpc_pi = ( int *)NULL;
     }
 
+    if (pd->solver)
+    {
+        deletePricerSolver(pd->solver);
+    }
+
     heur_free( pd );
     Schedulesets_free( &( pd->newsets ), &( pd->nnewsets ) );
     Schedulesets_free( &( pd->cclasses ), &( pd->gallocated ) );
@@ -336,17 +345,17 @@ void children_data_free( wctdata *pd )
 
     for ( i = 0; i < pd->nsame; ++i )
     {
-        wctdata_free( &( pd->same_children[i] ) );
+        wctdata_free( &( pd->duetime_child[i] ) );
     }
 
-    CC_IFFREE( pd->same_children, wctdata );
+    CC_IFFREE( pd->duetime_child, wctdata );
 
     for ( i = 0; i < pd->ndiff; ++i )
     {
-        wctdata_free( &( pd->diff_children[i] ) );
+        wctdata_free( &( pd->releasetime_child[i] ) );
     }
 
-    CC_IFFREE( pd->diff_children, wctdata );
+    CC_IFFREE( pd->releasetime_child, wctdata );
     pd->nsame = pd->ndiff = 0;
 }
 
@@ -359,22 +368,22 @@ void temporary_data_free( wctdata *pd )
 void wctdata_free( wctdata *pd )
 {
     temporary_data_free( pd );
-    Schedulesets_free( &( pd->bestcolors ), &( pd->nbestcolors ) );
-    CC_IFFREE( pd->duration, int );
-    CC_IFFREE( pd->weights, int );
-    CC_IFFREE( pd->orig_node_ids, int );
+    Schedulesets_free( &( pd->bestcolors ), &( pd->nbbest ) );
+    CC_IFFREE(pd->releasetime, int);
+    CC_IFFREE(pd->duetime, int);
+    CC_IFFREE(pd->orig_node_ids, int );
     CC_IFFREE(pd->jobarray, Job);
 }
 
 /** Preprocess data*/
-gint compare_readytime(gconstpointer a, gconstpointer b){
+gint compare_readytime(gconstpointer a, gconstpointer b) {
     const int *x = &(((const Job*)a)->processingime);
     const int *y = &(((const Job*)b)->processingime);
 
     return *x - *y;
 }
-int calculate_ready_due_times(Job* jobarray,int njobs, int nmachines, int Hmin){
-    int i,j,val = 0;
+int calculate_ready_due_times(Job* jobarray, int njobs, int nmachines, int Hmin) {
+    int i, j, val = 0;
     int *sumleft = (int*) NULL;
     int *sumright = (int *) NULL;
     int temp_duration, temp_weight;
@@ -383,104 +392,104 @@ int calculate_ready_due_times(Job* jobarray,int njobs, int nmachines, int Hmin){
     CCcheck_NULL_2(sumleft, "Failed to, allocate memory");
     sumright = CC_SAFE_MALLOC(njobs, int);
     CCcheck_NULL_2(sumright, "Failed to allocate memory");
-    
+
     sumleft[0] = 0;
-    for( i = 1; i < njobs; ++i) {
+    for ( i = 1; i < njobs; ++i) {
         sumleft[i] = sumleft[i - 1] + jobarray[i].processingime;
     }
 
     sumright[njobs - 1] = jobarray[njobs - 1].processingime;
-    for(i = njobs - 2 ; i >= 0; --i) {
+    for (i = njobs - 2 ; i >= 0; --i) {
         sumright[i] = sumleft[i + 1] + jobarray[i].processingime;
     }
 
 
-    for( i = nmachines  ; i < njobs; ++i) {
+    for ( i = nmachines  ; i < njobs; ++i) {
         temp_duration = jobarray[i].processingime;
         temp_weight = jobarray[i].weight;
         GList *temp_list = (GList*) NULL;
-        for( j = 0; j < i; ++j) {
-            if((jobarray[j].processingime <= temp_duration && jobarray[i].weight >= temp_weight)
-                || (sumleft[j] <= Hmin - sumright[i])) {
+        for ( j = 0; j < i; ++j) {
+            if ((jobarray[j].processingime <= temp_duration && jobarray[i].weight >= temp_weight)
+                    || (sumleft[j] <= Hmin - sumright[i])) {
                 temp_list = g_list_append(temp_list, jobarray + j);
             }
         }
 
-        if(g_list_length(temp_list) > (guint)nmachines - 1) {
+        if (g_list_length(temp_list) > (guint)nmachines - 1) {
             temp_list = g_list_sort(temp_list, compare_readytime);
             GList *it;
             int len = g_list_length(temp_list);
             int counter = 0;
-            for(it = temp_list;it && counter < len - nmachines + 1; it = it->next) {
+            for (it = temp_list; it && counter < len - nmachines + 1; it = it->next) {
                 jobarray[i].releasetime += ((Job *)it->data)->processingime;
                 counter++;
             }
-            jobarray[i].releasetime = (int) ceil((double) jobarray[i].releasetime/(double) nmachines);
+            jobarray[i].releasetime = (int) ceil((double) jobarray[i].releasetime / (double) nmachines);
         }
         g_list_free(temp_list);
     }
 
-    for( i = 0; i < njobs - 1; ++i) {
+    for ( i = 0; i < njobs - 1; ++i) {
         temp_duration = jobarray[i].processingime;
         temp_weight = jobarray[i].weight;
         int sum = jobarray[i].processingime;
-        for( j = i + 1; j < njobs; ++j) {
-            if((jobarray[j].processingime >= temp_duration && jobarray[i].weight <= temp_weight)
-                || (sumleft[j] >= Hmin - sumright[i])) {
+        for ( j = i + 1; j < njobs; ++j) {
+            if ((jobarray[j].processingime >= temp_duration && jobarray[i].weight <= temp_weight)
+                    || (sumleft[j] >= Hmin - sumright[i])) {
                 sum += jobarray[j].processingime;
             }
         }
-        int delta = (int)((double)jobarray[i].duetime - ceil((double)sum/(double) nmachines)) + jobarray[i].processingime;
-        if(delta < jobarray[i].duetime){
+        int delta = (int)((double)jobarray[i].duetime - ceil((double)sum / (double) nmachines)) + jobarray[i].processingime;
+        if (delta < jobarray[i].duetime) {
             jobarray[i].duetime = delta;
         }
     }
 
-    CLEAN:
+CLEAN:
     CC_IFFREE(sumleft, int);
-    CC_IFFREE(sumright,int);
-    return val; 
+    CC_IFFREE(sumright, int);
+    return val;
 }
 
-int calculate_Hmax(int *durations, int nmachines,int njobs){
-    int i,max = 0,val = 0;
+int calculate_Hmax(int *durations, int nmachines, int njobs) {
+    int i, max = 0, val = 0;
     double temp;
 
-    for( i = 0; i < njobs; ++i) {
+    for ( i = 0; i < njobs; ++i) {
         val += durations[i];
-        if(max < durations[i]) {
+        if (max < durations[i]) {
             max = durations[i];
         }
     }
 
-    val += (nmachines - 1)*max;
+    val += (nmachines - 1) * max;
     temp = (double) val;
-    temp = temp/(double)nmachines;
+    temp = temp / (double)nmachines;
     val = (int) ceil(temp);
     return val;
 }
 
-int calculate_Hmin(int *durations, int nmachines,int njobs, int *perm){
-    int i,val = 0;
+int calculate_Hmin(int *durations, int nmachines, int njobs, int *perm) {
+    int i, val = 0;
     double temp;
 
-    for(i = 0; i < njobs; ++i) {
+    for (i = 0; i < njobs; ++i) {
         val += durations[i];
     }
 
-    for( i = 0; i < nmachines - 1; ++i) {
-        val += durations[perm[i]];
+    for ( i = 0; i < nmachines - 1; ++i) {
+        val -= durations[perm[i]];
     }
 
     temp = (double) val;
-    temp = temp/(double)nmachines;
+    temp = temp / (double)nmachines;
     val = (int) ceil(temp);
 
     return val;
 }
 
-int Preprocessdata(wctdata *pd){
-    int i,val = 0;
+int Preprocessdata(wctdata *pd) {
+    int i, val = 0;
     int njobs = pd->njobs;
     int nmachines = pd->nmachines;
     Job *jobarray = (Job *) NULL;
@@ -490,11 +499,15 @@ int Preprocessdata(wctdata *pd){
     CCcheck_NULL_2(jobarray, "Failed to allocate memory");
     perm = CC_SAFE_MALLOC(njobs, int);
     CCcheck_NULL_2(perm, "Failed to allocate memory");
+    pd->releasetime = CC_SAFE_MALLOC(njobs, int);
+    CCcheck_NULL_2(pd->releasetime, "Failed to allocate releasetime");
+    pd->duetime = CC_SAFE_MALLOC(njobs, int);
+    CCcheck_NULL_2(pd->duetime, "Failed to allocate duetime");
 
 
 
     /** Initialize jobarray of rootnode */
-    for( i = 0; i < njobs; ++i) {
+    for ( i = 0; i < njobs; ++i) {
         jobarray[i].weight = pd->weights[i];
         jobarray[i].processingime = pd->duration[i];
         jobarray[i].releasetime = 0;
@@ -505,21 +518,27 @@ int Preprocessdata(wctdata *pd){
 
     /** Calculate H_max */
     pd->H_max = calculate_Hmax(pd->duration, pd->nmachines, njobs);
-    for(i = 0; i < njobs; ++i) {
+    for (i = 0; i < njobs; ++i) {
         jobarray[i].duetime = pd->H_max;
     }
+    printf("H_max = %d\n", pd->H_max);
 
     /** Calculate H_min */
     pd->H_min = calculate_Hmin(pd->duration, pd->nmachines, njobs, perm);
+    printf("H_min = %d\n", pd->H_min);
 
     /** Calculate ready times and due times */
     calculate_ready_due_times(jobarray, njobs, nmachines, pd->H_min);
 
     pd->jobarray = jobarray;
+    for (i = 0; i < njobs; ++i) {
+        pd->releasetime[i] = jobarray[i].releasetime;
+        pd->duetime[i] = jobarray[i].duetime;
+    }
 
 
-    CLEAN:
-    if(val) {
+CLEAN:
+    if (val) {
         CC_IFFREE(jobarray, Job);
     }
     CC_IFFREE(perm, int);
@@ -527,6 +546,49 @@ int Preprocessdata(wctdata *pd){
 }
 
 /** Help function for column generation */
+static void print_ages( wctdata *pd )
+{
+    int i;
+    printf( "AGES:" );
+
+    for ( i = 0; i < pd->ccount; ++i )
+    {
+        printf( " %4d", pd->cclasses[i].age );
+    }
+
+    printf( "\n" );
+}
+
+int compute_objective( wctdata *pd )
+{
+    int val = 0;
+    int i;
+    pd->lower_scaled_bound = .0;
+
+    for ( i = 0; i < pd->njobs; i++ )
+    {
+        pd->lower_scaled_bound += ( double ) pd->kpc_pi[i];
+    }
+
+    pd->dbl_safe_lower_bound = safe_lower_dbl( pd->lower_scaled_bound,
+                               pd->kpc_pi_scalef );
+    val = wctlp_objval( pd->LP, &( pd->LP_lower_bound ) );
+    CCcheck_val_2( val, "pmclp_objval failed" );
+    pd->lower_bound = ( int ) ceil( pd->dbl_safe_lower_bound );
+
+    if ( dbg_lvl() > 0 )
+    {
+        printf( "Current primal LP objective: %19.16f (%lld / %lld) (LP-solver %19.16f).\n",
+                pd->dbl_safe_lower_bound,
+                ( long long ) pd->lower_scaled_bound,
+                ( long long ) pd->kpc_pi_scalef, pd->LP_lower_bound );
+    }
+
+CLEAN:
+    return val;
+}
+
+
 void make_pi_feasible( wctdata *pd )
 {
     int c;
@@ -590,7 +652,7 @@ int add_newsets( wctdata *pd )
 
     if ( pd->ccount + pd->nnewsets > pd->gallocated )
     {
-        pd->gallocated *= 3;
+        pd->gallocated *= 2;
         tmpsets = CC_SAFE_MALLOC( pd->gallocated, Scheduleset );
         CCcheck_NULL_2( tmpsets, "Failed to allocate memory to tmpsets" );
         memcpy( tmpsets, pd->cclasses, pd->ccount * sizeof( Scheduleset ) );
@@ -648,4 +710,1139 @@ int double2int( int *kpc_pi, int *scalef, const double *pi, int vcount )
 
     return 0;
 }
+
+/** Branch and Price Algorithm */
+
+static int test_theorem_ahv(wctdata* pd, const double x[], GList* branchjobs, int* min_completiontime)
+{
+    int val = 0;
+    int i, j;
+
+    min_completiontime = CC_SAFE_MALLOC(pd->njobs, int);
+    CCcheck_NULL_2(min_completiontime, "failed to allocate memory");
+    fill_int(min_completiontime, pd->njobs, INT_MAX);
+    for (j = 0; j < pd->njobs; ++j) {
+        int found = 0;
+        int C = 0 ;
+        for ( i = 0; i < pd->ccount; ++i) {
+            C = GPOINTER_TO_INT(g_hash_table_lookup(pd->cclasses[i].completiontime, GINT_TO_POINTER(j)));
+            if (x[i] <= 0.0 || !C) {
+                continue;
+            }
+
+            if (C < min_completiontime[j]) {
+                min_completiontime[j] = C;
+            }
+
+            if (C != min_completiontime[j] && !found) {
+                branchjobs = g_list_append(branchjobs, GINT_TO_POINTER(j));
+                found = 1;
+            }
+
+        }
+    }
+
+
+
+CLEAN:
+    if (val) {
+        CC_IFFREE(min_completiontime, int);
+        g_list_free(branchjobs);
+    }
+    return val;
+}
+
+static int grab_integral_solution_ahv(wctdata* pd, int *completion_time) {
+    int val = 0;
+    int incumbent;
+    double testincumbent;
+    int* perm = (int *) NULL;
+    pmcheap *heap = (pmcheap *) NULL;
+    solution *sol = (solution *) NULL;
+    int i;
+
+    perm = CC_SAFE_MALLOC(pd->njobs, int);
+    CCcheck_NULL_2(perm, "Failed to allocate memory");
+    for (i = 0; i < pd->njobs; ++i) {
+        perm[i] = i;
+    }
+
+    sol = CC_SAFE_MALLOC(1, solution);
+    CCcheck_NULL_2(sol, "Failed to allocate memory")
+    solution_init(sol);
+    solution_alloc(sol, pd->nmachines, pd->njobs);
+
+    val = pmcheap_init(&heap, pd->nmachines);
+    for (i = 0; i < pd->nmachines; i++) {
+        pmcheap_insert(heap, sol->part[i].completiontime, sol->part + i);
+    }
+    CCutil_int_perm_quicksort(perm, completion_time, pd->njobs);
+
+    incumbent = 0;
+    for (i = 0; i < pd->njobs; ++i) {
+        Job *j = pd->jobarray + perm[i];
+        partlist *part = pmcheap_min(heap);
+        partlist_insert(part, sol->vlist, j);
+        pmcheap_insert(heap, part->completiontime, part);
+        incumbent += pd->jobarray[perm[i]].weight * (part->completiontime);
+    }
+
+
+    val = wctlp_objval (pd->LP, &testincumbent);
+    CCcheck_val_2(val, "COLORlp_objval failed");
+
+    Schedulesets_free(&(pd->bestcolors), &(pd->nbbest));
+    pd->bestcolors = (Scheduleset*) realloc(pd->bestcolors,
+                                            pd->nmachines * sizeof(Scheduleset));
+    CCcheck_NULL_2(pd->bestcolors, "Failed to realloc pd->bestcolors");
+
+    /** Construct solution with the help of theorem of AHV */
+    val = partlist_to_Scheduleset(sol->part, sol->nmachines, &(pd->bestcolors), &(pd->nbbest));
+    CCcheck_val_2(val, "Failed in conversion");
+
+    printf("Intermediate solution:\n");
+    /** Print Solution */
+
+    if (pd->besttotwct < pd->upper_bound) {
+        pd->upper_bound = pd->besttotwct;
+    }
+    if ( pd->upper_bound == pd->lower_bound) {
+        pd->status = finished;
+    }
+
+CLEAN:
+    CC_IFFREE(perm, int);
+    pmcheap_free(heap);
+    solution_free(sol);
+    CC_IFFREE(sol, solution);
+
+    return val;
+}
+
+static void adapt_global_upper_bound(wctproblem* problem, int new_upper_bound)
+{
+    if (problem->global_upper_bound > new_upper_bound) {
+        problem->global_upper_bound = new_upper_bound;
+    }
+}
+
+static int collect_releasetime_child(wctdata* cd)
+{
+    int rval = 0;
+    int c;
+
+    for (c = 0; c < cd->ndiff; ++c) {
+        if ( cd->releasetime_child[c].nbbest && ( !cd->nbbest || cd->releasetime_child[c].besttotwct < cd->upper_bound) )
+        {
+            if (cd->besttotwct) {
+                Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
+            }
+            cd->upper_bound = cd->besttotwct = cd->releasetime_child[c].besttotwct;
+            cd->releasetime_child[c].nbbest = 0;
+            cd->bestcolors = cd->releasetime_child[c].bestcolors;
+            cd->releasetime_child[c].bestcolors = (Scheduleset *) NULL;
+
+            /** Check if the solution is feasible, i.e. every job is covered */
+        }
+    }
+
+    return rval;
+}
+
+static int collect_duetime_child(wctdata* cd)
+{
+    int rval = 0;
+    int c;
+
+    for (c = 0; c < cd->nsame; ++c) {
+        if ( cd->duetime_child[c].nbbest && ( !cd->nbbest || cd->duetime_child[c].besttotwct < cd->upper_bound) )
+        {
+            if (cd->besttotwct) {
+                Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
+            }
+            cd->upper_bound = cd->besttotwct = cd->duetime_child[c].besttotwct;
+            cd->duetime_child[c].nbbest = 0;
+            cd->bestcolors = cd->duetime_child[c].bestcolors;
+            cd->duetime_child[c].bestcolors = (Scheduleset *) NULL;
+
+            /** Check if the solution is feasible, i.e. every job is covered */
+        }
+    }
+
+    return rval;
+}
+
+static int remove_finished_subtree(wctdata* child)
+{
+    int rval = 0;
+    int i;
+    wctdata* cd = (wctdata*) child;
+    int all_same_finished = 1;
+    int all_diff_finished = 1;
+
+    while (cd) {
+        for (i = 0; i < cd->nsame; ++i) {
+            if (cd->duetime_child[i].status < finished) {
+                all_same_finished = 0; break;
+            }
+        }
+        if (cd->nsame && all_same_finished) {
+            rval = collect_duetime_child(cd);
+            CCcheck_val_2(rval, "Failed in collect_same_children");
+            for (i = 0;  i < cd->nsame; ++i) {
+                wctdata_free(cd->duetime_child + i);
+            }
+            free(cd->duetime_child);
+            cd->duetime_child = (wctdata*) NULL;
+            cd->nsame = 0;
+        }
+
+
+        for (i = 0; i < cd->ndiff; ++i) {
+            if (cd->releasetime_child[i].status < finished) {
+                all_diff_finished = 0; break;
+            }
+        }
+        if (cd->ndiff && all_diff_finished) {
+            rval = collect_releasetime_child(cd);
+            CCcheck_val_2(rval, "Failed in collect_diff_children");
+            for (i = 0;  i < cd->ndiff; ++i) {
+                wctdata_free(cd->releasetime_child + i);
+            }
+            free(cd->releasetime_child);
+            cd->releasetime_child = (wctdata*) NULL;
+            cd->ndiff = 0;
+        }
+
+        if (!cd->duetime_child && !cd->releasetime_child) {
+            cd->status = finished;
+
+            cd = cd->parent;
+        } else {
+            cd = (wctdata*) NULL;
+        }
+    }
+CLEAN:
+    return rval;
+}
+
+int set_id_and_name( wctdata *pd, int id, const char *fname )
+{
+    int val = 0;
+    int sval = 0;
+    CCcheck_NULL_2( pd, "np memory was allocated to pd" );
+    pd->id = id;
+    sval = snprintf( pd->pname, MAX_PNAME_LEN, "%s", fname );
+
+    if ( sval < 0 || MAX_PNAME_LEN <= sval )
+    {
+        val = 1;
+        CCcheck_val( val, "Failed to write pname" )
+    }
+
+CLEAN:
+    return val;
+}
+
+static int create_duetime ( wctdata *parent_cd, int branch_job, int completiontime )
+{
+    int val = 0;
+    wctdata    *pd = ( wctdata *) NULL;
+
+    pd = ( wctdata *) CC_SAFE_MALLOC( 1, wctdata );
+    CCcheck_NULL_2( pd, "Failed to allocate pd" );
+    wctdata_init( pd );
+    pd->depth = parent_cd->depth + 1;
+    pd->duration = parent_cd->duration;
+    pd->weights = parent_cd->weights;
+    pd->jobarray = parent_cd->jobarray;
+
+    parent_cd->nsame         = 1;
+    parent_cd->duetime_child = pd;
+
+    pd->branch_job = branch_job;
+    pd->completiontime = completiontime;
+    pd->upper_bound = parent_cd->upper_bound;
+    pd->lower_bound = parent_cd->lower_bound;
+    pd->dbl_safe_lower_bound = parent_cd->dbl_safe_lower_bound;
+
+    pd->parent = parent_cd;
+
+    /** adjusted release time and duetime */
+    /** Construct PricerSolver */
+
+    /** transfer feasible schedules */
+
+    CCcheck_val_2( val, "Failed in transfer_same_cclasses" );
+CLEAN:
+
+    if ( val )
+    {
+        if ( pd )
+        {
+            wctdata_free( pd );
+            free( pd );
+        }
+
+        parent_cd->duetime_child = ( wctdata *) NULL;
+    }
+
+    return val;
+}
+
+static int is_releasetime_child(wctdata* cd)
+{
+   int i;
+
+   for (i = 0; cd->parent && i < cd->parent->ndiff; ++i) {
+      if (cd == cd->parent->releasetime_child + i) {
+         return 1;
+      }
+   }
+   return 0;
+}
+
+static int recover_pricersolver(wctdata* cd){
+    int val = 0;
+    wctdata**    path  = (wctdata**) NULL;
+    int            npath = 0;
+    wctdata*     tmp_cd  = cd;
+    wctdata*     root_cd = cd;
+    int*           elist   = (int*) NULL;
+    int            ndiff   = 0;
+    int            i;
+    int*           new_orig_node_ids = (int*) NULL;
+
+    while (tmp_cd) {
+        npath++;
+        tmp_cd = tmp_cd->parent;
+    }
+
+    path = CC_SAFE_MALLOC(npath, wctdata*);
+    CCcheck_NULL_2(path, "Failed to allocate path.");
+
+    tmp_cd = cd;
+    i      = npath;
+    while (tmp_cd) {
+        i--;
+        path[i] = tmp_cd;
+        root_cd = tmp_cd;
+
+        if (is_releasetime_child(tmp_cd)) ndiff++;
+
+        tmp_cd = tmp_cd->parent;
+    }
+    assert(!path[0]->parent);
+
+
+
+    if ( !cd->orig_node_ids) {
+        int v;
+        new_orig_node_ids = CC_SAFE_MALLOC(root_cd->njobs, int);
+        CCcheck_NULL_2(new_orig_node_ids, "Failed to allocate new_orig_node_ids.");
+        for (v = 0; v < root_cd->njobs; ++v) {
+            new_orig_node_ids [v] = v;
+        }
+    }
+
+
+    for (i = 1; i < npath; ++i) {
+        wctdata* cur_cd = path[i];
+        if (is_releasetime_child(cur_cd) ) {
+            
+        } else {
+            
+        }
+    }
+
+
+    if ( !cd->orig_node_ids) {
+        cd->orig_node_ids = new_orig_node_ids;
+        new_orig_node_ids = (int*) NULL;
+    }
+
+
+CLEAN:
+    CC_IFFREE(elist, int);
+    CC_IFFREE(path, wctdata*);
+    CC_IFFREE(new_orig_node_ids, int);
+
+    return val;
+}
+
+static int create_releasetime ( wctdata *parent_cd, int branch_job, int completiontime )
+{
+    int val = 0;
+    wctdata    *pd = ( wctdata *) NULL;
+
+    pd = ( wctdata *) CC_SAFE_MALLOC( 1, wctdata );
+    CCcheck_NULL_2( pd, "Failed to allocate pd" );
+    wctdata_init( pd );
+    pd->depth = parent_cd->depth + 1;
+    pd->duration = parent_cd->duration;
+    pd->weights = parent_cd->weights;
+    pd->jobarray = parent_cd->jobarray;
+
+    parent_cd->nsame         = 1;
+    parent_cd->releasetime_child = pd;
+
+    pd->branch_job = branch_job;
+    pd->completiontime = completiontime;
+    pd->upper_bound = parent_cd->upper_bound;
+    pd->lower_bound = parent_cd->lower_bound;
+    pd->dbl_safe_lower_bound = parent_cd->dbl_safe_lower_bound;
+
+    pd->parent = parent_cd;
+
+    /** adjusted duetime */
+    /** Construct PricerSolver */
+
+    /** transfer feasible schedules */
+
+    CCcheck_val_2( val, "Failed in transfer_same_cclasses" );
+CLEAN:
+
+    if ( val )
+    {
+        if ( pd )
+        {
+            wctdata_free( pd );
+            free( pd );
+        }
+
+        parent_cd->duetime_child = ( wctdata *) NULL;
+    }
+    return val;
+}
+
+static int find_strongest_children(int *strongest_v1, wctdata* pd, wctproblem* problem, GList *branchnodes, int *completiontime) {
+    int    rval = 0;
+
+    int    max_non_improving_branches  = 3; /* cd->njobs / 100 + 1; */
+    int    remaining_branches          = max_non_improving_branches;
+    double strongest_dbl_lb = 0.0;
+    *strongest_v1 = -1;
+    GList *it = branchnodes;
+
+
+    while ( it && (remaining_branches--) ) {
+        int v1 = GPOINTER_TO_INT(it->data);
+        double dbl_child_lb;
+
+        /* Create duetime and releasetime */
+        rval = create_duetime(pd, v1, completiontime[v1]);
+        CCcheck_val_2(rval, "Failed in create_duetime");
+
+        rval = create_releasetime(pd, v1, completiontime[v1]);
+        CCcheck_val_2(rval, "Failed in create_differ");
+
+        pd->duetime_child->maxiterations = 5;
+        pd->releasetime_child->maxiterations = 5;
+
+        compute_lower_bound(problem, pd->duetime_child);
+        compute_lower_bound(problem, pd->releasetime_child);
+
+        dbl_child_lb = (pd->duetime_child->dbl_safe_lower_bound < pd->releasetime_child->dbl_safe_lower_bound) ?
+                       pd->duetime_child->dbl_safe_lower_bound : pd->releasetime_child->dbl_safe_lower_bound;
+
+        wctdata_free(pd->duetime_child);
+        pd->nsame = 0; free(pd->duetime_child); pd->duetime_child = (wctdata*) NULL;
+        wctdata_free(pd->releasetime_child);
+        pd->ndiff = 0; free(pd->releasetime_child); pd->releasetime_child = (wctdata*) NULL;
+
+        if (dbl_child_lb > strongest_dbl_lb) {
+            strongest_dbl_lb = dbl_child_lb;
+            *strongest_v1     = v1;
+            remaining_branches = max_non_improving_branches;
+        }
+    }
+
+CLEAN:
+    return rval;
+}
+
+static void Scheduleset_unify ( Scheduleset *cclasses, int *new_ccount, int ccount )
+{
+    int i;
+    Scheduleset temp;
+    Scheduleset_quicksort( cclasses, ccount, ( *Scheduleset_less ) );
+    *new_ccount = 0;
+    i = 0;
+
+    if ( ! ccount )
+    {
+        return;
+    }
+
+    /* Find first non-empty set */
+    while ( !cclasses[i].count )
+    {
+        Scheduleset_free( &( cclasses[i++] ) );
+    }
+
+    for ( ; i < ccount; ++i )
+    {
+        if ( *new_ccount == 0
+                || Scheduleset_less( &( cclasses[*new_ccount - 1] ), &( cclasses[i] ) ) )
+        {
+            ( *new_ccount )++;
+
+            if ( *new_ccount  < i + 1 )
+            {
+                Scheduleset_SWAP( &( cclasses[*new_ccount - 1] ), & ( cclasses[i] ), &temp );
+            }
+        }
+        else
+        {
+            Scheduleset_free( &( cclasses[i] ) );
+        }
+    }
+}
+
+int prune_duplicated_sets ( wctdata *pd )
+{
+    int val = 0;
+    int i, j;
+    Scheduleset_unify ( pd->cclasses, &( pd->ccount ), pd->ccount );
+
+    for ( i = 0 ; i < pd->ccount; ++i )
+    {
+        if ( dbg_lvl() > 1 )
+        {
+            printf( "TRANSSORT SET " );
+
+            for ( j = 0; j < pd->cclasses[i].count; ++j )
+            {
+                printf( " %d", pd->cclasses[i].members[j] );
+            }
+
+            printf( "\n" );
+        }
+    }
+
+    return val;
+}
+
+int create_branches( wctdata *pd, wctproblem *problem )
+{
+    int val = 0;
+    int result;
+    double *x = ( double *)NULL;
+    int strongest_v1 = -1;
+    GList *branchjobs = (GList*) NULL;
+    int *min_completiontime = (int *) NULL;
+
+    if ( !pd->LP )
+    {
+        val = build_lp( pd );
+        CCcheck_val_2( val, "Failed at build_lp" );
+    }
+
+    if ( !pd->ccount )
+    {
+        compute_lower_bound( problem, pd );
+    }
+
+    assert( pd->ccount != 0 );
+    x = CC_SAFE_MALLOC( pd->ccount, double );
+    CCcheck_NULL_2( x, "Failed to allocate memory to x" );
+    val = wctlp_optimize( pd->LP );
+    CCcheck_val_2( val, "Failed at wctlp_optimize" );
+    val = wctlp_x( pd->LP, x, 0 );
+    CCcheck_val_2( val, "Failed at wctlp_x" );
+    CC_IFFREE( pd->x, double );
+    pd->x = CC_SAFE_MALLOC( pd->ccount, double );
+    CCcheck_NULL_2( pd->x, "Failed to allocate memory to pd->x" );
+    memcpy( pd->x, x, pd->ccount * sizeof( double ) );
+    val = test_theorem_ahv(pd, pd->x, branchjobs, min_completiontime);
+    CCcheck_val_2(val, "Failed in test ahv");
+
+    if ( g_list_length(branchjobs) == 0 )
+    {
+        printf( "LP returned integral solution\n" );
+        val = grab_integral_solution_ahv(pd, min_completiontime);
+        CCcheck_val_2( val, "Failed in grab_int_sol" );
+        assert( pd->status = finished );
+        goto CLEAN;
+    }
+
+    val = heur_exec( problem, pd, &result );
+    CCcheck_val_2( val, "Failed at heur_exec" );
+
+    val = find_strongest_children(&strongest_v1, pd, problem, branchjobs, min_completiontime);
+    CCcheck_val_2( val, "Failed in find_strongest_children" );
+
+    val = create_duetime( pd, strongest_v1, min_completiontime[strongest_v1] );
+    CCcheck_val( val, "Failed in create_same" );
+    val = set_id_and_name( pd->duetime_child, problem->nwctdata++, pd->pname );
+    CCcheck_val_2( val, "Failed in set_id_and_name" );
+    val = compute_lower_bound( problem, pd->duetime_child );
+    CCcheck_val_2( val, "Failed in compute_lower_bound" );
+
+    val = create_releasetime( pd, strongest_v1, min_completiontime[strongest_v1]);
+    CCcheck_val_2( val, "Failed in create_differ" );
+    val = set_id_and_name( pd->releasetime_child, problem->nwctdata++, pd->pname );
+    CCcheck_val_2( val, "Failed in set_id_and_name" );
+    val = compute_lower_bound( problem, pd->releasetime_child );
+    CCcheck_val_2( val, "Failed in compute_lower_bound" );
+
+
+CLEAN:
+    lpwctdata_free( pd );
+    g_list_free(branchjobs);
+    CC_IFFREE(min_completiontime, int);
+
+    CC_IFFREE( x, double );
+    return val;
+}
+
+double safe_lower_dbl( int numerator, int denominator )
+{
+    double result;
+    double denom_mult;
+    denom_mult = denominator;
+    denom_mult = nextafter( denom_mult, DBL_MAX );
+    denom_mult = 1 / denom_mult;
+    denom_mult = nextafter( denom_mult, -DBL_MAX );
+    result = ( double ) numerator * denom_mult;
+    result = nextafter( result, -DBL_MAX );
+    return result;
+}
+
+static int trigger_lb_changes( wctdata *child )
+{
+    int val = 0;
+    int i;
+    int new_lower_bound = child->lower_bound;
+    wctdata *pd = ( wctdata *) child->parent;
+
+    while ( pd )
+    {
+        for ( i = 0;  i < pd->nsame; ++i )
+        {
+            if ( pd->duetime_child[i].lower_bound < new_lower_bound )
+            {
+                new_lower_bound = pd->duetime_child[i].lower_bound;
+            }
+        }
+
+        for ( i = 0;  i < pd->ndiff; ++i )
+        {
+            if ( pd->releasetime_child[i].lower_bound < new_lower_bound )
+            {
+                new_lower_bound = pd->releasetime_child[i].lower_bound;
+            }
+        }
+
+        if ( new_lower_bound > pd->lower_bound )
+        {
+            if ( ! pd->parent )   /* i.e. pd == root_cd */
+            {
+                time_t current_time;
+                char   current_timestr[40] = "";
+                ( void ) time( &current_time );
+                strftime( current_timestr, 39, "%c", localtime( &current_time ) );
+                printf( "Lower bound increased from %d to %d (%s). \n",
+                        pd->lower_bound, new_lower_bound, current_timestr );
+            }
+
+            pd->lower_bound = new_lower_bound;
+            pd = pd->parent;
+        }
+        else
+        {
+            pd = ( wctdata *) NULL;
+        }
+    }
+
+    return val;
+}
+
+int skip_wctdata( wctdata *pd, wctproblem *problem )
+{
+    pmcheap *br_heap = problem->br_heap;
+
+    if ( dbg_lvl() )
+    {
+        printf( "Skipping with lb %d and ub %d at depth %d (id = %d, "
+                "opt_track = %d, unprocessed nodes = %d).\n",
+                pd->lower_bound, pd->upper_bound,
+                pd->depth,
+                pd->id, pd->opt_track, pmcheap_size( br_heap ) );
+    }
+
+    pd->status = finished;
+    return 0;
+}
+
+int insert_into_branching_heap( wctdata *pd, wctproblem *problem )
+{
+    int val = 0;
+    int heap_key = 0;
+
+    switch ( problem->parms.branching_strategy )
+    {
+    case dfs_strategy:
+        if ( pd->parent )
+            heap_key = ( int )( pd->dbl_est_lower_bound ) - pd->depth * 1000000 ;
+
+        break;
+
+    case min_lb_strategy:
+    default:
+        heap_key = ( int )( pd->dbl_est_lower_bound * problem->mult_key ) - pd->depth -
+                   pd->id % 2;
+    }
+
+    int lb = ( int ) ceil( pd->dbl_est_lower_bound );
+
+    if ( lb < ( problem->parms.nmachines + 1 ) )
+    {
+        if ( dbg_lvl() )
+        {
+            printf( "Inserting into branching heap with lb %d and ub %d at depth %d (id = %d) heap_key = %d\n",
+                    pd->lower_bound, pd->upper_bound, pd->depth, pd->id, heap_key );
+        }
+
+        val = pmcheap_insert( problem->br_heap, heap_key, ( void *)pd );
+        CCcheck_val( val, "Failed at pmcheap_insert" );
+    }
+    else
+    {
+        skip_wctdata( pd, problem );
+    }
+
+    trigger_lb_changes( pd );
+    CCcheck_val_2( val, "Failed in trigger_lb_changes" );
+CLEAN:
+    return val;
+}
+
+int branching_msg( wctdata *pd, wctproblem *problem )
+{
+    pmcheap *br_heap = problem->br_heap;
+
+    if ( pd->lower_bound < pd->upper_bound )
+    {
+        CCutil_suspend_timer( &problem->tot_cputime );
+        printf( "Branching with lb %d (est. %f and %f) at depth %d (id = %d, "
+                "time = %f, unprocessed nodes = %d, vcount = %d, upper bound = %d, lower bound = %d).\n",
+                pd->lower_bound, pd->dbl_safe_lower_bound, pd->LP_lower_bound,
+                pd->depth,
+                pd->id, problem->tot_cputime.cum_zeit, pmcheap_size( br_heap ), pd->njobs, problem->global_upper_bound, problem->global_lower_bound);
+        CCutil_resume_timer( &problem->tot_cputime );
+    }
+
+    return 0;
+}
+
+int sequential_branching( wctproblem *problem )
+{
+    int val = 0;
+    wctdata *pd;
+    pmcheap *br_heap = problem->br_heap;
+    wctparms *parms = &( problem->parms );
+    printf( "ENTERED SEQUANTIAL BRANCHING:\n" );
+    CCutil_suspend_timer( &problem->tot_branching_cputime );
+
+    while ( ( pd = ( wctdata *) pmcheap_min( br_heap ) )
+            && problem->tot_branching_cputime.cum_zeit < parms->branching_cpu_limit )
+    {
+        CCutil_resume_timer( &problem->tot_branching_cputime );
+        int i;
+        pd->upper_bound = problem->global_upper_bound;
+        if ( pd->lower_bound >= pd->upper_bound )
+        {
+            skip_wctdata( pd, problem );
+            remove_finished_subtree( pd);
+        } else {
+            branching_msg( pd, problem );
+
+            /** Construct PricerSolver */
+            recover_pricersolver(pd);
+
+            if ( problem->maxdepth < pd->depth )
+            {
+                problem->maxdepth = pd->depth;
+            }
+
+            val = create_branches( pd, problem );
+            CCcheck_val_2( val, "Failed at create_branches" );
+
+            for ( i = 0; i < pd->nsame; i++ )
+            {
+                val = insert_into_branching_heap( &( pd->duetime_child[i] ), problem );
+                CCcheck_val_2( val, "Failed in insert_into_branching_heap" );
+            }
+
+            for ( i = 0; i < pd->ndiff; i++ )
+            {
+                val = insert_into_branching_heap( pd->releasetime_child + i, problem );
+                CCcheck_val_2( val, "Faield at insert_into_branching_heap" );
+            }
+
+            assert(pd->lower_bound <= pd->upper_bound);
+
+            adapt_global_upper_bound(problem, pd->upper_bound);
+
+            if (pd->upper_bound == pd->lower_bound) {
+                remove_finished_subtree(pd);
+            }
+
+            /** Check for integer solutions */
+        }
+
+        CCutil_suspend_timer( &problem->tot_branching_cputime );
+    }
+
+    CCutil_resume_timer( &problem->tot_branching_cputime );
+
+    if ( pd )
+    {
+        printf( "Branching timeout of %f second reached\n",
+                parms->branching_cpu_limit );
+    }
+
+    children_data_free( &problem->root_pd );
+CLEAN:
+    return val;
+}
+
+int build_lp( wctdata *pd )
+{
+    int val = 0;
+    int i, j;
+    int  *covered = ( int *)NULL;
+    int counter = 0;
+    covered = CC_SAFE_MALLOC( pd->njobs, int );
+    CCcheck_NULL_2( covered, "Failed to allocate memory to covered" );
+    fill_int( covered, pd->njobs, 0 );
+    val = wctlp_init( &( pd->LP ), NULL );
+    CCcheck_val_2( val, "wctlp_init failed" );
+
+    for ( i = 0; i < pd->njobs; i++ )
+    {
+        char sense = wctlp_GREATER_EQUAL;
+        val = wctlp_addrow( pd->LP, 0, ( int *)NULL, ( double *)NULL, sense, 1.0,
+                            ( char *)NULL );
+        CCcheck_val_2( val, "Failed wctlp_addrow" );
+    }
+
+    pd->coef = ( double *)CCutil_reallocrus( pd->coef, pd->njobs * sizeof( double ) );
+    CCcheck_NULL_2( pd->coef, "out of memory for coef" );
+    fill_dbl( pd->coef, pd->njobs, 1.0 );
+    /** add constraint about number of machines */
+
+    for ( i = 0; i < pd->ccount; i++ )
+    {
+        /** Change the cost function */
+        val = wctlp_addcol( pd->LP, pd->cclasses[i].count,
+                            pd->cclasses[i].members,
+                            pd->coef, 1.0, .0, 1.0, wctlp_CONT, NULL );
+
+        if ( val )
+        {
+            wctlp_printerrorcode( val );
+        }
+
+        CCcheck_val_2( val, "pmclp_addcol failed" );
+
+        for ( j = 0; j < pd->cclasses[i].count && counter < pd->njobs; j++ )
+        {
+            if ( !covered[pd->cclasses[i].members[j]] )
+            {
+                covered[pd->cclasses[i].members[j]] = 1;
+                counter++;
+            }
+        }
+    }
+
+    if ( counter < pd->njobs )
+    {
+        for ( i = 0; i < pd->njobs; i++ )
+        {
+            if ( !covered[i] )
+            {
+                pd->newsets = CC_SAFE_MALLOC( 1, Scheduleset );
+                Scheduleset_init( pd->newsets );
+                pd->newsets[0].members = CC_SAFE_MALLOC( 1, int );
+                pd->nnewsets = 1;
+                CCcheck_NULL_2( pd->newsets[0].members,
+                                "Failed to allocate memory to pd->newsets->members" );
+                pd->newsets[0].count++;
+                pd->newsets[0].members[0] = i;
+
+                val = wctlp_addcol( pd->LP, 1, pd->newsets[0].members, pd->coef, 1.0, 0., 1.0,
+                                    wctlp_CONT, NULL );
+                CCcheck_val_2( val, "Failed in pmclp_addcol" );
+                add_newsets( pd );
+            }
+        }
+    }
+
+    pd->pi = ( double *)CCutil_reallocrus( pd->pi, pd->njobs * sizeof( double ) );
+    CCcheck_NULL_2( pd->pi, "Failed to allocate memory to pd->pi" );
+CLEAN:
+
+    if ( val )
+    {
+        wctlp_free( &( pd->LP ) );
+        CC_IFFREE( pd->coef, double );
+        CC_IFFREE( pd->pi, double );
+    }
+
+    CC_IFFREE( covered, int );
+    return val;
+}
+
+int compute_lower_bound( wctproblem *problem, wctdata *pd )
+{
+    int  j, val = 0;
+    int iterations = 0;
+    int break_while_loop = 1;
+    double cur_cputime;
+    double last_lower_bound = DBL_MAX;
+    int    nnonimprovements     = 0;
+
+    if ( dbg_lvl() )
+    {
+        printf( "Starting compute_lower_bound with lb %d and ub %d at depth %d(id = %d, opt_track = %d)\n",
+                pd->lower_bound, pd->upper_bound, pd->depth, pd->id, pd->opt_track );
+    }
+
+    CCutil_start_timer( &( problem->tot_lb_cpu_time ) );
+
+    /** Construct solutions if list of columns is empty */
+    if ( !pd->ccount ) {
+
+    }
+
+    assert( pd->gallocated >= pd->ccount );
+
+    if ( !pd->LP )
+    {
+        val = build_lp( pd );
+        CCcheck_val( val, "build_lp failed" );
+    }
+
+    pd->kpc_pi = CC_SAFE_MALLOC( pd->njobs, int );
+    CCcheck_NULL_2( pd->kpc_pi, "Failed to allocate memory to pd->kpc_pi" );
+
+    do
+    {
+        iterations++;
+        /** Insert possibility to delete old columns ? */
+
+        cur_cputime = CCutil_zeit();
+        val = wctlp_optimize( pd->LP );
+        CCcheck_val_2( val, "pmclp_optimize failed" );
+        cur_cputime = CCutil_zeit() - cur_cputime;
+
+        if ( dbg_lvl() )
+        {
+            printf( "Simplex took %f seconds.\n", CCutil_zeit() - cur_cputime );
+            fflush( stdout );
+        }
+
+
+        if ( dbg_lvl() > 1 )
+        {
+            print_ages( pd );
+        }
+
+        val = wctlp_pi( pd->LP, pd->pi );
+        CCcheck_val_2( val, "pmclp_pi failed" );
+        make_pi_feasible( pd );
+        double2int( pd->kpc_pi, &( pd->kpc_pi_scalef ), pd->pi, pd->njobs );
+        val = compute_objective( pd );
+        CCcheck_val_2( val, "compute_objective failed" );
+        pd->dbl_est_lower_bound = pd->dbl_safe_lower_bound;
+
+        if ( iterations < pd->maxiterations )
+        {
+            if ( fabs( last_lower_bound - pd->dbl_est_lower_bound ) < 0.000001 ) {
+                nnonimprovements++;
+            } else {
+                nnonimprovements = 0;
+            }
+
+            last_lower_bound = pd->dbl_safe_lower_bound;
+            CCutil_start_resume_time( &problem->tot_pricing );
+            /** Solve the pricing problem */
+
+            CCutil_suspend_timer( &problem->tot_pricing );
+
+            for ( j = 0; j < pd->nnewsets; j++ )
+            {
+                val = wctlp_addcol( pd->LP, pd->newsets[j].count,
+                                    pd->newsets[j].members,
+                                    pd->coef, 1.0, 0.0, 1.0,
+                                    wctlp_CONT, NULL );
+                CCcheck_val_2( val, "pmclp_addcol failed" );
+            }
+
+
+            break_while_loop = ( ( pd->nnewsets == 0 ) || nnonimprovements > 5
+                                 || last_lower_bound < problem->parms.nmachines );
+            add_newsets( pd );
+
+        }
+        CCutil_suspend_timer( &( problem->tot_cputime ) );
+        CCutil_resume_timer( &( problem->tot_cputime ) );
+    }
+    while ( ( iterations < pd->maxiterations ) && !break_while_loop
+            && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit );
+
+    if ( iterations < pd->maxiterations
+            && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit )
+    {
+        val = wctlp_optimize( pd->LP );
+        CCcheck_val_2( val, "pmclp_optimize failed" );
+        val = wctlp_pi( pd->LP, pd->pi );
+        CCcheck_val_2( val, "pmclp_pi failed" );
+        make_pi_feasible( pd );
+        double2int( pd->kpc_pi, &( pd->kpc_pi_scalef ), pd->pi, pd->njobs );
+        val = compute_objective( pd );
+        CCcheck_val_2( val, "compute_objective failed" );
+
+        if ( dbg_lvl() > 1 )
+        {
+            printf( "Found lb = %d (%f) upper_bound = %d (id= %d, iterations = %d,opt_track = %d).\n",
+                    pd->lower_bound, pd->dbl_safe_lower_bound, pd->upper_bound,
+                    pd->id, iterations, pd->opt_track );
+        }
+
+        pd->x = CC_SAFE_MALLOC( pd->ccount, double );
+        CCcheck_NULL_2( pd->x, "Failed to allocate memory to pd->x" );
+        val = wctlp_x( pd->LP, pd->x, 0 );
+        CCcheck_val_2( val, "Failed in pmclp_x" );
+        pd->status = LP_bound_computed;
+    } else {
+        pd->status = LP_bound_estimated;
+    }
+
+    fflush( stdout );
+    CCutil_suspend_timer( &( problem->tot_lb_cpu_time ) );
+CLEAN:
+    return val;
+}
+
+static int prefill_heap( wctdata *pd, wctproblem *problem )
+{
+    int val = 0;
+    int insert_into_heap = 0;
+
+    if ( problem->nwctdata <= pd->id )
+    {
+        problem->nwctdata = pd->id + 1;
+    }
+
+    if ( pd->status < LP_bound_computed )
+    {
+        printf( "Found a node with LP not computed!\n" );
+        val = compute_lower_bound( problem, pd );
+        CCcheck_val_2( val, "Failed at compute_lower_bound" );
+        insert_into_heap = 1;
+    }
+
+    if ( pd->status < finished )
+    {
+        int i;
+
+        if ( !pd->nsame || !pd->ndiff )
+        {
+            insert_into_heap = 1;
+        }
+
+        for ( i = 0; ( !insert_into_heap ) && i < pd->nsame; ++i )
+        {
+            if ( pd->duetime_child[i].status < LP_bound_computed )
+            {
+                insert_into_heap = 1;
+            }
+        }
+
+        for ( i = 0; ( !insert_into_heap ) && i < pd->ndiff; ++i )
+        {
+            if ( pd->releasetime_child[i].status < LP_bound_computed )
+            {
+                insert_into_heap = 1;
+            }
+        }
+    }
+
+    if ( insert_into_heap )
+    {
+        val = insert_into_branching_heap( pd, problem );
+        CCcheck_val_2( val, "Failed in insert_into_branching_heap" );
+        children_data_free( pd );
+    }
+    else
+    {
+        int i;
+
+        for ( i = 0; i < pd->nsame; ++i )
+        {
+            prefill_heap( pd->duetime_child + i, problem );
+        }
+
+        for ( i = 0; i < pd->ndiff; ++i )
+        {
+            prefill_heap( pd->releasetime_child + i, problem );
+        }
+    }
+
+CLEAN:
+    return val;
+}
+
+int compute_schedule( wctproblem *problem )
+{
+    int val = 0;
+    wctdata *root_pd = &( problem->root_pd );
+    wctparms *parms = &( problem->parms );
+    int nmachine = problem->parms.nmachines;
+    problem->mult_key = ( double ) ( INT_MAX - 1 ) / root_pd->njobs;
+    problem->first_upper_bound = problem->global_upper_bound;
+    problem->first_lower_bound = problem->global_lower_bound;
+    problem->first_rel_error = ( double )( problem->global_upper_bound -
+                                           problem->global_lower_bound ) / ( ( double )problem->global_lower_bound );
+
+
+    /** Transform columns into maximal schedule with  respect to the properties of optimal solutions */
+
+    /** Add maximal schedule sets with respect to the properties of optimal solutions */
+    prune_duplicated_sets( root_pd );
+
+
+    if ( root_pd->status >= LP_bound_computed )
+    {
+        val = prefill_heap( root_pd, problem );
+        CCcheck_val( val, "Failed in prefill_heap" );
+    } else {
+        val = compute_lower_bound( problem, root_pd );
+        CCcheck_val_2( val, "Failed in compute_lower_bound" );
+
+        if ( root_pd->dbl_safe_lower_bound > (double) nmachine )
+        {
+            problem->found = 0;
+            goto CLEAN;
+        }
+
+        val = insert_into_branching_heap( root_pd, problem );
+        CCcheck_val_2( val, "insert_into_branching_heap failed" );
+    }
+
+    if ( parms->branchandbound == yes )
+    {
+        CCutil_start_resume_time( &( problem->tot_branching_cputime ) );
+        val = sequential_branching( problem );
+        CCcheck_val( val, "Failed in sequential_branching" );
+        CCutil_suspend_timer( &( problem->tot_branching_cputime ) );
+    }
+
+CLEAN:
+    return val;
+}
+
 

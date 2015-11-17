@@ -27,7 +27,8 @@ void wctparms_init(wctparms *parms){
     parms->backupdir = (char*) NULL;
 
     parms->upper_bounds_only = 0;
-    parms->branching_cpu_limit = 3600;
+    parms->branching_cpu_limit = 3600.0;
+    parms->scatter_search_cpu_limit = 120.0;
 }
 
 void wctparms_free(wctparms *parms){
@@ -117,5 +118,10 @@ int wctparms_set_scatter_search(wctparms* parms,int scatter){
 
 int wctparms_set_branchandbound(wctparms *parms, int bound){
     parms->branchandbound = bound;
+    return 0;
+}
+
+int wctparms_set_scatter_search_cpu_limit(wctparms *parms,double limit){
+    parms->scatter_search_cpu_limit = limit;
     return 0;
 }

@@ -1,6 +1,11 @@
 #ifndef _HEAP_H
 #define _HEAP_H 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #include <assert.h>
 #define CCutil_MAXDBL (1e30)
 #define CCutil_MAXINT (2147483647)
@@ -35,3 +40,6 @@ pmcheap_reset(pmcheap* heap),
 pmcheap_reset_free(pmcheap* heap);
 #endif
 
+#ifdef __cplusplus
+}
+#endif

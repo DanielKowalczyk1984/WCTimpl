@@ -201,3 +201,39 @@ int lowerbound_eei(Job* array,int njobs,int nmachines){
 
     return val;
 }
+
+int lowerbound_ak(Job *array, int njobs, int nmachines){
+    int i,val = 0;
+    int *perm_p = (int *) NULL;
+    int *perm_w = (int *) NULL;
+    int *start = (int *) NULL;
+
+    perm_p = CC_SAFE_MALLOC(njobs, int);
+    perm_w = CC_SAFE_MALLOC(njobs, int);
+    start = CC_SAFE_MALLOC(njobs, int);
+
+    for(i = 0; i < njobs; ++i) {
+        perm_p[i] = array[i].processingime;
+        perm_w[i] = array[i].weight;
+    }
+
+    CCutil_int_array_quicksort(perm_p, njobs);
+    CCutil_int_array_quicksort_0(perm_w, njobs);
+
+    for(i = 0; i < njobs; ++i) {
+        if(i < nmachines) {
+            start[i] = 0;
+        } else {
+            start[i] = start[i - nmachines] + perm_p[i];
+        }
+
+        val += perm_w[i]*(start[i]) + array[i].processingime*array[i].weight;
+    }
+
+
+
+    CC_IFFREE(start, int);
+    CC_IFFREE(perm_p, int);
+    CC_IFFREE(perm_w, int);
+    return val;
+}

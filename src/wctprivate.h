@@ -6,7 +6,11 @@
 #include "datastructsol.h"
 #include "wctparms.h"
 #include "lp.h"
+#include "solverwrapper.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * scatter search data types
@@ -88,6 +92,8 @@ struct wctdata {
     // The job information
     int njobs;
     int nmachines;
+    int *duetime;
+    int *releasetime;
     int *duration;
     int *weights;
     int *orig_node_ids;
@@ -101,6 +107,7 @@ struct wctdata {
     double *x;
     double *coef;
     double *pi;
+    PricerSolver *solver;
     //Colorset(Assignments)
     int ccount;
     Scheduleset*cclasses;
@@ -126,9 +133,10 @@ struct wctdata {
     //KPC instances
     
     
-    
+    // Best Solution
     Scheduleset*bestcolors;
-    int nbestcolors;
+    int besttotwct;
+    int nbbest;
     
     const Scheduleset*debugcolors;
     int ndebugcolors;
@@ -140,11 +148,13 @@ struct wctdata {
     int retirementage;
     
     //Branches
-    int v1,v2;
+    int branch_job;
+    int completiontime;
+    
     wctdata* parent;
-    wctdata* same_children;
+    wctdata* duetime_child;
     int nsame;
-    wctdata* diff_children;
+    wctdata* releasetime_child;
     int ndiff;
 
     //heur_diving
@@ -214,7 +224,8 @@ int lp_build(wctdata *pd);
 void lpwctdata_free(wctdata *pd);
 void children_data_free(wctdata *pd);
 void wctdata_free(wctdata *pd);
-
-
+#ifdef __cplusplus
+}
 #endif
 
+#endif

@@ -11,6 +11,9 @@
 #ifndef __WCTPARMS_H
 #define __WCTPARMS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 enum wctBranchStrat{
     min_strategy    = 0,
@@ -64,6 +67,7 @@ typedef struct wctparms{
     
     int upper_bounds_only;
     double branching_cpu_limit;
+    double scatter_search_cpu_limit;
     
     int nmachines;
 } wctparms;
@@ -82,6 +86,7 @@ int wctparms_set_nb_feas_sol(wctparms *parms,int nb_sol);
 int wctparms_set_combine_method(wctparms *parms,int combine_method);
 int wctparms_set_scatter_search(wctparms* parms,int scatter);
 int wctparms_set_branchandbound(wctparms *parms,int bound);
+int wctparms_set_scatter_search_cpu_limit(wctparms *parms,double limit);
 
 /*Functions for defining the filesname*/
 int wctparms_set_outfile(wctparms *parms, const char *fname);
@@ -98,3 +103,6 @@ int wctparms_set_nmachines(wctparms *parms,int nmachines);
 
 #endif
 
+#ifdef __cplusplus
+}
+#endif

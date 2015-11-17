@@ -13,16 +13,26 @@
 #include "util.h"
 #include "datastructsol.h"
 
+void iterator(gpointer key, gpointer value, gpointer user_data);
+
+void iterator(gpointer key, gpointer value, gpointer user_data) {
+    GHashTable *new =(GHashTable *) user_data;
+    g_hash_table_insert(new, key, value);
+}
+
 static int copy_Schedulesets( Scheduleset *dst, const Scheduleset *src, int nsrc );
 #define copy_sets() {                                                   \
         dst->count = src->count;                                            \
         dst->totweight = src->totweight;                                      \
         dst->age = src->age;                                                \
+        dst->totwct = src->totwct; \
         if(dst->count == 0){                                                \
             dst->members = (int*)NULL;                                      \
         } else {                                                            \
             dst->members = CC_SAFE_MALLOC(dst->count, int);                 \
             CCcheck_NULL_2(dst->members, "Failed to allocate memory");      \
+            dst->completiontime = g_hash_table_new(g_direct_hash, g_direct_equal); \
+            g_hash_table_foreach(src->completiontime, iterator, dst->completiontime); \
             memcpy(dst->members, src->members, dst->count*sizeof(int));     \
         }                                                                   \
         dst++;                                                              \
@@ -33,11 +43,14 @@ static int copy_Schedulesets( Scheduleset *dst, const Scheduleset *src, int nsrc
         dst[x].count = src[x].count;                                        \
         dst[x].totweight = src[x].totweight;                                  \
         dst[x].age = src[x].age;                                            \
+        dst[x].totwct = src[x].totwct; \
         if(dst[x].count == 0){                                              \
             dst[x].members = (int*)NULL;                                    \
         } else {                                                            \
             dst[x].members = CC_SAFE_MALLOC(dst[x].count, int);             \
             CCcheck_NULL_2(dst[x].members, "Failed to allocate memory");    \
+            dst[x].completiontime = g_hash_table_new(g_int_hash, g_int_equal);\
+            g_hash_table_foreach(src[x].completiontime, iterator, dst[x].completiontime);\
             memcpy(dst[x].members, src[x].members, dst[x].count*sizeof(int));\
         }                                                                   \
     }
@@ -46,9 +59,11 @@ void Scheduleset_init( Scheduleset *set )
 {
     if ( set ) {
         set->members  = ( int * ) NULL;
+        set->completiontime = (GHashTable *) NULL;
         set->count    = 0;
         set->age      = 0;
         set->totweight = 0;
+        set->totwct = 0;
     }
 }
 
@@ -56,10 +71,12 @@ void Scheduleset_free( Scheduleset *set )
 {
     if ( set && set->members ) {
         CC_IFFREE( set->members, int );
+        g_hash_table_destroy(set->completiontime);
         set->members  = ( int * )NULL;
         set->count    = 0;
         set->totweight = 0;
         set->age      = 0;
+        set->totwct = 0;
     }
 }
 
@@ -456,16 +473,22 @@ int partlist_to_Scheduleset( partlist *part, int nbpart, Scheduleset **classes,
             temp_sets[k].totweight = part[i].completiontime;
             temp_sets[k].members = CC_SAFE_MALLOC( temp_sets[k].count, int );
             CCcheck_NULL( temp_sets[k].members, "Failed to allocate memory to members" );
+            temp_sets[k].completiontime = g_hash_table_new(g_direct_hash, g_direct_equal);
             GList *v = part[i].list->head;
             j = 0;
 
+            int completion = 0;
             while ( v != NULL ) {
-                temp_sets[k].members[j] = ( ( Job * )v->data )->job;
+                Job *job = ( Job * )v->data;
+                temp_sets[k].members[j] = job->job;
+                completion += job->processingime;
+                temp_sets[k].totwct += job->weight*completion;
+                g_hash_table_insert(temp_sets[k].completiontime, GINT_TO_POINTER(job->job), GINT_TO_POINTER(completion));
                 v = g_list_next( v );
                 j++;
             }
 
-            CCutil_int_array_quicksort( temp_sets[k].members, temp_sets[k].count );
+            //CCutil_int_array_quicksort( temp_sets[k].members, temp_sets[k].count );
             k++;
         }
     }

@@ -6,7 +6,6 @@ int move(Job *j, partlist* m_j, partlist* m_i);
 int sort_jobs(gconstpointer a, gconstpointer b){
     int aa = (((const Job*)a)->job);
     int bb = (((const Job*)b)->job);
-
     return aa - bb;
 }
 
@@ -21,29 +20,28 @@ int k_l_move_general(Job** K_jobs, Job** L_jobs, partlist*m_k,partlist *m_l, sol
     int i,val = 0;
     Job* ptr_job = (Job*) NULL;
     Job* ptr_job2 = (Job*) NULL;
-    GList* array = (GList *) NULL;
+    GList* list = (GList *) NULL;
     GList *it = (GList*) NULL;
     GList *it2 = (GList*) NULL;
 
     if (l > 0){
         m_l = sol->vlist[L_jobs[0]->job].part;
-    } 
+    }
 
     for (i = 0; i < k; ++i){
         assert(sol->vlist[K_jobs[i]->job].part == m_k);
-        array = g_list_append(array, K_jobs[i]);
+        list = g_list_append(list, K_jobs[i]);
     }
 
     if (l > 0){
         for (i = 0; i < l; ++i){
             assert(sol->vlist[L_jobs[i]->job].part == m_l);
-            array = g_list_append(array, L_jobs[i]);
+            list = g_list_append(list, L_jobs[i]);
         }
     }
+    list = g_list_sort(list, sort_jobs);
 
-    array = g_list_sort(array, sort_jobs);
-
-    for ( it = array; it; it = it->next){
+    for ( it = list; it; it = it->next){
         ptr_job = (Job *) it->data;
         if (l > 0)
         {
@@ -52,9 +50,9 @@ int k_l_move_general(Job** K_jobs, Job** L_jobs, partlist*m_k,partlist *m_l, sol
                 val += move(ptr_job, m_k, m_l);
             } else {
                 val += move(ptr_job, m_l, m_k);
-            }       
-            
-            it2 = array;
+            }
+
+            it2 = list;
             while(it2 != it){
               ptr_job2 = (Job *)it2->data;
               if (sol->vlist[ptr_job->job].part != sol->vlist[ptr_job2->job].part)
@@ -67,7 +65,7 @@ int k_l_move_general(Job** K_jobs, Job** L_jobs, partlist*m_k,partlist *m_l, sol
             }
         } else {
             val += move(ptr_job,m_k,m_l);
-            it2 = array;
+            it2 = list;
             while(it2 != it){
               ptr_job2 = (Job *)it2->data;
               if (sol->vlist[ptr_job->job].part != sol->vlist[ptr_job2->job].part)
@@ -81,7 +79,7 @@ int k_l_move_general(Job** K_jobs, Job** L_jobs, partlist*m_k,partlist *m_l, sol
         }
     }
 
-    g_list_free(array);
+    g_list_free(list);
     return val;
 }
 
@@ -115,7 +113,7 @@ int local_search_machine_general_best(solution *sol,int lowerbound, int k, int l
         L_jobs_max = CC_SAFE_MALLOC(l, Job*);
     }
 
-    // printf("Executing local search with k = %d and l = %d\n", k,l);
+    printf("Executing local search with k = %d and l = %d\n", k,l);
 
     moved = 1;
     while(moved && sol->totalweightcomptime != lowerbound){
@@ -127,7 +125,7 @@ int local_search_machine_general_best(solution *sol,int lowerbound, int k, int l
         {
             for (j = i + 1; j < nmachines; ++j)
             {
-                
+
                 temp_m1 = sol->part + i;
                 temp_m2 = sol->part + j;
                 n1 = g_queue_get_length(temp_m1->list);
@@ -215,7 +213,7 @@ int local_search_machine_general_best(solution *sol,int lowerbound, int k, int l
                             }
                             temp = k_l_move_general(K_jobs, L_jobs,temp_m1,temp_m2, sol, k, l);
                             if(temp > max)
-                            {   
+                            {
                                 for ( it1 = 0; it1 < k; ++it1)
                                 {
                                     K_jobs_max[it1] = K_jobs[it1];
@@ -259,7 +257,7 @@ int local_search_machine_general_best(solution *sol,int lowerbound, int k, int l
     };
 
 
-    // printf("local search %d  - %d -> number of iterations = %d,  running time = %f and objective = %d\n",k,l, --nbiter,0.0,sol->totalweightcomptime);
+    printf("local search %d  - %d -> number of iterations = %d,  running time = %f and objective = %d\n",k,l, --nbiter,0.0,sol->totalweightcomptime);
 
     CC_IFFREE(L_jobs, Job*);
     CC_IFFREE(K_jobs, Job*);
@@ -278,6 +276,9 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
     partlist* L_max = (partlist *) NULL;
     partlist* K_max = (partlist *) NULL;
     int max;
+    CCutil_timer test;
+    CCutil_init_timer(&test, NULL);
+    int improvement = 0;
 
     Job **K_jobs = (Job**) NULL;
     Job **L_jobs = (Job**) NULL;
@@ -300,9 +301,12 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
         L_jobs_max = CC_SAFE_MALLOC(l, Job*);
     }
 
-    // printf("Executing local search with k = %d and l = %d\n", k,l);
+    if(dbg_lvl()) {
+        printf("Executing local search with k = %d and l = %d\n", k,l);
+    }
 
     moved = 1;
+    CCutil_start_timer(&test);
     while(moved && sol->totalweightcomptime != lowerbound){
         nbiter++;
         moved = 0;
@@ -312,7 +316,7 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
         {
             for (j = i + 1; j < nmachines && !moved; ++j)
             {
-                
+
                 temp_m1 = sol->part + i;
                 temp_m2 = sol->part + j;
                 n1 = g_queue_get_length(temp_m1->list);
@@ -340,7 +344,7 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
                         k_subset_init(n2, l, L_subset, &L_flag);
                         if (l > n2) {K_flag = 0; continue;};
                         while(L_flag && !moved)
-                        {   
+                        {
                             for(it2 = 0; it2 < l; ++it2)
                             {
                                 L_jobs[it2] = ((Job*)g_queue_peek_nth(temp_m2->list, L_subset[it2 + 1] - 1));
@@ -401,7 +405,7 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
                                 }
                                 temp = k_l_move_general(K_jobs, L_jobs,temp_m1,temp_m2, sol, k, l);
                                 if(temp > max)
-                                {   
+                                {
                                     for ( it1 = 0; it1 < k; ++it1)
                                     {
                                         K_jobs_max[it1] = K_jobs[it1];
@@ -425,17 +429,13 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
         }
 
         if (moved && max > 0){
-            if (l == 0)
+            improvement += max;
+            for (it1 = 0; it1 < k; ++it1)
             {
-                for (it1 = 0; it1 < k; ++it1)
-                {
-                    partlist_move_order(L_max, sol->vlist, K_jobs_max[it1], njobs);
-                }
-            } else if (l > 0){
-                for (it1 = 0; it1 < k; ++it1)
-                {
-                    partlist_move_order(L_max, sol->vlist, K_jobs_max[it1], njobs);
-                }
+                partlist_move_order(L_max, sol->vlist, K_jobs_max[it1], njobs);
+            }
+
+            if (l > 0){
                 for (it1 = 0; it1 < l; ++it1)
                 {
                     partlist_move_order(K_max, sol->vlist, L_jobs_max[it1], njobs);
@@ -444,8 +444,12 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
             sol->totalweightcomptime -= max;
         }
     };
+    CCutil_stop_timer(&test, 0);
 
-    // printf("local search %d  - %d -> number of iterations = %d,  running time = %f and objective = %d\n",k,l, --nbiter,0.0,sol->totalweightcomptime);
+    if(dbg_lvl()) {
+        printf("local search %d  - %d -> number of iterations = %d,  running time = %f and objective = %d, time = %f, time per iteration = %f, improvement = %d\n",k,l, nbiter,0.0,sol->totalweightcomptime, test.cum_zeit,test.cum_zeit/nbiter, improvement);
+    }
+
 
     CC_IFFREE(L_jobs, Job*);
     CC_IFFREE(K_jobs, Job*);
@@ -456,8 +460,23 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
     return val;
 }
 
+void localsearch_wrap(solution *sol, int lowerbound,int best){
+    if (best)
+    {
+        local_search_machine_general_best(sol, lowerbound, 2, 0);
+        local_search_machine_general_best(sol, lowerbound, 2, 1);
+        local_search_machine_general_best(sol, lowerbound, 1, 0);
+        local_search_machine_general_best(sol, lowerbound, 1, 1);
+    } else {
+        //local_search_machine_general_first(sol, lowerbound, 2, 1);
+        //local_search_machine_general_first(sol, lowerbound, 2, 0);
+        local_search_machine_general_first(sol, lowerbound, 1, 0);
+        local_search_machine_general_first(sol, lowerbound, 1, 1);
+    }
+}
+
 void localsearch_random_k(solution *sol, int lowerbound, int nb){
-        int i,j,l,k,tot;
+    int i,j,l,k,tot;
     int **matrix = (int**) NULL;
     matrix = CC_SAFE_MALLOC(nb, int*);
     for( i = 0; i < nb; ++i) {

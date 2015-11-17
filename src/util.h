@@ -12,10 +12,12 @@
 #ifndef __UTIL_H
 #define __UTIL_H
 
-//#include "pmcdefs.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
-//#include <glib.h>
 
 #define CCutil_MAXDBL (1e30)
 #define CCutil_MAXINT (2147483647)
@@ -370,7 +372,7 @@ int ksubset_rec_init(ksubset_rec *set,ulong n);
 void ksubset_rec_free(ksubset_rec *set);
 void ksubset_rec_generate(void *data,ksubset_rec *set,ulong kmin,ulong kmax,ulong rq,ulong nq,void (*visit)(const void *,const void* ,ulong));
 void ksubset_next_rec(void *data,ksubset_rec *set,ulong d);
-#endif /*__UTIL_H*/
+
 
 
 /****************************************************************************/
@@ -385,10 +387,6 @@ void fill_float(float *dst,int n,float v);
 void fill_char( char *dst, int n, char v );
 void acopy_int(const int *src,int *dst,int n);
 void acopy_dbl(const double *src,double *dst,int n);
-
-#ifndef PMC_util_h
-#define PMC_util_h
-#endif
 
 /**
  * binomial-heap.c
@@ -431,10 +429,6 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  */
 
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /**
  * Heap type.  If a heap is a min heap (@ref BINOMIAL_HEAP_TYPE_MIN), the
@@ -539,6 +533,8 @@ unsigned int binomial_heap_num_entries(BinomialHeap *heap);
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
 
 
