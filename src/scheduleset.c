@@ -29,11 +29,11 @@ static int copy_Schedulesets( Scheduleset *dst, const Scheduleset *src, int nsrc
         if(dst->count == 0){                                                \
             dst->members = (int*)NULL;                                      \
         } else {                                                            \
-            dst->members = CC_SAFE_MALLOC(dst->count, int);                 \
+            dst->members = CC_SAFE_MALLOC(dst->count + 1, int);                 \
             CCcheck_NULL_2(dst->members, "Failed to allocate memory");      \
             dst->completiontime = g_hash_table_new(g_direct_hash, g_direct_equal); \
             g_hash_table_foreach(src->completiontime, iterator, dst->completiontime); \
-            memcpy(dst->members, src->members, dst->count*sizeof(int));     \
+            memcpy(dst->members, src->members, (dst->count + 1)*sizeof(int));     \
         }                                                                   \
         dst++;                                                              \
         src++;                                                              \
@@ -47,11 +47,11 @@ static int copy_Schedulesets( Scheduleset *dst, const Scheduleset *src, int nsrc
         if(dst[x].count == 0){                                              \
             dst[x].members = (int*)NULL;                                    \
         } else {                                                            \
-            dst[x].members = CC_SAFE_MALLOC(dst[x].count, int);             \
+            dst[x].members = CC_SAFE_MALLOC(dst[x].count + 1, int);             \
             CCcheck_NULL_2(dst[x].members, "Failed to allocate memory");    \
             dst[x].completiontime = g_hash_table_new(g_int_hash, g_int_equal);\
             g_hash_table_foreach(src[x].completiontime, iterator, dst[x].completiontime);\
-            memcpy(dst[x].members, src[x].members, dst[x].count*sizeof(int));\
+            memcpy(dst[x].members, src[x].members, (dst[x].count + 1)*sizeof(int));\
         }                                                                   \
     }
 
@@ -265,6 +265,23 @@ int Scheduleset_more_totweight( Scheduleset *c1, Scheduleset *c2 )
     return 0;
 }
 
+int Scheduleset_less_wct( Scheduleset *c1, Scheduleset *c2 )
+{
+    int i;
+
+    if ( c1->totwct != c2->totwct ) {
+        return c1->totwct < c2->totwct;
+    }
+
+    for ( i = 0; i < c1->count; ++i ) {
+        if ( c1->members[i] != c2->members[i] ) {
+            return c1->members[i] < c2->members[i];
+        }
+    }
+
+    return 0;
+}
+
 void Scheduleset_quicksort( Scheduleset *cclasses, int ccount,
                          int ( *functionPtr )( Scheduleset *, Scheduleset * ) )
 {
@@ -448,7 +465,7 @@ int Scheduleset_max( Scheduleset *cclasses, int ccount )
     return val;
 }
 
-int partlist_to_Scheduleset( partlist *part, int nbpart, Scheduleset **classes,
+int partlist_to_Scheduleset( partlist *part, int nbpart, int njobs, Scheduleset **classes,
                           int *ccount )
 {
     int val = 0;
@@ -471,7 +488,7 @@ int partlist_to_Scheduleset( partlist *part, int nbpart, Scheduleset **classes,
             Scheduleset_init( temp_sets + k );
             temp_sets[k].count = g_queue_get_length( part[i].list );
             temp_sets[k].totweight = part[i].completiontime;
-            temp_sets[k].members = CC_SAFE_MALLOC( temp_sets[k].count, int );
+            temp_sets[k].members = CC_SAFE_MALLOC( temp_sets[k].count + 1, int );
             CCcheck_NULL( temp_sets[k].members, "Failed to allocate memory to members" );
             temp_sets[k].completiontime = g_hash_table_new(g_direct_hash, g_direct_equal);
             GList *v = part[i].list->head;
@@ -487,6 +504,7 @@ int partlist_to_Scheduleset( partlist *part, int nbpart, Scheduleset **classes,
                 v = g_list_next( v );
                 j++;
             }
+            temp_sets[k].members[j] = njobs;
 
             //CCutil_int_array_quicksort( temp_sets[k].members, temp_sets[k].count );
             k++;

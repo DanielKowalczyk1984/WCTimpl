@@ -96,7 +96,7 @@ int wctlp_chg_lb_var(wctlp *lp,int var,double lb);
 
 double lp_int_tolerance(void);
 
-#endif
 #ifdef __cplusplus
 }
+#endif
 #endif

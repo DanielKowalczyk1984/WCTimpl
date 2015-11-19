@@ -158,8 +158,26 @@ class Duedate: public tdzdd::DdSpec<Duedate, int, 2>{
     int *r;
     int *d;  
     public:
-        Duedate(int *_p,int *_r,int *_d):p(_p),r(_r),d(_d) {
+        int *sum_p;
+        int *min_p;
+        Duedate(int *_p,int *_r,int *_d,int njobs):p(_p),r(_r),d(_d) {
+            nbjobs = njobs;
+            sum_p = new int [nbjobs];
+            min_p = new int [nbjobs];
 
+            int end = nbjobs - 1;
+            sum_p[end] = p[end];
+            min_p[end] = p[end];
+
+            for (int  i = end - 1; i >= 0; i--)
+            {
+                sum_p[i] = sum_p[ i + 1] + p[i];
+                if(p[i] < min_p[i + 1]) {
+                    min_p[i] = p[i];
+                } else {
+                    min_p[i] = min_p[i + 1];
+                }
+            }
         }
 
         int getRoot(int &state) const{

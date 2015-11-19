@@ -123,13 +123,14 @@ void Scheduleset_quicksort(Scheduleset *cclasses, int ccount,int (*functionPtr)(
 void Scheduleset_permquicksort(int *perm, Scheduleset *cclasses, int ccount, int (*functionPtr)(Scheduleset*,Scheduleset*));
 int Scheduleset_less(Scheduleset *c1,Scheduleset *c2);
 int Scheduleset_more(Scheduleset *c1,Scheduleset *c2);
+int Scheduleset_less_wct( Scheduleset *c1, Scheduleset *c2 );
 int print_schedule(Scheduleset *cclasses, int ccount);
 int Scheduleset_max(Scheduleset *cclasses,int ccount);
 int update_Schedulesets( Scheduleset **dst, int *ndst, const Scheduleset *src, int nsrc );
 int add_Schedulesets( Scheduleset **dst, int *ndst, Scheduleset *src, int nsrc );
 int Scheduleset_less_totweight( Scheduleset *c1, Scheduleset *c2 );
 int Scheduleset_more_totweight( Scheduleset *c1, Scheduleset *c2 );
-int partlist_to_Scheduleset( partlist *part, int nbpart, Scheduleset **classes, int *ccount );
+int partlist_to_Scheduleset( partlist *part, int nbpart, int njobs, Scheduleset **classes, int *ccount );
 
 #ifdef __cplusplus
 }

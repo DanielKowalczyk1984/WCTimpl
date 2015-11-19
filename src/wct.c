@@ -797,7 +797,7 @@ static int grab_integral_solution_ahv(wctdata* pd, int *completion_time) {
     CCcheck_NULL_2(pd->bestcolors, "Failed to realloc pd->bestcolors");
 
     /** Construct solution with the help of theorem of AHV */
-    val = partlist_to_Scheduleset(sol->part, sol->nmachines, &(pd->bestcolors), &(pd->nbbest));
+    val = partlist_to_Scheduleset(sol->part, sol->nmachines, pd->njobs, &(pd->bestcolors), &(pd->nbbest));
     CCcheck_val_2(val, "Failed in conversion");
 
     printf("Intermediate solution:\n");
@@ -1008,7 +1008,6 @@ static int recover_pricersolver(wctdata* cd){
     int            npath = 0;
     wctdata*     tmp_cd  = cd;
     wctdata*     root_cd = cd;
-    int*           elist   = (int*) NULL;
     int            ndiff   = 0;
     int            i;
     int*           new_orig_node_ids = (int*) NULL;
@@ -1049,7 +1048,7 @@ static int recover_pricersolver(wctdata* cd){
     for (i = 1; i < npath; ++i) {
         wctdata* cur_cd = path[i];
         if (is_releasetime_child(cur_cd) ) {
-            
+
         } else {
             
         }
@@ -1063,7 +1062,6 @@ static int recover_pricersolver(wctdata* cd){
 
 
 CLEAN:
-    CC_IFFREE(elist, int);
     CC_IFFREE(path, wctdata*);
     CC_IFFREE(new_orig_node_ids, int);
 
@@ -1095,6 +1093,7 @@ static int create_releasetime ( wctdata *parent_cd, int branch_job, int completi
     pd->parent = parent_cd;
 
     /** adjusted duetime */
+
     /** Construct PricerSolver */
 
     /** transfer feasible schedules */
@@ -1522,26 +1521,23 @@ int build_lp( wctdata *pd )
 
     for ( i = 0; i < pd->njobs; i++ )
     {
-        char sense = wctlp_GREATER_EQUAL;
-        val = wctlp_addrow( pd->LP, 0, ( int *)NULL, ( double *)NULL, sense, 1.0,
+        val = wctlp_addrow( pd->LP, 0, ( int *)NULL, ( double *)NULL, wctlp_GREATER_EQUAL, 1.0,
                             ( char *)NULL );
         CCcheck_val_2( val, "Failed wctlp_addrow" );
     }
+    wctlp_addrow(pd->LP, 0  , (int *)NULL, (double *) NULL, wctlp_LESS_EQUAL,(double)pd->nmachines , NULL);
 
-    pd->coef = ( double *)CCutil_reallocrus( pd->coef, pd->njobs * sizeof( double ) );
+    pd->coef = ( double *)CCutil_reallocrus( pd->coef, (pd->njobs + 1) * sizeof( double ) );
     CCcheck_NULL_2( pd->coef, "out of memory for coef" );
-    fill_dbl( pd->coef, pd->njobs, 1.0 );
+    fill_dbl( pd->coef, pd->njobs + 1, 1.0 );
     /** add constraint about number of machines */
 
-    for ( i = 0; i < pd->ccount; i++ )
-    {
-        /** Change the cost function */
-        val = wctlp_addcol( pd->LP, pd->cclasses[i].count,
+    for ( i = 0; i < pd->ccount; i++ ){
+        val = wctlp_addcol( pd->LP, pd->cclasses[i].count + 1,
                             pd->cclasses[i].members,
-                            pd->coef, 1.0, .0, 1.0, wctlp_CONT, NULL );
+                            pd->coef, pd->cclasses[i].totwct, .0, 1.0, wctlp_CONT, NULL );
 
-        if ( val )
-        {
+        if ( val ){
             wctlp_printerrorcode( val );
         }
 
@@ -1557,30 +1553,32 @@ int build_lp( wctdata *pd )
         }
     }
 
-    if ( counter < pd->njobs )
-    {
-        for ( i = 0; i < pd->njobs; i++ )
-        {
-            if ( !covered[i] )
-            {
+    if ( counter < pd->njobs ){
+        for ( i = 0; i < pd->njobs; i++ ){
+            if ( !covered[i] ){
                 pd->newsets = CC_SAFE_MALLOC( 1, Scheduleset );
                 Scheduleset_init( pd->newsets );
-                pd->newsets[0].members = CC_SAFE_MALLOC( 1, int );
+                pd->newsets[0].members = CC_SAFE_MALLOC( 2, int );
                 pd->nnewsets = 1;
                 CCcheck_NULL_2( pd->newsets[0].members,
                                 "Failed to allocate memory to pd->newsets->members" );
                 pd->newsets[0].count++;
                 pd->newsets[0].members[0] = i;
+                pd->newsets[0].members[1] = pd->njobs;
+                pd->newsets[0].totwct = pd->weights[i]*pd->duration[i];
+                pd->newsets[0].totweight = pd->duration[i];
+                pd->newsets->age = 0;
 
-                val = wctlp_addcol( pd->LP, 1, pd->newsets[0].members, pd->coef, 1.0, 0., 1.0,
+                val = wctlp_addcol( pd->LP, 2, pd->newsets[0].members, pd->coef, pd->newsets[0].totwct, 0.0, 1.0,
                                     wctlp_CONT, NULL );
+
                 CCcheck_val_2( val, "Failed in pmclp_addcol" );
                 add_newsets( pd );
             }
         }
     }
 
-    pd->pi = ( double *)CCutil_reallocrus( pd->pi, pd->njobs * sizeof( double ) );
+    pd->pi = ( double *)CCutil_reallocrus( pd->pi, (pd->njobs + 1) * sizeof( double ) );
     CCcheck_NULL_2( pd->pi, "Failed to allocate memory to pd->pi" );
 CLEAN:
 
@@ -1590,13 +1588,11 @@ CLEAN:
         CC_IFFREE( pd->coef, double );
         CC_IFFREE( pd->pi, double );
     }
-
     CC_IFFREE( covered, int );
     return val;
 }
 
-int compute_lower_bound( wctproblem *problem, wctdata *pd )
-{
+int compute_lower_bound( wctproblem *problem, wctdata *pd ){
     int  j, val = 0;
     int iterations = 0;
     int break_while_loop = 1;
@@ -1625,7 +1621,7 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd )
         CCcheck_val( val, "build_lp failed" );
     }
 
-    pd->kpc_pi = CC_SAFE_MALLOC( pd->njobs, int );
+    pd->kpc_pi = CC_SAFE_MALLOC( pd->njobs + 1, int );
     CCcheck_NULL_2( pd->kpc_pi, "Failed to allocate memory to pd->kpc_pi" );
 
     do
@@ -1669,15 +1665,13 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd )
             last_lower_bound = pd->dbl_safe_lower_bound;
             CCutil_start_resume_time( &problem->tot_pricing );
             /** Solve the pricing problem */
+            solvedbl(pd->solver, pd->pi, pd->newsets->members, &(pd->newsets->count), &(pd->newsets->totwct),&(pd->nnewsets));
 
             CCutil_suspend_timer( &problem->tot_pricing );
 
             for ( j = 0; j < pd->nnewsets; j++ )
             {
-                val = wctlp_addcol( pd->LP, pd->newsets[j].count,
-                                    pd->newsets[j].members,
-                                    pd->coef, 1.0, 0.0, 1.0,
-                                    wctlp_CONT, NULL );
+                val = wctlp_addcol(pd->LP, pd->newsets[j].count, pd->newsets[j].members, pd->coef, pd->newsets[j].totwct, 0.0, 1.0, wctlp_CONT, NULL);
                 CCcheck_val_2( val, "pmclp_addcol failed" );
             }
 
@@ -1814,7 +1808,6 @@ int compute_schedule( wctproblem *problem )
     /** Add maximal schedule sets with respect to the properties of optimal solutions */
     prune_duplicated_sets( root_pd );
 
-
     if ( root_pd->status >= LP_bound_computed )
     {
         val = prefill_heap( root_pd, problem );
@@ -1823,23 +1816,15 @@ int compute_schedule( wctproblem *problem )
         val = compute_lower_bound( problem, root_pd );
         CCcheck_val_2( val, "Failed in compute_lower_bound" );
 
-        if ( root_pd->dbl_safe_lower_bound > (double) nmachine )
-        {
-            problem->found = 0;
-            goto CLEAN;
-        }
-
         val = insert_into_branching_heap( root_pd, problem );
         CCcheck_val_2( val, "insert_into_branching_heap failed" );
     }
 
-    if ( parms->branchandbound == yes )
-    {
-        CCutil_start_resume_time( &( problem->tot_branching_cputime ) );
-        val = sequential_branching( problem );
-        CCcheck_val( val, "Failed in sequential_branching" );
-        CCutil_suspend_timer( &( problem->tot_branching_cputime ) );
-    }
+    CCutil_start_resume_time( &( problem->tot_branching_cputime ) );
+    val = sequential_branching( problem );
+    CCcheck_val( val, "Failed in sequential_branching" );
+    CCutil_suspend_timer( &( problem->tot_branching_cputime ) );
+
 
 CLEAN:
     return val;

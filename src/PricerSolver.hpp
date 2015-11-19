@@ -2,6 +2,7 @@
 #include "PricerEvaluate.hpp"
 #include "tdzdd/DdStructure.hpp"
 #include "tdzdd/eval/Cardinality.hpp"
+#include "tdzdd/dd/Node.hpp"
 #include <iostream>
 #include <vector>
 
@@ -101,6 +102,7 @@ public:
 
 class PricerSolver
 {
+public:
     tdzdd::DdStructure<2> dd;
     tdzdd::DdStructure<2> tmp;
     int *p;
@@ -108,14 +110,10 @@ class PricerSolver
     int *r;
     int *d;
     int nbjobs;
-public:
     PricerSolver( int *_p, int *_w,  int *_r, int *_d,int njobs, int Hmin, int Hmax):p(_p),w(_w),r(_r),d(_d),nbjobs(njobs){
         PricerSpec ps(p,r,d,nbjobs, Hmin,Hmax);
         dd = tdzdd::DdStructure<2>(ps);
         dd.zddReduce();
-        tdzdd::NodeTableHandler<2> diagram = dd.getDiagram();
-        std::ofstream file("diagram.dot");
-        diagram.privateEntity().dumpDot(file);
         delete [] ps.sum_p;
         delete [] ps.min_p;
     };
@@ -126,6 +124,14 @@ public:
 
     struct PricerInfo<int> solveInt(int* pi){
         return dd.evaluate(MaxReducedCostInt(pi, p, w, nbjobs));
+    }
+
+    struct PricerInfo<double> solvefarkasDbl(double *pi){
+        return dd.evaluate(MaxFarkasPricingDbl(pi,p,w,nbjobs));
+    }
+
+    struct PricerInfo<int> solvefarkasInt(int* pi){
+        return dd.evaluate(MaxFarkasPricingInt(pi, p, w, nbjobs));
     }
 
     void addRestriction(){

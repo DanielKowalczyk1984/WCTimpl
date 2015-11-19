@@ -128,12 +128,11 @@ int heur_exec(  wctproblem *problem, wctdata *pd, int *result )
 
         do {
             cutoff = ( ( ( status > GRB_OPTIMAL )
-                         || ( objval > ( double )problem->parms.nmachines + lp_int_tolerance() )
-                         || ( nlpcands == 0
-                              && objval > ( double )problem->parms.nmachines   + lp_int_tolerance() ) )  );
+                         || ( objval > ( double )pd->upper_bound + lp_int_tolerance() )
+                         || ( nlpcands == 0 && objval > ( double )problem->parms.nmachines   + lp_int_tolerance() ) )  );
 
             if ( !cutoff || backtracked || farkaspricing ) {
-                val = heur_compute_lower_bound_BPPC( problem, pd );
+                val = heur_compute_lower_bound( problem, pd );
 
                 if ( val ) {
                     printf( "Failed at heur_compute_lower_bound_BPPC\n" );
@@ -546,7 +545,7 @@ CLEAN:
     return val;
 }
 
-int heur_compute_lower_bound_BPPC( wctproblem *problem, wctdata *pd )
+int heur_compute_lower_bound( wctproblem *problem, wctdata *pd )
 {
     int j,val = 0;
     int iterations = 0;
@@ -734,6 +733,7 @@ int adjustLP_floor( wctdata *pd, int var )
     CHECK_VAL_GRB2( val, "Failed to update RHS", LP->env );
     val = GRBchgcoeffs( LP->model, pd->cclasses[var].count,
                         pd->cclasses[var].members, vind, value );
+
 CLEAN:
     CC_IFFREE( vind, int );
     CC_IFFREE( value, double );

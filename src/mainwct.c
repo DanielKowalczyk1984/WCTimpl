@@ -277,21 +277,20 @@ int main(int ac, char **av){
     for(i = 0; i < pd->njobs;i++){
         pd->orig_node_ids[i] = i;
     }
-    Preprocessdata(pd);
     printf("Reading and preprocessing of the data took %f\n", CCutil_zeit()-start_time );
-    CCutil_start_timer(&problem.tot_lb);
-    pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs,pd->H_min,pd->H_max);
-    CCutil_stop_timer(&problem.tot_lb, 0);
+    Preprocessdata(pd);
+
 
     /** Computing initial lowerbound */
+    CCutil_start_timer(&problem.tot_lb);
     problem.global_lower_bound = lowerbound_eei(pd->jobarray, pd->njobs, pd->nmachines);
     problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cp(pd->jobarray, pd->njobs, pd->nmachines));
     problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cw(pd->jobarray, pd->njobs, pd->nmachines));
     printf("Computing lowerbound took %f\n", problem.tot_lb.cum_zeit);
+    CCutil_stop_timer(&problem.tot_lb, 0);
 
     /** Construct Feasible solutions */
-    //construct_feasible_solutions(&problem);
-
+    construct_feasible_solutions(&problem);
 
     /** Compute Schedule with Branch and Price */
 
