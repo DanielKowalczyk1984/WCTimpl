@@ -1,36 +1,14 @@
 #include "tdzdd/DdSpec.hpp"
 #include <vector>
 
-class Combination: public tdzdd::DdSpec<Combination,int,2> {
-    int const n;
-    int const k;
-
-public:
-    Combination(int n, int k)
-            : n(n), k(k) {
-    }
-
-    int getRoot(int& state) const {
-        state = 0;
-        return n;
-    }
-
-    int getChild(int& state, int level, int value) const {
-        state += value;
-        if (--level == 0) return (state == k) ? -1 : 0;
-        if (state > k) return 0;
-        if (state + level < k) return 0;
-        return level;
-    }
-};
 
 class PricerSpec: public tdzdd::DdSpec<PricerSpec, int, 2>{
     int nbjobs;
-    int Hmin;
-    int Hmax;
     int *p;
     int *r;
     int *d;
+    int Hmin;
+    int Hmax;
 
     public:
         int *sum_p;
@@ -56,7 +34,6 @@ class PricerSpec: public tdzdd::DdSpec<PricerSpec, int, 2>{
         }
 
         ~PricerSpec(){
-            
         }
 
         int getRoot(int & state) const{
@@ -142,7 +119,7 @@ class Restriction: public tdzdd::DdSpec<Restriction, int, 2>{
     public:
         Restriction(){
     
-        }
+        };
 
         int getRoot(int  & state) const {
             state = 0;
@@ -202,7 +179,7 @@ class Duedate: public tdzdd::DdSpec<Duedate, int, 2>{
         }
 };
 
-class Releasetime:  public tdzdd::DdSpec<Releasetime, int, 2>{
+class Releasetime:  public tdzdd::DdSpec<Releasetime, int,2>{
     int nbjobs;
     int n;
     int *jobs;
@@ -212,7 +189,7 @@ class Releasetime:  public tdzdd::DdSpec<Releasetime, int, 2>{
     public:
         Releasetime(int _nbjobs, int _n): nbjobs(_nbjobs), n(_n){
 
-        }
+        };
 
         int getRoot(int &state) const{
             state = 0;

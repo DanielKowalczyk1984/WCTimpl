@@ -74,7 +74,7 @@ public:
      * @param child the level at which edges from this level are completed.
      * @param count the number of dead nodes at this level.
      */
-    void update(unsigned int current, int child, size_t count) {
+    void update(int current, int child, size_t count) {
         if (current <= 1) return;
 
         if (current >= sweepLevel.size()) {
@@ -82,7 +82,7 @@ public:
             deadCount.resize(current + 2);
         }
 
-        for (unsigned int i = child; i <= current; ++i) {
+        for (int i = child; i <= current; ++i) {
             if (sweepLevel[i] > 0) break;
             sweepLevel[i] = current + 1;
         }

@@ -114,7 +114,7 @@ static BinomialTree *binomial_tree_merge(BinomialHeap *heap,
 
 	/* Allocate a new tree */
 
-	new_tree = malloc(sizeof(BinomialTree));
+	new_tree = (BinomialTree*) malloc(sizeof(BinomialTree));
 
 	if (new_tree == NULL) {
 		return NULL;
@@ -130,7 +130,7 @@ static BinomialTree *binomial_tree_merge(BinomialHeap *heap,
 	/* Copy subtrees of the smallest tree.  The last entry in the
 	 * array is the larger tree */
 
-	new_tree->subtrees = malloc(sizeof(BinomialTree *) * new_tree->order);
+	new_tree->subtrees = (BinomialTree**) malloc(sizeof(BinomialTree *) * new_tree->order);
 
 	if (new_tree->subtrees == NULL) {
 		free(new_tree);
@@ -191,7 +191,7 @@ static int binomial_heap_merge(BinomialHeap *heap, BinomialHeap *other)
 
 	/* Allocate an array for the new roots */
 
-	new_roots = malloc(sizeof(BinomialTree *) * max);
+	new_roots = (BinomialTree**) malloc(sizeof(BinomialTree *) * max);
 
 	if (new_roots == NULL) {
 		return 0;
@@ -321,7 +321,7 @@ BinomialHeap *binomial_heap_new(BinomialHeapType heap_type,
 
 	/* Allocate a new heap */
 
-	new_heap = calloc(1, sizeof(BinomialHeap));
+	new_heap = (BinomialHeap*)calloc(1, sizeof(BinomialHeap));
 
 	if (new_heap == NULL) {
 		return NULL;
@@ -360,7 +360,7 @@ int binomial_heap_insert(BinomialHeap *heap, BinomialHeapValue value)
 
 	/* Allocate an order 0 tree for storing the new value */
 
-	new_tree = malloc(sizeof(BinomialTree));
+	new_tree = (BinomialTree*) malloc(sizeof(BinomialTree));
 
 	if (new_tree == NULL) {
 		return 0;

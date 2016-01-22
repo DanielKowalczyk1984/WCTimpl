@@ -70,7 +70,7 @@ typedef struct wctlp_warmstart{
 int wctlp_init(wctlp **lp,const char *name);
 void wctlp_free(wctlp **lp);
 
-int wctlp_optimize(wctlp *lp);
+int wctlp_optimize(wctlp *lp,int *status);
 int wctlp_objval(wctlp *, double *obj);
 int wctlp_pi(wctlp *, double *pi);
 int wctlp_x(wctlp *, double *x,int first);

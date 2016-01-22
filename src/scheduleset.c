@@ -16,8 +16,8 @@
 void iterator(gpointer key, gpointer value, gpointer user_data);
 
 void iterator(gpointer key, gpointer value, gpointer user_data) {
-    GHashTable *new =(GHashTable *) user_data;
-    g_hash_table_insert(new, key, value);
+    GHashTable *new_table =(GHashTable *) user_data;
+    g_hash_table_insert(new_table, key, value);
 }
 
 static int copy_Schedulesets( Scheduleset *dst, const Scheduleset *src, int nsrc );

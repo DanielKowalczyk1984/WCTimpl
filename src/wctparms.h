@@ -43,6 +43,11 @@ enum BranchandBound {
     yes = 1,
 };
 
+enum dualvariablesType{
+    Dbl = 0,
+    Int = 1,
+};
+
 
 typedef struct wctparms{
     int init_upper_bound;
@@ -54,6 +59,7 @@ typedef struct wctparms{
     int scatter_search;
     int branchandbound;
     int symmetrybreaking;
+    int dual_var_type;
     
     int delete_elists;
     int delete_cclasses;
@@ -87,6 +93,7 @@ int wctparms_set_combine_method(wctparms *parms,int combine_method);
 int wctparms_set_scatter_search(wctparms* parms,int scatter);
 int wctparms_set_branchandbound(wctparms *parms,int bound);
 int wctparms_set_scatter_search_cpu_limit(wctparms *parms,double limit);
+int wctparms_set_dual_var_type(wctparms *parms,int);
 
 /*Functions for defining the filesname*/
 int wctparms_set_outfile(wctparms *parms, const char *fname);
@@ -101,8 +108,8 @@ int wctparms_set_nmachines(wctparms *parms,int nmachines);
 
 
 
-#endif
 
 #ifdef __cplusplus
 }
+#endif
 #endif

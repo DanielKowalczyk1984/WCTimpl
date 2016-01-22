@@ -555,6 +555,7 @@ int heur_compute_lower_bound( wctproblem *problem, wctdata *pd )
     double start_time;
     double last_lower_bound = DBL_MAX;
     int    nnonimprovements     = 0;
+    int status = 0;
     CCcheck_val_2( val, "Failed at adjGraph_build" );
 
     if ( dbg_lvl() > 1 ) {
@@ -578,7 +579,7 @@ int heur_compute_lower_bound( wctproblem *problem, wctdata *pd )
     do {
         iterations++;
         cur_cputime = CCutil_zeit();
-        val = wctlp_optimize( pd->LP );
+        val = wctlp_optimize( pd->LP, &status );
         CCcheck_val( val, "wctlp_optimize failed" );
         cur_cputime = CCutil_zeit() - cur_cputime;
 
@@ -628,7 +629,7 @@ int heur_compute_lower_bound( wctproblem *problem, wctdata *pd )
               && lb_cputime <= problem->parms.branching_cpu_limit );
 
     if ( iterations < pd->maxiterations && lb_cputime <= problem->parms.branching_cpu_limit ) {
-        val = wctlp_optimize( pd->LP );
+        val = wctlp_optimize( pd->LP, &status );
         CCcheck_val_2( val, "wctlp_optimize failed" );
         val = compute_objective_heur( pd );
         CCcheck_val_2( val, "compute_objective failed" );

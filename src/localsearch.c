@@ -468,8 +468,8 @@ void localsearch_wrap(solution *sol, int lowerbound,int best){
         local_search_machine_general_best(sol, lowerbound, 1, 0);
         local_search_machine_general_best(sol, lowerbound, 1, 1);
     } else {
-        //local_search_machine_general_first(sol, lowerbound, 2, 1);
-        //local_search_machine_general_first(sol, lowerbound, 2, 0);
+        local_search_machine_general_first(sol, lowerbound, 2, 1);
+        local_search_machine_general_first(sol, lowerbound, 2, 0);
         local_search_machine_general_first(sol, lowerbound, 1, 0);
         local_search_machine_general_first(sol, lowerbound, 1, 1);
     }

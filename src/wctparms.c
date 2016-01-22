@@ -15,6 +15,7 @@ void wctparms_init(wctparms *parms){
     parms->combine_method = min_combine_method;
     parms->scatter_search = 0;
     parms->branchandbound = no;
+    parms->dual_var_type = Dbl;
     
     parms->delete_elists = 1;
     parms->delete_cclasses = 0;
@@ -123,5 +124,10 @@ int wctparms_set_branchandbound(wctparms *parms, int bound){
 
 int wctparms_set_scatter_search_cpu_limit(wctparms *parms,double limit){
     parms->scatter_search_cpu_limit = limit;
+    return 0;
+}
+
+int wctparms_set_dual_var_type(wctparms *parms, int type){
+    parms->dual_var_type = type;
     return 0;
 }

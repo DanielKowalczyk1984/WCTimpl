@@ -26,6 +26,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <vector>
 
 namespace tdzdd {
 
@@ -49,7 +50,7 @@ public:
     T const& get(int b) const {
         assert(0 <= b && b < ARITY);
         return *value[b];
-    }
+    };
 
     /**
      * Returns the level of the b-th child.

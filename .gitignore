@@ -61,3 +61,14 @@ install_manifest.txt
 *.pdf
 *.ps
 
+.DS_Store
+build/.DS_Store
+help/.DS_Store
+src/.DS_Store
+
+buildmac/*
+buildlinux/*
+
+FindFiles/*
+scripts/*
+

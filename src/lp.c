@@ -61,30 +61,23 @@ void wctlp_free(wctlp **lp){
     }
 }
 
-int wctlp_optimize(wctlp *lp){
+int wctlp_optimize(wctlp *lp, int* status){
     int val;
-    int status;
 
     val = GRBoptimize((lp)->model);
     CHECK_VAL_GRB(val,"GRBoptimize failed",lp->env);
 
-    val = GRBgetintattr(lp->model,GRB_INT_ATTR_STATUS,&status);
+    val = GRBgetintattr(lp->model,GRB_INT_ATTR_STATUS,status);
     CHECK_VAL_GRB(val,"GRBgetinattr failed",lp->env);
 
-    if (status != GRB_OPTIMAL){
+    if (*status != GRB_OPTIMAL){
         printf("Failed to solve the model to optimality. status= ");
-        switch(status){
+        switch(*status){
             case GRB_LOADED:
                 printf("GRB_LOADED");
                 val = 1;
                 break;
             case GRB_INFEASIBLE:
-                printf("GRB_INFEASIBLE");
-                val = GRBcomputeIIS(lp->model);
-                CHECK_VAL_GRB(val,"failed GRBcomputeIIS failed",lp->env);
-                val = GRBwrite(lp->model,"grbinfeas_debug.lp");
-                CHECK_VAL_GRB(val,"failed GRBwrite",lp->env);
-                val = 1;
                 break;
             case GRB_UNBOUNDED:
                 printf("GRB_UNBOUNDED");
@@ -95,7 +88,7 @@ int wctlp_optimize(wctlp *lp){
                 val = 1;
                 break;
             default:
-                printf("%d",status);
+                printf("%d",*status);
         }
         printf("\n");
 

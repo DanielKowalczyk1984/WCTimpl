@@ -37,7 +37,7 @@
 #include "../util/MyHashTable.hpp"
 #include "../util/MyList.hpp"
 #include "../util/MyVector.hpp"
-#include "../DdSpec.hpp"
+#include "DdSpec.hpp"
 
 namespace tdzdd {
 

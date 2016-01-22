@@ -37,28 +37,29 @@ int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution* new
 
   partlist *temp = (partlist *) NULL;
   Job* temp_job = (Job *) NULL;
-  GList *it = (GList *) NULL;
+  //GList *it = (GList *) NULL;
   GQueue *to_do_list = (GQueue *) NULL;
 
   temp = new_sol->part;
   to_do_list = g_queue_new();
 
   for (i = 0; i < njobs; ++i) {
-    g_queue_push_head(to_do_list, jobarray + i);
+    g_queue_push_tail(to_do_list, jobarray + i);
   }
 
   while (!g_queue_is_empty(to_do_list)) {
     temp_job = (Job *)to_do_list->head->data;
-    max = ((double)temp[0].completiontime + (double)temp_job->processingime) / ((double) temp_job->weight);
+    printf("%d\n", temp_job->job);
+    max = ((double)temp[0].completiontime + (double)temp_job->processingime);
     min = max;
     GArray *rcl = g_array_new(FALSE, FALSE, sizeof(pair_job_machine));
     /** Compute min and max */
-    for (i = 0; i < nmachines; ++i)
+    for (i = 1; i < nmachines; ++i)
     {
-      for (it = to_do_list->head; it; it = it->next)
-      {
-        temp_job = (Job*)it->data;
-        temp_dbl = ((double)temp[i].completiontime + (double)temp_job->processingime) / ((double) temp_job->weight);
+      //for (it = to_do_list->head; it; it = it->next)
+      //{
+        //temp_job = (Job*)it->data;
+        temp_dbl = (temp[i].completiontime + temp_job->processingime);
         if (max < temp_dbl)
         {
           max = temp_dbl;
@@ -67,7 +68,7 @@ int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution* new
         {
           min = temp_dbl;
         }
-      }
+      //}
     }
 
     /** Compute RCL */
@@ -76,16 +77,16 @@ int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution* new
     ub = min + 0.25 * (max - lb);
     for (i = 0; i < nmachines; ++i)
     {
-      for (it = to_do_list->head; it; it = g_list_next(it))
-      {
-        temp_job = ((Job*)it->data);
-        double g = (((double)temp[i].completiontime + (double)temp_job->processingime) / ((double) temp_job->weight));
+      //for (it = to_do_list->head; it; it = g_list_next(it))
+      //{
+        //temp_job = ((Job*)it->data);
+        double g = ((double)temp[i].completiontime + (double)temp_job->processingime);
         if (lb <= g && g <= ub) {
           temp_job_machine.job = temp_job->job;
           temp_job_machine.machine = i;
           g_array_append_val(rcl, temp_job_machine);
         }
-      }
+      //}
     }
 
     /** Choose uniformaly an assignment of a job to a machine */
@@ -98,6 +99,7 @@ int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution* new
   }
 
   g_queue_free(to_do_list);
+  getchar();
   return 0;
 }
 
@@ -190,7 +192,7 @@ static int add_feasible_solution( wctproblem *problem, solution *new_sol)
   SS *scatter_search = &( problem->scatter_search );
 
   solution_calc(new_sol, root_pd->jobarray);
-  localsearch_wrap(new_sol, problem->global_lower_bound, 0);
+  localsearch_wrap(new_sol, problem->global_lower_bound, 1);
   solution_unique( new_sol );
 
   if ( !solution_in_pool( scatter_search, new_sol ) ) {
@@ -240,6 +242,11 @@ int construct_feasible_solutions(wctproblem *problem) {
                              pd->njobs, pd->nmachines, pd->jobarray, problem->global_lower_bound);
   CCcheck_val_2(val, "Failed in SSproblem_definition");
 
+  for (int i = 0; i < pd->njobs; ++i)
+  {
+    printf("test %f \n", (double) pd->jobarray[i].weight/pd->jobarray[i].processingime);
+  }
+
   while (scatter_search->p->PSize < parms->nb_feas_sol) {
     solution *new_sol = (solution *) NULL;
     new_sol = new_sol_init(pd->nmachines, pd->njobs);
@@ -267,9 +274,9 @@ int construct_feasible_solutions(wctproblem *problem) {
   SSCreate_refset(scatter_search);
   scatter_search->upperbound = problem->global_upper_bound;
   printf("upperbound = %d, lowerbound = %d\n", problem->global_upper_bound, problem->global_lower_bound);
-  if(parms->combine_method) {
+  if(parms->combine_method && parms->scatter_search) {
     SSrun_scatter_search(scatter_search, &(problem->tot_scatter_search) );
-  } else {
+  } else if (parms->scatter_search) {
     SSrun_scatter_searchPR(scatter_search, & (problem->tot_scatter_search));
   }
 

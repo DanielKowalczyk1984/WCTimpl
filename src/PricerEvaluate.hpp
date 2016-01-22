@@ -1,32 +1,6 @@
-/*
- * TdZdd: a Top-down/Breadth-first Decision Diagram Manipulation Framework
- * by Hiroaki Iwashita <iwashita@erato.ist.hokudai.ac.jp>
- * Copyright (c) 2014 ERATO MINATO Project
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- */
-
-#pragma once
-
-
 #include "tdzdd/DdEval.hpp"
 #include <cfloat>
+#include <climits>
 #include <vector>
 
 
@@ -44,15 +18,31 @@ public:
         jobs = other.jobs;
         cost = other.cost;
         return *this;
+    };
+};
+
+struct MinNumItems: public tdzdd::DdEval<MinNumItems,int> {
+    void evalTerminal(int& n, bool one) const {
+        n = one ? 0 : INT_MAX - 1;
+    }
+
+    void evalNode(int& n, int, int &v0, int i0, int &v1, int i1) const {
+        n = std::min(v0, v1 + 1);
     }
 };
 
+struct MaxNumItems: public tdzdd::DdEval<MaxNumItems,int> {
+    void evalTerminal(int& n, bool one) const {
+        n = one ? 0 : INT_MIN;
+    }
 
+    void evalNode(int& n, int, int &v0, int i0, int &v1, int i1) const {
+        n = std::max(v0, v1 + 1);
+    }
+};
 
-
-namespace tdzdd {
 template<typename E>
-class MaxReducedCostBaseDbl: public DdEval<E, PricerInfo<double> > {
+class MaxReducedCostBaseDbl: public tdzdd::DdEval<E, PricerInfo<double> > {
     double *pi;
     int *p;
     int *w;
@@ -62,17 +52,16 @@ public:
     MaxReducedCostBaseDbl(double *_pi, int *_p, int *_w, int _nbjobs)
         : pi(_pi), p(_p), w(_w), nbjobs(_nbjobs) {
 
-    }
+    };
 
     void evalTerminal( PricerInfo<double>& n, bool one) {
         n.obj = one ? pi[nbjobs] : DBL_MIN;
         n.sum_w = 0;
         n.cost = 0;
         n.jobs.resize(0);
-
     }
 
-    void evalNode( PricerInfo<double> &n, int i, DdValues<PricerInfo<double>, 2> const & values) const {
+    void evalNode( PricerInfo<double> &n, int i, tdzdd::DdValues<PricerInfo<double>, 2> const & values) const {
         int j = nbjobs - i;
         assert(j >= 0 && j <= nbjobs - 1);
         PricerInfo<double> n0 = values.get(0);
@@ -94,7 +83,7 @@ public:
 };
 
 template<typename E>
-class MaxFarkasPricingBaseDbl: public DdEval<E, PricerInfo<double> > {
+class MaxFarkasPricingBaseDbl: public tdzdd::DdEval<E, PricerInfo<double> > {
     double *pi;
     int *p;
     int *w;
@@ -103,8 +92,7 @@ class MaxFarkasPricingBaseDbl: public DdEval<E, PricerInfo<double> > {
 public:
     MaxFarkasPricingBaseDbl(double *_pi, int *_p, int *_w, int _nbjobs)
         : pi(_pi), p(_p), w(_w), nbjobs(_nbjobs) {
-
-    }
+    };
 
     void evalTerminal( PricerInfo<double>& n, bool one) {
         n.obj = one ? pi[nbjobs] : DBL_MIN;
@@ -114,7 +102,9 @@ public:
 
     }
 
-    void evalNode( PricerInfo<double> &n, int i, DdValues<PricerInfo<double>, 2> const & values) const {
+
+
+    void evalNode( PricerInfo<double> &n, int i, tdzdd::DdValues<PricerInfo<double>, 2> const & values) const {
         int j = nbjobs - i;
         assert(j >= 0 && j <= nbjobs - 1);
         PricerInfo<double> n0 = values.get(0);
@@ -136,7 +126,7 @@ public:
 };
 
 template<typename E>
-class MaxReducedCostBaseInt: public DdEval<E, PricerInfo<int> > {
+class MaxReducedCostBaseInt: public tdzdd::DdEval<E, PricerInfo<int> > {
     int *pi;
     int *p;
     int *w;
@@ -146,7 +136,7 @@ public:
     MaxReducedCostBaseInt(int *_pi, int *_p, int *_w, int _nbjobs)
         : pi(_pi), p(_p), w(_w), nbjobs(_nbjobs) {
 
-    }
+    };
 
     void evalTerminal( PricerInfo<int>& n, bool one) {
         n.obj = one ? pi[nbjobs] : INT_MIN;
@@ -156,7 +146,7 @@ public:
 
     }
 
-    void evalNode( PricerInfo<int> &n, int i, DdValues<PricerInfo<int>, 2> const & values) const {
+    void evalNode( PricerInfo<int> &n, int i, tdzdd::DdValues<PricerInfo<int>, 2> const & values) const {
         int j = nbjobs - i;
         assert(j >= 0 && j <= nbjobs - 1);
         PricerInfo<int> n0 = values.get(0);
@@ -173,12 +163,11 @@ public:
             n.cost = n1.cost + n1.sum_w * p[j] + w[j] * p[j];
             n.jobs.push_back(j);
         }
-
     }
 };
 
 template<typename E>
-class MaxFarkasPricingBaseInt: public DdEval<E, PricerInfo<int> > {
+class MaxFarkasPricingBaseInt: public tdzdd::DdEval<E, PricerInfo<int> > {
     int *pi;
     int *p;
     int *w;
@@ -188,7 +177,7 @@ public:
     MaxFarkasPricingBaseInt(int *_pi, int *_p, int *_w, int _nbjobs)
         : pi(_pi), p(_p), w(_w), nbjobs(_nbjobs) {
 
-    }
+    };
 
     void evalTerminal( PricerInfo<int>& n, bool one) {
         n.obj = one ? pi[nbjobs] : INT_MIN;
@@ -198,7 +187,7 @@ public:
 
     }
 
-    void evalNode( PricerInfo<int> &n, int i, DdValues<PricerInfo<int>, 2> const & values) const {
+    void evalNode( PricerInfo<int> &n, int i, tdzdd::DdValues<PricerInfo<int>, 2> const & values) const {
         int j = nbjobs - i;
         assert(j >= 0 && j <= nbjobs - 1);
         PricerInfo<int> n0 = values.get(0);
@@ -215,36 +204,28 @@ public:
             n.cost = n1.cost + n1.sum_w * p[j] + w[j] * p[j];
             n.jobs.push_back(j);
         }
-
     }
 };
 
-}
 
 
-
-
-struct MaxReducedCostDbl: public tdzdd::MaxReducedCostBaseDbl<MaxReducedCostDbl> {
-    MaxReducedCostDbl(double *_pi, int *_p, int *_w, int _nbjobs): tdzdd::MaxReducedCostBaseDbl<MaxReducedCostDbl>(_pi, _p, _w, _nbjobs) {
-
-    }
+struct MaxReducedCostDbl: MaxReducedCostBaseDbl<MaxReducedCostDbl> {
+    MaxReducedCostDbl(double *_pi, int *_p, int *_w, int _nbjobs): MaxReducedCostBaseDbl<MaxReducedCostDbl>(_pi, _p, _w, _nbjobs) {
+    };
 };
 
-struct MaxReducedCostInt: public tdzdd::MaxReducedCostBaseInt<MaxReducedCostInt> {
-    MaxReducedCostInt(int *_pi, int *_p, int *_w, int _nbjobs): tdzdd::MaxReducedCostBaseInt<MaxReducedCostInt>(_pi, _p, _w, _nbjobs) {
-
-    }
+struct MaxReducedCostInt: public MaxReducedCostBaseInt<MaxReducedCostInt> {
+    MaxReducedCostInt(int *_pi, int *_p, int *_w, int _nbjobs): MaxReducedCostBaseInt<MaxReducedCostInt>(_pi, _p, _w, _nbjobs) {
+    };
 };
 
-struct MaxFarkasPricingDbl: public tdzdd::MaxFarkasPricingBaseDbl<MaxFarkasPricingDbl> {
-    MaxFarkasPricingDbl(double *_pi, int *_p, int *_w, int _nbjobs): tdzdd::MaxFarkasPricingBaseDbl<MaxFarkasPricingDbl>(_pi, _p, _w, _nbjobs) {
-
-    }
+struct MaxFarkasPricingDbl: public MaxFarkasPricingBaseDbl<MaxFarkasPricingDbl> {
+    MaxFarkasPricingDbl(double *_pi, int *_p, int *_w, int _nbjobs): MaxFarkasPricingBaseDbl<MaxFarkasPricingDbl>(_pi, _p, _w, _nbjobs) {
+    };
 };
 
-struct MaxFarkasPricingInt: public tdzdd::MaxFarkasPricingBaseInt<MaxFarkasPricingInt> {
-    MaxFarkasPricingInt(int *_pi, int *_p, int *_w, int _nbjobs): tdzdd::MaxFarkasPricingBaseInt<MaxFarkasPricingInt>(_pi, _p, _w, _nbjobs) {
-
-    }
+struct MaxFarkasPricingInt: public MaxFarkasPricingBaseInt<MaxFarkasPricingInt> {
+    MaxFarkasPricingInt(int *_pi, int *_p, int *_w, int _nbjobs): MaxFarkasPricingBaseInt<MaxFarkasPricingInt>(_pi, _p, _w, _nbjobs) {
+    };
 };
 

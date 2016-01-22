@@ -83,10 +83,11 @@ struct wctdata {
     
     enum{
         initialized             = 0,
-        LP_bound_estimated      = 1,
-        LP_bound_computed       = 2,
-        submitted_for_branching = 3,
-        finished                = 4,
+        infeasible              = 1,
+        LP_bound_estimated      = 2,
+        LP_bound_computed       = 3,
+        submitted_for_branching = 4,
+        finished                = 5,
     }status;
     
     // The job information
@@ -120,6 +121,7 @@ struct wctdata {
     int kpc_pi_scalef_heur;
     int *kpc_pi;
     int *kpc_pi_heur;
+
     int lower_bound;
     int upper_bound;
     int lower_scaled_bound;
@@ -128,7 +130,11 @@ struct wctdata {
     double dbl_est_lower_bound_heur;
     double LP_lower_bound;
     double LP_lower_bound_heur;
-    
+    /** Wentges smoothing technique */
+    double *pi_in;
+    double *pi_out;
+    double eta_in;
+    double eta_out;
     
     //KPC instances
     
