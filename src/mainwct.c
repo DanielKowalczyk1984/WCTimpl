@@ -287,20 +287,21 @@ int main(int ac, char **av) {
     printf("Reading and preprocessing of the data took %f\n", CCutil_zeit()-start_time );
     Preprocessdata(pd);
 
-    CCutil_start_timer(&problem.tot_lb);
-    pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
-    CCutil_stop_timer(&problem.tot_lb, 0);
-    printf("Computing lowerbound took %f\n", problem.tot_lb.cum_zeit);
-
     /** Computing initial lowerbound */
     problem.global_lower_bound = lowerbound_eei(pd->jobarray, pd->njobs, pd->nmachines);
     problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cp(pd->jobarray, pd->njobs, pd->nmachines));
     problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cw(pd->jobarray, pd->njobs, pd->nmachines));
+    printf("Computing lowerbound took %f\n", problem.tot_lb.cum_zeit);
 
     /** Construct Feasible solutions */
-    //sconstruct_feasible_solutions(&problem);
+    construct_feasible_solutions(&problem);
 
     /** Compute Schedule with Branch and Price */
+    compute_schedule(&problem);
+
+    /** Print all the information to screen and csv */
+    print_to_csv(&problem);
+    print_to_screen(&problem);
 
 CLEAN:
     wctproblem_free(&problem);

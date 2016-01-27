@@ -242,11 +242,6 @@ int construct_feasible_solutions(wctproblem *problem) {
                              pd->njobs, pd->nmachines, pd->jobarray, problem->global_lower_bound);
   CCcheck_val_2(val, "Failed in SSproblem_definition");
 
-  for (int i = 0; i < pd->njobs; ++i)
-  {
-    printf("test %f \n", (double) pd->jobarray[i].weight/pd->jobarray[i].processingime);
-  }
-
   while (scatter_search->p->PSize < parms->nb_feas_sol) {
     solution *new_sol = (solution *) NULL;
     new_sol = new_sol_init(pd->nmachines, pd->njobs);

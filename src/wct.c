@@ -1451,7 +1451,7 @@ int insert_into_branching_heap( wctdata *pd, wctproblem *problem )
 
     int lb = ( int ) ceil( pd->dbl_est_lower_bound );
 
-    if ( lb < ( problem->parms.nmachines + 1 ) )
+    if ( lb < problem->global_upper_bound)
     {
         if ( dbg_lvl() )
         {
@@ -1732,11 +1732,11 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
                 /** Solve the pricing problem */
                 switch(parms->dual_var_type) {
                 case Dbl:
-                    //solvedbl(pd->solver, pd->pi, pd->newsets->members, &(pd->newsets->count), &(pd->newsets->totwct),&(pd->nnewsets));
+                    solvedbl(pd->solver, pd->pi, &(pd->newsets->members), &(pd->newsets->count), &(pd->newsets->totwct),&(pd->nnewsets));
                     break;
                 case Int:
                     double2int( pd->kpc_pi, &( pd->kpc_pi_scalef ), pd->pi, pd->njobs );
-                    //solveint(pd->solver, pd->kpc_pi, pd->newsets->members, &(pd->newsets->count), &(pd->newsets->totwct), &(pd->nnewsets));
+                    solveint(pd->solver, pd->kpc_pi, &(pd->newsets->members), &(pd->newsets->count), &(pd->newsets->totwct), &(pd->nnewsets));
                     val = compute_objective( pd );
                     CCcheck_val_2( val, "compute_objective failed" );
                     pd->dbl_est_lower_bound = pd->dbl_safe_lower_bound;
@@ -1885,8 +1885,6 @@ int compute_schedule( wctproblem *problem )
 {
     int val = 0;
     wctdata *root_pd = &( problem->root_pd );
-    wctparms *parms = &( problem->parms );
-    int nmachine = problem->parms.nmachines;
     problem->mult_key = ( double ) ( INT_MAX - 1 ) / root_pd->njobs;
     problem->first_upper_bound = problem->global_upper_bound;
     problem->first_lower_bound = problem->global_lower_bound;
