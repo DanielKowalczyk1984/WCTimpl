@@ -40,7 +40,7 @@ int wctlp_init(wctlp **lp, const char *name){
     val = GRBsetintparam((*lp)->env, GRB_INT_PAR_THREADS,1);
     CHECK_VAL_GRB(val,"GRBsetintparam TREADS failed",(*lp)->env);
 
-    val = GRBsetintparam((*lp)->env,GRB_INT_PAR_METHOD,GRB_METHOD_AUTO);
+    val = GRBsetintparam((*lp)->env,GRB_INT_PAR_METHOD,GRB_METHOD_PRIMAL);
     CHECK_VAL_GRB(val,"GRBsetintparam LPMETHOD failed",(*lp)->env);
 
     val = GRBnewmodel((*lp)->env,&((*lp)->model),name,0,(double*)NULL,

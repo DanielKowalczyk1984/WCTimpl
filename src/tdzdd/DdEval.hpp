@@ -38,10 +38,11 @@ namespace tdzdd {
  */
 template<typename T, int ARITY>
 class DdValues {
-    T const* value[ARITY];
+    T * value[ARITY];
     int level[ARITY];
 
 public:
+    int weight;
     /**
      * Returns the value of the b-th child.
      * @param b branch index.
@@ -51,6 +52,10 @@ public:
         assert(0 <= b && b < ARITY);
         return *value[b];
     };
+
+    T* get_ptr(int b) {
+        return value[b];
+    }
 
     /**
      * Returns the level of the b-th child.
@@ -62,14 +67,23 @@ public:
         return level[b];
     }
 
-    void setReference(int b, T const& v) {
+    void setReference(int b, T & v){
         assert(0 <= b && b < ARITY);
         value[b] = &v;
+    }
+
+    void setReference(int b, T * v) {
+        assert(0 <= b && b < ARITY);
+        value[b] =  v;
     }
 
     void setLevel(int b, int i) {
         assert(0 <= b && b < ARITY);
         level[b] = i;
+    }
+
+    void setWeight( int w){
+        weight = w;
     }
 
     friend std::ostream& operator<<(std::ostream& os, DdValues const& o) {

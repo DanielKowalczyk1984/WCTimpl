@@ -134,6 +134,7 @@ public:
 template<int ARITY>
 struct Node {
     NodeId branch[ARITY];
+    int weight;
 
     Node() {
     }

@@ -25,14 +25,14 @@ static void usage(char* f) {
     fprintf(stderr, "   -o f    write coloring to file f\n");
     fprintf(stderr, "   -f n    Number of feasible solutions that have to be constructed\n");
     fprintf(stderr, "   -u int  initial upper bound\n");
-    fprintf(stderr, "   -s int  Branching strategy: 0= none, 1= minimum lower bound(default), 2 = DFS\n");
+    fprintf(stderr, "   -s int  Node selection: 0= none, 1= minimum lower bound(default), 2 = DFS\n");
     fprintf(stderr, "   -l dbl  cpu time limit for branching\n");
-    fprintf(stderr, "    L dbl  cpu time limit for scatter search\n");
+    fprintf(stderr, "   -L dbl  cpu time limit for scatter search\n");
     fprintf(stderr, "   -R int  Rounding Strategy: 0 = neighbor_rounding(default), 1 = neighbor rounding, 2 = no_rounding\n");
     fprintf(stderr, "   -C int  Combine Method: 0 = Pathrelinking, 1 = PM\n");
-    fprintf(stderr, "   -r int Scatter Search use: 0 = no scatter search(default), 1 = scatter search\n");
-    fprintf(stderr, "   -B int Branch and Bound use: 0 = no branch and bound(default), 1 = use branch and bound\n");
-    fprintf(stderr, "   -t int Dual Variable type: 0 = double(default), 1 = integer\n");
+    fprintf(stderr, "   -r int  Scatter Search use: 0 = no scatter search(default), 1 = scatter search\n");
+    fprintf(stderr, "   -B int  Branch and Bound use: 0 = no branch and bound(default), 1 = use branch and bound\n");
+    fprintf(stderr, "   -t int  Dual Variable type: 0 = double(default), 1 = integer\n");
 }
 
 
@@ -300,8 +300,8 @@ int main(int ac, char **av) {
     compute_schedule(&problem);
 
     /** Print all the information to screen and csv */
-    print_to_csv(&problem);
-    print_to_screen(&problem);
+    //print_to_csv(&problem);
+    //print_to_screen(&problem);
 
 CLEAN:
     wctproblem_free(&problem);

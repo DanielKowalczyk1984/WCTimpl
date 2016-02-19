@@ -382,6 +382,7 @@ gint compare_readytime(gconstpointer a, gconstpointer b) {
 
     return *x - *y;
 }
+
 int calculate_ready_due_times(Job* jobarray, int njobs, int nmachines, int Hmin) {
     int i, j, val = 0;
     int *sumleft = (int*) NULL;
@@ -564,16 +565,21 @@ int compute_objective( wctdata *pd )
     int val = 0;
     int i;
     pd->lower_scaled_bound = .0;
+    pd->LP_lower_bound_heur = .0;
 
     for ( i = 0; i < pd->njobs; i++ )
     {
-        pd->lower_scaled_bound += ( double ) pd->kpc_pi[i];
+        pd->LP_lower_bound_heur += ( double ) pd->pi[i];
     }
 
-    pd->dbl_safe_lower_bound = safe_lower_dbl( pd->lower_scaled_bound,
-                               pd->kpc_pi_scalef );
+    pd->LP_lower_bound_heur += pd->nmachines*pd->pi[pd->njobs];
+
+    // pd->dbl_safe_lower_bound = safe_lower_dbl( pd->lower_scaled_bound,
+    //                            pd->kpc_pi_scalef );
     val = wctlp_objval( pd->LP, &( pd->LP_lower_bound ) );
     CCcheck_val_2( val, "pmclp_objval failed" );
+    printf("LP = %f %f\n", pd->LP_lower_bound, pd->LP_lower_bound_heur);
+    getchar();
     pd->lower_bound = ( int ) ceil( pd->dbl_safe_lower_bound );
 
     if ( dbg_lvl() > 0 )
@@ -609,7 +615,7 @@ void make_pi_feasible( wctdata *pd )
             colsum += pd->pi[pd->cclasses[c].members[i]];
             colsum = nextafter( colsum, DBL_MAX );
         }
-        colsum += pd->pi[pd->cclasses[c].members[i]];
+        colsum += pd->nmachines*pd->pi[pd->cclasses[c].members[i]];
 
         if ( colsum > pd->cclasses[c].totwct )
         {
@@ -829,7 +835,7 @@ static int grab_integral_solution_ahv(wctdata* pd, int *completion_time) {
     incumbent = 0;
     for (i = 0; i < pd->njobs; ++i) {
         Job *j = pd->jobarray + perm[i];
-        partlist *part = pmcheap_min(heap);
+        partlist *part = (partlist *) pmcheap_min(heap);
         partlist_insert(part, sol->vlist, j);
         pmcheap_insert(heap, part->completiontime, part);
         incumbent += pd->jobarray[perm[i]].weight * (part->completiontime);
@@ -1668,6 +1674,7 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
     double cur_cputime;
     double last_lower_bound = DBL_MAX;
     int    nnonimprovements     = 0;
+    PricerSolver *solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
 
     if ( dbg_lvl() )
     {
@@ -1689,6 +1696,7 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
         val = build_lp( pd );
         CCcheck_val( val, "build_lp failed" );
     }
+    wctlp_write(pd->LP, "test.lp");
 
     pd->kpc_pi = CC_SAFE_MALLOC( pd->njobs + 1, int );
     CCcheck_NULL_2( pd->kpc_pi, "Failed to allocate memory to pd->kpc_pi" );
@@ -1701,6 +1709,10 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
         val = wctlp_optimize( pd->LP, &status );
         CCcheck_val_2( val, "pmclp_optimize failed" );
         cur_cputime = CCutil_zeit() - cur_cputime;
+        double test;
+        wctlp_objval(pd->LP, &test);
+        printf("test = %f\n", test);
+        wctlp_write(pd->LP, "why.lp");
 
         if ( dbg_lvl() )
         {
@@ -1713,30 +1725,36 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
             print_ages( pd );
         }
 
-        val = wctlp_pi( pd->LP, pd->pi );
-        CCcheck_val_2( val, "pmclp_pi failed" );
         switch(status) {
         case GRB_OPTIMAL:
+            val = wctlp_pi( pd->LP, pd->pi );
+            CCcheck_val_2( val, "pmclp_pi failed" );
             iterations++;
             if ( iterations < pd->maxiterations )
             {
-                if ( fabs( last_lower_bound - pd->dbl_est_lower_bound ) < 0.000001 ) {
-                    nnonimprovements++;
-                } else {
-                    nnonimprovements = 0;
-                }
+                // if ( fabs( last_lower_bound - pd->dbl_est_lower_bound ) < 0.000001 ) {
+                //     nnonimprovements++;
+                // } else {
+                //     nnonimprovements = 0;
+                // }
 
                 make_pi_feasible( pd );
                 last_lower_bound = pd->dbl_safe_lower_bound;
                 CCutil_start_resume_time( &problem->tot_pricing );
                 /** Solve the pricing problem */
+                pd->newsets = CC_SAFE_MALLOC(1, Scheduleset);
+                Scheduleset_init(pd->newsets);
                 switch(parms->dual_var_type) {
                 case Dbl:
-                    solvedbl(pd->solver, pd->pi, &(pd->newsets->members), &(pd->newsets->count), &(pd->newsets->totwct),&(pd->nnewsets));
+                    solvedblbdd(solver, pd->pi, &(pd->newsets->members), &(pd->newsets->count), &(pd->newsets->totwct),&(pd->nnewsets));
+                    solvedblzdd(solver, pd->pi);
+
+                    calc(solver,pd->pi);
+                    compute_objective(pd);
                     break;
                 case Int:
                     double2int( pd->kpc_pi, &( pd->kpc_pi_scalef ), pd->pi, pd->njobs );
-                    solveint(pd->solver, pd->kpc_pi, &(pd->newsets->members), &(pd->newsets->count), &(pd->newsets->totwct), &(pd->nnewsets));
+                    solveint(solver, pd->kpc_pi, &(pd->newsets->members), &(pd->newsets->count), &(pd->newsets->totwct), &(pd->nnewsets));
                     val = compute_objective( pd );
                     CCcheck_val_2( val, "compute_objective failed" );
                     pd->dbl_est_lower_bound = pd->dbl_safe_lower_bound;
@@ -1746,10 +1764,9 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
 
                 for ( j = 0; j < pd->nnewsets; j++ )
                 {
-                    val = wctlp_addcol(pd->LP, pd->newsets[j].count, pd->newsets[j].members, pd->coef, pd->newsets[j].totwct, 0.0, 1.0, wctlp_CONT, NULL);
+                    val = wctlp_addcol(pd->LP, pd->newsets[j].count + 1, pd->newsets[j].members, pd->coef, pd->newsets[j].totwct, 0.0, 1.0, wctlp_CONT, NULL);
                     CCcheck_val_2( val, "pmclp_addcol failed" );
                 }
-
 
                 break_while_loop = ( ( pd->nnewsets == 0 ) || nnonimprovements > 5 );
                 add_newsets( pd );
@@ -1763,6 +1780,7 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
         CCutil_suspend_timer( &( problem->tot_cputime ) );
         CCutil_resume_timer( &( problem->tot_cputime ) );
     }
+
     while ( ( iterations < pd->maxiterations ) && !break_while_loop
             && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit );
 
@@ -1890,12 +1908,14 @@ int compute_schedule( wctproblem *problem )
     problem->first_lower_bound = problem->global_lower_bound;
     problem->first_rel_error = ( double )( problem->global_upper_bound -
                                            problem->global_lower_bound ) / ( ( double )problem->global_lower_bound );
-
+    for(int i = 0; i < root_pd->njobs; ++i) {
+        printf("%d %d %d\n", i,root_pd->jobarray[i].processingime,root_pd->jobarray[i].weight);
+    }
 
     /** Transform columns into maximal schedule with  respect to the properties of optimal solutions */
 
     /** Add maximal schedule sets with respect to the properties of optimal solutions */
-    prune_duplicated_sets( root_pd );
+    //prune_duplicated_sets( root_pd );
 
     if ( root_pd->status >= LP_bound_computed )
     {
@@ -1905,12 +1925,12 @@ int compute_schedule( wctproblem *problem )
         val = compute_lower_bound( problem, root_pd );
         CCcheck_val_2( val, "Failed in compute_lower_bound" );
 
-        val = insert_into_branching_heap( root_pd, problem );
+        //val = insert_into_branching_heap( root_pd, problem );
         CCcheck_val_2( val, "insert_into_branching_heap failed" );
     }
 
     CCutil_start_resume_time( &( problem->tot_branching_cputime ) );
-    val = sequential_branching( problem );
+    //val = sequential_branching( problem );
     CCcheck_val( val, "Failed in sequential_branching" );
     CCutil_suspend_timer( &( problem->tot_branching_cputime ) );
 

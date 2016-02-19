@@ -308,6 +308,7 @@ public:
 
             for (int b = 0; b < AR; ++b) {
                 spec.get_copy(state(pp), state(p));
+                q->weight = spec.getState(state(p));
                 int ii = spec.get_child(state(pp), i, b);
 
                 if (ii <= 0) {

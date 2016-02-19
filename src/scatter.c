@@ -94,7 +94,7 @@ void max_dist( void *data, void *user_data )
 
     if ( ( sol->dist > max->dist ) || ( sol->dist == max->dist
                                         && sol->totalweightcomptime < max->totalweightcomptime ) ) {
-        max = data;
+        max = (solution*) data;
     }
 }
 
@@ -418,7 +418,7 @@ int solution_in_refset( SS *scatter_search, solution *new_sol )
 
     do {
         for ( i = 0; i < njobs; ++i ) {
-            solution *sol = g_ptr_array_index(list1, j);
+            solution *sol = (solution *) g_ptr_array_index(list1, j);
             if (  sol->perm[i] != new_sol->perm[i] ) {
                 break;
             }
@@ -440,7 +440,7 @@ int solution_in_refset( SS *scatter_search, solution *new_sol )
     j = 0;
     do {
         for ( i = 0; i < njobs; ++i ) {
-            solution *sol = g_ptr_array_index(list2, j);
+            solution *sol = (solution *) g_ptr_array_index(list2, j);
             if ( ( sol)->perm[i] != new_sol->perm[i] ) {
                 break;
             }
@@ -750,12 +750,12 @@ int SSrun_scatter_search( SS *scatter_search, CCutil_timer * timer)
             }
 
             k_subset_lex_successor( list->len, 3, totsubset, &flag );
-            sol = g_ptr_array_index(list, totsubset[1] - 1);
+            sol = (solution *) g_ptr_array_index(list, totsubset[1] - 1);
         }
 
         k_subset_init( list->len, 4, totsubset, &flag );
-        sol = g_ptr_array_index(list, 0);
-        solution *temp_sol = g_ptr_array_index(list, 1);
+        sol = (solution *) g_ptr_array_index(list, 0);
+        solution *temp_sol = (solution *) g_ptr_array_index(list, 1);
 
         while ( flag && scatter_search->status != opt
                 && sol->totalweightcomptime <= scatter_search->upperbound
@@ -794,8 +794,8 @@ int SSrun_scatter_search( SS *scatter_search, CCutil_timer * timer)
             }
 
             k_subset_lex_successor( list->len, 4, totsubset, &flag );
-            sol = g_ptr_array_index( list, totsubset[1] - 1 );
-            temp_sol = g_ptr_array_index( list, totsubset[2] - 1 );
+            sol = (solution *) g_ptr_array_index( list, totsubset[1] - 1 );
+            temp_sol =  (solution *)g_ptr_array_index( list, totsubset[2] - 1 );
         }
 
         for (  i = 0; i < refset->list2->len + 1; ++i ) {
@@ -969,8 +969,8 @@ int combinePathRelinking(SS *scatter_search, GPtrArray *array, int *subsetsol, i
 
     l = pool;
     while (l != NULL) {
-        solution *last1 = g_ptr_array_index(refset->list1, refset->list1->len - 1);
-        solution *last2 = g_ptr_array_index(refset->list2,  0);
+        solution *last1 = (solution *) g_ptr_array_index(refset->list1, refset->list1->len - 1);
+        solution *last2 = (solution *) g_ptr_array_index(refset->list2,  0);
         GList *next = l->next;
         solution *new_sol = (solution *)l->data;
         int not_in_refset = !solution_in_refset( scatter_search, new_sol );
@@ -1172,7 +1172,7 @@ int combine_GPX( SS *scatter_search, GPtrArray *queue, int *subsetsol,
     }
 
     for ( k = 1;  k <= nbelements && val; k++ ) {
-        temp_sol  = g_ptr_array_index( queue, subsetsol[k] - 1 );
+        temp_sol  = (solution *) g_ptr_array_index( queue, subsetsol[k] - 1 );
 
         if ( temp_sol->iter >= scatter_search->iter ) {
             val = 0;
@@ -1264,7 +1264,7 @@ int combine_GPX( SS *scatter_search, GPtrArray *queue, int *subsetsol,
         GList *it = list->head;
 
         while ( it ) {
-            temp = pmcheap_min( heap );
+            temp = (partlist *) pmcheap_min( heap );
             Job *job = ( Job * )it->data;
 
 
@@ -1328,7 +1328,7 @@ int combine_PM( SS *scatter_search, GPtrArray *array, int *subsetsol,
     // }
 
     for ( k = 1;  k <= nbelements && val; k++ ) {
-        sol  = g_ptr_array_index( array, subsetsol[k] - 1 );
+        sol  =  (solution *) g_ptr_array_index( array, subsetsol[k] - 1 );
 
         if ( sol->iter >= scatter_search->iter ) {
             val = 0;
@@ -1409,7 +1409,7 @@ int combine_PM( SS *scatter_search, GPtrArray *array, int *subsetsol,
             }
         } */
 
-        temp = pmcheap_min(heap);
+        temp = (partlist *) pmcheap_min(heap);
 
         val = partlist_insert(temp, new_sol->vlist, node1);
         CCcheck_val_2( val, "Failed partlist_insert" );
@@ -1454,7 +1454,7 @@ int combine_PM( SS *scatter_search, GPtrArray *array, int *subsetsol,
                     }
                 } */
 
-                temp = pmcheap_min(heap);
+                temp = (partlist *) pmcheap_min(heap);
 
                 val = partlist_insert( temp, new_sol->vlist, node );
                 CCcheck_val_2(val, "Failed in partlist order")
@@ -1545,9 +1545,9 @@ int dynamic_update( SS *scatter_search, GPtrArray *list, solution *new_sol )
 {
     int val = 1;
     REFSET *refset = scatter_search->rs;
-    solution *last1 = g_ptr_array_index(refset->list1, refset->list1->len - 1);
+    solution *last1 = (solution *) g_ptr_array_index(refset->list1, refset->list1->len - 1);
     assert(last1 != NULL);
-    solution *last2 = g_ptr_array_index(refset->list2,  0);
+    solution *last2 = (solution *) g_ptr_array_index(refset->list2,  0);
     assert(last2 != NULL);
     int not_in_refset = !solution_in_refset( scatter_search, new_sol );
 

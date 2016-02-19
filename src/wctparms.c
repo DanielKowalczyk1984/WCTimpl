@@ -29,7 +29,7 @@ void wctparms_init(wctparms *parms){
 
     parms->upper_bounds_only = 0;
     parms->branching_cpu_limit = 3600.0;
-    parms->scatter_search_cpu_limit = 120.0;
+    parms->scatter_search_cpu_limit = 40.0;
 }
 
 void wctparms_free(wctparms *parms){

@@ -1,7 +1,6 @@
 #ifndef WCT_PRIVATE_H
 #define WCT_PRIVATE_H 
 
-
 #include "util.h"
 #include "datastructsol.h"
 #include "wctparms.h"
@@ -30,6 +29,13 @@ typedef struct _P{
     int lenght;
 } P;
 
+typedef enum {
+        init   = 0,
+        add    = 1,
+        update = 3,
+        opt    = 4
+    }  scatter_status;
+
 typedef struct _SS{
     REFSET *rs;
     P *p;
@@ -47,12 +53,7 @@ typedef struct _SS{
     int iter;
     int combine_method;
     
-    enum {
-        init   = 0,
-        add    = 1,
-        update = 3,
-        opt    = 4
-    } status;
+    scatter_status status;
 } SS;
 
 
@@ -74,6 +75,14 @@ typedef struct heur_diving {
 /**
  * wct data types nodes of branch and bound tree
  */
+typedef enum{
+        initialized             = 0,
+        infeasible              = 1,
+        LP_bound_estimated      = 2,
+        LP_bound_computed       = 3,
+        submitted_for_branching = 4,
+        finished                = 5,
+} data_status;
 
 typedef struct wctdata wctdata;
 struct wctdata {
@@ -81,14 +90,7 @@ struct wctdata {
     int id;
     int depth;
     
-    enum{
-        initialized             = 0,
-        infeasible              = 1,
-        LP_bound_estimated      = 2,
-        LP_bound_computed       = 3,
-        submitted_for_branching = 4,
-        finished                = 5,
-    }status;
+    data_status status;
     
     // The job information
     int njobs;
@@ -174,6 +176,13 @@ struct wctdata {
  */
 
 
+typedef enum  {
+        no_sol = 0,     
+        feasible   = 1,
+        meta_heur  = 2,
+        optimal    = 3
+    } problem_status;
+
 typedef struct wctproblem wctproblem;
 
 struct wctproblem{
@@ -189,13 +198,7 @@ struct wctproblem{
     double rel_error;
     int maxdepth;
 
-    enum  {
-        no_sol = 0,     
-        feasible   = 1,
-        meta_heur  = 2,
-        optimal    = 3
-    } status;
-
+    problem_status status;
     /* Scatter search*/
     SS scatter_search;
     
@@ -230,6 +233,7 @@ int lp_build(wctdata *pd);
 void lpwctdata_free(wctdata *pd);
 void children_data_free(wctdata *pd);
 void wctdata_free(wctdata *pd);
+void add_all_sets(PricerSolver *solver, wctdata *pd);
 #ifdef __cplusplus
 }
 #endif

@@ -320,6 +320,10 @@ public:
     void print_state(std::ostream& os, void const* p) const {
         this->entity().printState(os, state(p));
     }
+
+    State getState(void const *p){
+        return state(p);
+    }
 };
 
 /**

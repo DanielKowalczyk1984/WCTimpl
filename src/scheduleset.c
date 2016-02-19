@@ -32,7 +32,6 @@ static int copy_Schedulesets( Scheduleset *dst, const Scheduleset *src, int nsrc
             dst->members = CC_SAFE_MALLOC(dst->count + 1, int);                 \
             CCcheck_NULL_2(dst->members, "Failed to allocate memory");      \
             dst->completiontime = g_hash_table_new(g_direct_hash, g_direct_equal); \
-            g_hash_table_foreach(src->completiontime, iterator, dst->completiontime); \
             memcpy(dst->members, src->members, (dst->count + 1)*sizeof(int));     \
         }                                                                   \
         dst++;                                                              \
@@ -50,7 +49,6 @@ static int copy_Schedulesets( Scheduleset *dst, const Scheduleset *src, int nsrc
             dst[x].members = CC_SAFE_MALLOC(dst[x].count + 1, int);             \
             CCcheck_NULL_2(dst[x].members, "Failed to allocate memory");    \
             dst[x].completiontime = g_hash_table_new(g_int_hash, g_int_equal);\
-            g_hash_table_foreach(src[x].completiontime, iterator, dst[x].completiontime);\
             memcpy(dst[x].members, src[x].members, (dst[x].count + 1)*sizeof(int));\
         }                                                                   \
     }

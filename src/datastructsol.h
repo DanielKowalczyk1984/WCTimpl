@@ -1,3 +1,5 @@
+#ifndef DATASTRUCTSOL_H
+#define DATASTRUCTSOL_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -135,3 +137,5 @@ int partlist_to_Scheduleset( partlist *part, int nbpart, int njobs, Scheduleset 
 #ifdef __cplusplus
 }
 #endif
+
+#endif // DATASTRUCTSOL_H

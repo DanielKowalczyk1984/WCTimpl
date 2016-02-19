@@ -168,6 +168,7 @@ void solution_print(solution *sol) {
         printf("with C =  %d, wC = %d and %d jobs\n", sol->part[i].completiontime, sol->part[i].totcompweight
             , g_queue_get_length(sol->part[i].list));
     }
+    printf("with total weighted completion time %d\n", sol->totalweightcomptime);
 }
 
 void test_SOLUTION(solution *sol) {

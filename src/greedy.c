@@ -49,7 +49,6 @@ int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution* new
 
   while (!g_queue_is_empty(to_do_list)) {
     temp_job = (Job *)to_do_list->head->data;
-    printf("%d\n", temp_job->job);
     max = ((double)temp[0].completiontime + (double)temp_job->processingime);
     min = max;
     GArray *rcl = g_array_new(FALSE, FALSE, sizeof(pair_job_machine));
@@ -99,7 +98,6 @@ int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution* new
   }
 
   g_queue_free(to_do_list);
-  getchar();
   return 0;
 }
 
@@ -123,9 +121,9 @@ int random_assignment( Job *jobarray, int njobs, int nmachines, solution *new_so
     if (n < 0.8) {
       temp = (partlist *) g_queue_pop_head(queue);
     } else if ( n >= 0.8 && n < 0.95) {
-      temp = g_queue_pop_nth(queue, 1);
+      temp = (partlist*) g_queue_pop_nth(queue, 1);
     } else {
-      temp = g_queue_pop_nth(queue, 2);
+      temp = (partlist *)g_queue_pop_nth(queue, 2);
     }
     val = partlist_insert( temp, new_sol->vlist, j );
     CCcheck_val_2( val, "Failed in partlist_insert_order" );
@@ -178,6 +176,7 @@ void update_bestschedule( wctproblem *problem, solution *new_sol )
     problem->global_upper_bound = new_sol->totalweightcomptime;
     problem->rel_error = ( double )( problem->global_upper_bound -
                                      problem->global_lower_bound ) / ( problem->global_lower_bound );
+    partlist_to_Scheduleset(new_sol->part, new_sol->nmachines, new_sol->njobs, &(problem->bestschedule), &(problem->nbestschedule));
   }
 
   if ( problem->global_upper_bound == problem->global_lower_bound ) {
@@ -199,6 +198,13 @@ static int add_feasible_solution( wctproblem *problem, solution *new_sol)
     add_solution_pool( scatter_search, new_sol );
     update_bestschedule( problem, new_sol );
     scatter_search->p->PSize++;
+    if(root_pd->ccount == 0) {
+        update_Schedulesets(&root_pd->cclasses, &root_pd->ccount, problem->bestschedule, problem->nbestschedule);
+        root_pd->gallocated = root_pd->ccount;
+    } else { 
+      partlist_to_Scheduleset(new_sol->part, new_sol->nmachines, new_sol->njobs, &(root_pd->newsets), &(root_pd->nnewsets));
+      add_newsets(root_pd);
+    }
   } else {
     solution_free( new_sol );
     CC_IFFREE( new_sol, solution );
@@ -232,6 +238,7 @@ int construct_feasible_solutions(wctproblem *problem) {
   wctdata *pd = &(problem->root_pd);
   SS *scatter_search = &(problem->scatter_search);
   CCutil_timer *timer = &(problem->tot_scatter_search);
+  int iterations = 0;
 
   CCutil_start_timer(timer);
 
@@ -243,6 +250,7 @@ int construct_feasible_solutions(wctproblem *problem) {
   CCcheck_val_2(val, "Failed in SSproblem_definition");
 
   while (scatter_search->p->PSize < parms->nb_feas_sol) {
+    iterations++;
     solution *new_sol = (solution *) NULL;
     new_sol = new_sol_init(pd->nmachines, pd->njobs);
     CCcheck_NULL(new_sol, "Failed to allocate")
@@ -265,15 +273,24 @@ int construct_feasible_solutions(wctproblem *problem) {
 
   CCutil_suspend_timer(timer);
   CCutil_resume_timer(timer);
-  printf("We needed %f seconds to construct %d solutions\n", timer->cum_zeit, parms->nb_feas_sol);
-  SSCreate_refset(scatter_search);
-  scatter_search->upperbound = problem->global_upper_bound;
-  printf("upperbound = %d, lowerbound = %d\n", problem->global_upper_bound, problem->global_lower_bound);
-  if(parms->combine_method && parms->scatter_search) {
-    SSrun_scatter_search(scatter_search, &(problem->tot_scatter_search) );
-  } else if (parms->scatter_search) {
-    SSrun_scatter_searchPR(scatter_search, & (problem->tot_scatter_search));
+  printf("We needed %f seconds to construct %d solutions in %d\n", timer->cum_zeit, parms->nb_feas_sol, iterations);
+  if(parms->scatter_search) {
+    SSCreate_refset(scatter_search);
+    scatter_search->upperbound = problem->global_upper_bound;
+    if(parms->combine_method) {
+      SSrun_scatter_search(scatter_search, &(problem->tot_scatter_search) );
+    } else {
+      SSrun_scatter_searchPR(scatter_search, & (problem->tot_scatter_search));
+    }
+    for(unsigned i = 0; i < scatter_search->rs->list1->len ;i++) {
+      solution *new_sol = (solution*)g_ptr_array_index(scatter_search->rs->list1 , i);
+      solution_print(new_sol);
+      partlist_to_Scheduleset(new_sol->part, pd->nmachines, pd->njobs, &(pd->newsets), &(pd->nnewsets));
+      getchar();
+      add_newsets(pd);
+    }
   }
+printf("upperbound = %d, lowerbound = %d\n", problem->global_upper_bound, problem->global_lower_bound);
 
 CLEAN:
   g_rand_free(rand1);

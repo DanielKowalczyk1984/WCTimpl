@@ -90,6 +90,8 @@ int local_search_machine_general_best(solution *sol,int lowerbound, int k, int l
     int nmachines = sol->nmachines;
     partlist* L_max = (partlist *) NULL;
     partlist* K_max = (partlist *) NULL;
+    CCutil_timer time_move;
+    CCutil_init_timer(&time_move, NULL);
     int max;
 
     Job **K_jobs = (Job**) NULL;
@@ -112,10 +114,12 @@ int local_search_machine_general_best(solution *sol,int lowerbound, int k, int l
         L_subset = CC_SAFE_MALLOC(l + 1, int);
         L_jobs_max = CC_SAFE_MALLOC(l, Job*);
     }
-
-    printf("Executing local search with k = %d and l = %d\n", k,l);
+    if(dbg_lvl() > 0) {
+        printf("Executing local search with k = %d and l = %d\n", k,l);
+    }
 
     moved = 1;
+    CCutil_start_timer(&time_move);
     while(moved && sol->totalweightcomptime != lowerbound){
         nbiter++;
         moved = 0;
@@ -255,9 +259,12 @@ int local_search_machine_general_best(solution *sol,int lowerbound, int k, int l
             sol->totalweightcomptime -= max;
         }
     };
+    CCutil_stop_timer(&time_move, 0);
 
-
-    printf("local search %d  - %d -> number of iterations = %d,  running time = %f and objective = %d\n",k,l, --nbiter,0.0,sol->totalweightcomptime);
+    if(dbg_lvl() > 0)
+    {
+        printf("local search %d  - %d -> number of iterations = %d,  running time = %f and objective = %d\n",k,l, --nbiter,time_move.cum_zeit,sol->totalweightcomptime);
+    }
 
     CC_IFFREE(L_jobs, Job*);
     CC_IFFREE(K_jobs, Job*);
@@ -463,15 +470,16 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
 void localsearch_wrap(solution *sol, int lowerbound,int best){
     if (best)
     {
-        local_search_machine_general_best(sol, lowerbound, 2, 0);
-        local_search_machine_general_best(sol, lowerbound, 2, 1);
         local_search_machine_general_best(sol, lowerbound, 1, 0);
+        local_search_machine_general_best(sol, lowerbound, 2, 0);
         local_search_machine_general_best(sol, lowerbound, 1, 1);
-    } else {
-        local_search_machine_general_first(sol, lowerbound, 2, 1);
-        local_search_machine_general_first(sol, lowerbound, 2, 0);
+        local_search_machine_general_best(sol, lowerbound, 2, 1);
+    } else
+    {
         local_search_machine_general_first(sol, lowerbound, 1, 0);
+        local_search_machine_general_first(sol, lowerbound, 2, 0);
         local_search_machine_general_first(sol, lowerbound, 1, 1);
+        local_search_machine_general_first(sol, lowerbound, 2, 1);
     }
 }
 

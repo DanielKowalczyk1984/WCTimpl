@@ -2,230 +2,301 @@
 #include <cfloat>
 #include <climits>
 #include <vector>
+#include <algorithm>
 
 
 template<typename T>
-class PricerInfo {
+class PricerInfoZDD {
 public:
-    int sum_w;
-    T obj;
-    std::vector<int> jobs;
-    int cost;
+    T  *obj;
+    int *cost;
+    bool *A;
 
-    PricerInfo& operator=( const PricerInfo& other ) {
-        sum_w = other.sum_w;
+    PricerInfoZDD(){
+    }
+
+    ~PricerInfoZDD(){
+        delete[] obj;
+        delete[] cost;
+        delete[] A;
+    }
+
+    T get_max(int H_max){
+        return *std::max_element(obj, obj + (H_max + 1));
+    }
+
+    PricerInfoZDD& operator=( const PricerInfoZDD& other ) {
         obj = other.obj;
-        jobs = other.jobs;
         cost = other.cost;
+        A = other.A;
         return *this;
     };
-};
 
-struct MinNumItems: public tdzdd::DdEval<MinNumItems,int> {
-    void evalTerminal(int& n, bool one) const {
-        n = one ? 0 : INT_MAX - 1;
-    }
-
-    void evalNode(int& n, int, int &v0, int i0, int &v1, int i1) const {
-        n = std::min(v0, v1 + 1);
+    friend std::ostream& operator<<(std::ostream& os, PricerInfoZDD<T> const& o) {
+        os << "max = " << o.obj << "," << std::endl << "cost = " << o.cost << std::endl;
+        return os;
     }
 };
 
-struct MaxNumItems: public tdzdd::DdEval<MaxNumItems,int> {
-    void evalTerminal(int& n, bool one) const {
-        n = one ? 0 : INT_MIN;
-    }
+template<typename T>
+class PricerInfoBDD {
+public:
+    T obj;
+    std::vector<int> jobs;
+    int sum_w;
+    int sum_p;
+    int cost;
 
-    void evalNode(int& n, int, int &v0, int i0, int &v1, int i1) const {
-        n = std::max(v0, v1 + 1);
+    PricerInfoBDD& operator=( const PricerInfoBDD& other ) {
+        sum_w = other.sum_w;
+        sum_p = other.sum_p;
+        cost = other.cost;
+        obj = other.obj;
+        jobs.clear();
+        jobs = other.jobs;
+        return *this;
+    };
+
+    friend std::ostream& operator<<(std::ostream& os, PricerInfoBDD<T> const& o) {
+        os << "max = " << o.obj << "," << std::endl << "cost = " << o.cost << std::endl;
+        return os;
     }
 };
 
-template<typename E>
-class MaxReducedCostBaseDbl: public tdzdd::DdEval<E, PricerInfo<double> > {
-    double *pi;
+template<typename E, typename T>
+class DurationZDD: public tdzdd::DdEval<E, PricerInfoZDD<T>, T > {
+    T *pi;
+    int *p;
+    int *w;
+    int nbjobs;
+    int H_max;
+
+public:
+    DurationZDD(T *_pi, int *_p, int *_w, int _nbjobs, int _H_max)
+        : pi(_pi), p(_p), w(_w), nbjobs(_nbjobs), H_max(_H_max) {
+    };
+
+    void evalTerminal( PricerInfoZDD<T>& n, bool one) {
+        for(unsigned i = 0; i < H_max + 1; ++i) {
+            n.obj[i] = one ? 0 : -15656873.0;
+        }
+    }
+
+    void evalNode( PricerInfoZDD<T>  &n, int i, tdzdd::DdValues<PricerInfoZDD<T>, 2>  &  values) const {
+        int j = nbjobs - i;
+        assert(j >= 0 && j <= nbjobs - 1);
+        PricerInfoZDD<T> *n0 = values.get_ptr(0);
+        PricerInfoZDD<T> *n1 = values.get_ptr(1);
+
+        for(int k = 0; k < H_max + 1; ++k) {
+            int it = k + p[j];
+            if(it <= H_max) {
+                if(n1->obj[it] < n.obj[k] - w[j]*it + pi[j]) {
+                    n1->obj[it] = n.obj[k] - w[j]*it + pi[j];
+                    n1->cost[it] = n.cost[k] + w[j]*it;
+                    n1->A[it] = true;
+                }
+
+            }
+            
+            if(n0->obj[k] < n.obj[k]) {
+                n0->obj[k] = n.obj[k];
+                n0->cost[k] = n.cost[k];
+                n0->A[k] = false;
+            }
+        }
+    }
+
+    void initializenode(PricerInfoZDD<T> &n) {
+        n.obj = new T [H_max + 1];
+        n.cost = new int [H_max + 1];
+        n.A = new bool [H_max + 1];
+        for(unsigned i = 0; i < H_max + 1; ++i) {
+            n.obj[i] = -10983290.0;
+        }
+
+    }
+
+    void initializerootnode(PricerInfoZDD<T> &n) {
+        n.obj = new T [H_max + 1];
+        n.cost = new int [H_max + 1];
+        n.A = new bool [H_max + 1];
+        for(unsigned i = 0; i < H_max + 1; ++i) {
+            n.obj[i] = pi[nbjobs];
+        }
+    }
+
+    T get_objective(PricerInfoZDD<T> &n){
+        return n.get_max(H_max);
+    }
+};
+
+template<typename E, typename T>
+class DurationBDD: public tdzdd::DdEval<E, PricerInfoBDD<T> > {
+    T *pi;
     int *p;
     int *w;
     int nbjobs;
 
 public:
-    MaxReducedCostBaseDbl(double *_pi, int *_p, int *_w, int _nbjobs)
+    DurationBDD(T *_pi, int *_p, int *_w, int _nbjobs)
         : pi(_pi), p(_p), w(_w), nbjobs(_nbjobs) {
 
     };
 
-    void evalTerminal( PricerInfo<double>& n, bool one) {
-        n.obj = one ? pi[nbjobs] : DBL_MIN;
-        n.sum_w = 0;
+    void evalTerminal( PricerInfoBDD<T>& n, bool one) {
+        n.obj = one ? 0 : -1871286761.0;
         n.cost = 0;
+        n.sum_p = 0;
         n.jobs.resize(0);
     }
 
-    void evalNode( PricerInfo<double> &n, int i, tdzdd::DdValues<PricerInfo<double>, 2> const & values) const {
+    void evalNode( PricerInfoBDD<T> &n, int i, tdzdd::DdValues<PricerInfoBDD<T>, 2>  &  values) const {
         int j = nbjobs - i;
         assert(j >= 0 && j <= nbjobs - 1);
-        PricerInfo<double> n0 = values.get(0);
-        PricerInfo<double> n1 = values.get(1);
-        if (n0.obj > n1.obj - n1.sum_w * p[j] - (double)w[j] * (double)p[j] + pi[j]) {
-            n.obj = n0.obj;
-            n.sum_w = n0.sum_w;
-            n.jobs = n0.jobs;
-            n.cost = n0.cost;
-        } else {
-            n.obj = n1.obj - n1.sum_w * p[j] - w[j] * p[j] + pi[j];
-            n.sum_w = n1.sum_w + w[j];
-            n.jobs = n1.jobs;
-            n.cost = n1.cost + n1.sum_w * p[j] + w[j] * p[j];
-            n.jobs.push_back(j);
+        PricerInfoBDD<T> *n0 = values.get_ptr(0);
+        PricerInfoBDD<T> *n1 = values.get_ptr(1);
+
+        if (n0->obj < n.obj) {
+            n0->obj = n.obj;
+            n0->cost = n.cost;
+            n0->sum_p = n.sum_p;
+            n0->jobs.clear();
+            n0->jobs = n.jobs;
         }
 
+        if (n1->obj < n.obj - (T) w[j] * (n.sum_p + p[j]) +  pi[j]) {
+            n1->obj = n.obj - (T) w[j] * (n.sum_p + p[j]) + pi[j];
+            n1->cost = n.cost + w[j] * (n.sum_p + p[j]);
+            n1->sum_p = n.sum_p + p[j];
+            n1->jobs.clear();
+            n1->jobs = n.jobs;
+            n1->jobs.push_back(j);
+        }
+    }
+
+    void initializenode(PricerInfoBDD<T> &n) {
+        n.obj = -1871286761.0;
+    }
+
+    void initializerootnode(PricerInfoBDD<T> &n) {
+        n.obj = pi[nbjobs];
     }
 };
 
-template<typename E>
-class MaxFarkasPricingBaseDbl: public tdzdd::DdEval<E, PricerInfo<double> > {
-    double *pi;
+template<typename E, typename T>
+class WeightBDD: public tdzdd::DdEval<E, PricerInfoBDD<T> > {
+    T *pi;
     int *p;
     int *w;
     int nbjobs;
 
 public:
-    MaxFarkasPricingBaseDbl(double *_pi, int *_p, int *_w, int _nbjobs)
+    WeightBDD(T *_pi, int *_p, int *_w, int _nbjobs)
         : pi(_pi), p(_p), w(_w), nbjobs(_nbjobs) {
     };
 
-    void evalTerminal( PricerInfo<double>& n, bool one) {
-        n.obj = one ? pi[nbjobs] : DBL_MIN;
-        n.sum_w = 0;
+    void evalTerminal( PricerInfoBDD<T>& n, bool one) {
+        n.obj = one ? 0 : -1871286761.0;
         n.cost = 0;
+        n.sum_w = 0;
         n.jobs.resize(0);
-
     }
 
-
-
-    void evalNode( PricerInfo<double> &n, int i, tdzdd::DdValues<PricerInfo<double>, 2> const & values) const {
+    void evalNode( PricerInfoBDD<T> &n, int i, tdzdd::DdValues<PricerInfoBDD<T>, 2>  &  values) const {
         int j = nbjobs - i;
         assert(j >= 0 && j <= nbjobs - 1);
-        PricerInfo<double> n0 = values.get(0);
-        PricerInfo<double> n1 = values.get(1);
-        if (n0.obj > n1.obj + pi[j]) {
-            n.obj = n0.obj;
-            n.sum_w = n0.sum_w;
-            n.jobs = n0.jobs;
-            n.cost = n0.cost;
+        PricerInfoBDD<T> *n0 = values.get_ptr(0);
+        PricerInfoBDD<T> *n1 = values.get_ptr(1);
+
+        if(n0->obj > n1->obj - p[j]*( n1->sum_w + w[j]) + pi[j]) {
+            n = *n0;
         } else {
-            n.obj = n1.obj  + pi[j];
-            n.sum_w = n1.sum_w + w[j];
-            n.jobs = n1.jobs;
-            n.cost = n1.cost + n1.sum_w * p[j] + w[j] * p[j];
+            n.obj = n1->obj - (T)p[j]*( n1->sum_w + w[j]) + pi[j];
+            n.sum_p = n1->sum_p + p[j];
+            n.sum_w = n1->sum_w + w[j];
+            n.cost = n1->cost + (T)p[j]*( n1->sum_w + w[j]);
+            n.jobs.clear();
+            n.jobs = n1->jobs;
             n.jobs.push_back(j);
         }
-
     }
 };
 
-template<typename E>
-class MaxReducedCostBaseInt: public tdzdd::DdEval<E, PricerInfo<int> > {
-    int *pi;
+template<typename E, typename T>
+class Farkas: public tdzdd::DdEval<E, PricerInfoBDD<T> > {
+    T *pi;
     int *p;
     int *w;
     int nbjobs;
 
 public:
-    MaxReducedCostBaseInt(int *_pi, int *_p, int *_w, int _nbjobs)
+    Farkas(T *_pi, int *_p, int *_w, int _nbjobs)
         : pi(_pi), p(_p), w(_w), nbjobs(_nbjobs) {
-
     };
 
-    void evalTerminal( PricerInfo<int>& n, bool one) {
-        n.obj = one ? pi[nbjobs] : INT_MIN;
-        n.sum_w = 0;
+    void evalTerminal( PricerInfoBDD<T>& n, bool one) {
+        n.obj = one ? 0 : -1871286761.0;
         n.cost = 0;
+        n.sum_p = 0;
         n.jobs.resize(0);
-
     }
 
-    void evalNode( PricerInfo<int> &n, int i, tdzdd::DdValues<PricerInfo<int>, 2> const & values) const {
+    void evalNode( PricerInfoBDD<T> &n, int i, tdzdd::DdValues<PricerInfoBDD<T>, 2>  &  values) const {
         int j = nbjobs - i;
         assert(j >= 0 && j <= nbjobs - 1);
-        PricerInfo<int> n0 = values.get(0);
-        PricerInfo<int> n1 = values.get(1);
-        if (n0.obj > n1.obj - n1.sum_w * p[j] - w[j]*p[j] + pi[j]) {
-            n.obj = n0.obj;
-            n.sum_w = n0.sum_w;
-            n.jobs = n0.jobs;
-            n.cost = n0.cost;
-        } else {
-            n.obj = n1.obj - n1.sum_w * p[j] - w[j] * p[j] + pi[j];
-            n.sum_w = n1.sum_w + w[j];
-            n.jobs = n1.jobs;
-            n.cost = n1.cost + n1.sum_w * p[j] + w[j] * p[j];
-            n.jobs.push_back(j);
+        PricerInfoBDD<T> *n0 = values.get_ptr(0);
+        PricerInfoBDD<T> *n1 = values.get_ptr(1);
+
+        if (n0->obj < n.obj) {
+            n0->obj = n.obj;
+            n0->cost = n.cost;
+            n0->sum_p = n.sum_p;
+            n0->jobs.clear();
+            n0->jobs = n.jobs;
+        }
+
+        if (n1->obj < n.obj - w[j] * (n.sum_p + p[j]) + pi[j]) {
+            n1->obj = n.obj + pi[j];
+            n1->cost = n.cost + w[j] * (n.sum_p + p[j]);
+            n1->sum_p = n.sum_p + p[j];
+            n1->jobs.clear();
+            n1->jobs = n.jobs;
+            n1->jobs.push_back(j);
         }
     }
-};
 
-template<typename E>
-class MaxFarkasPricingBaseInt: public tdzdd::DdEval<E, PricerInfo<int> > {
-    int *pi;
-    int *p;
-    int *w;
-    int nbjobs;
-
-public:
-    MaxFarkasPricingBaseInt(int *_pi, int *_p, int *_w, int _nbjobs)
-        : pi(_pi), p(_p), w(_w), nbjobs(_nbjobs) {
-
-    };
-
-    void evalTerminal( PricerInfo<int>& n, bool one) {
-        n.obj = one ? pi[nbjobs] : INT_MIN;
-        n.sum_w = 0;
-        n.cost = 0;
-        n.jobs.resize(0);
-
+    void initializenode(PricerInfoBDD<T> &n) {
+        n.obj = -1871286761.0;
     }
 
-    void evalNode( PricerInfo<int> &n, int i, tdzdd::DdValues<PricerInfo<int>, 2> const & values) const {
-        int j = nbjobs - i;
-        assert(j >= 0 && j <= nbjobs - 1);
-        PricerInfo<int> n0 = values.get(0);
-        PricerInfo<int> n1 = values.get(1);
-        if (n0.obj > n1.obj + pi[j]) {
-            n.obj = n0.obj;
-            n.sum_w = n0.sum_w;
-            n.jobs = n0.jobs;
-            n.cost = n0.cost;
-        } else {
-            n.obj = n1.obj + pi[j];
-            n.sum_w = n1.sum_w + w[j];
-            n.jobs = n1.jobs;
-            n.cost = n1.cost + n1.sum_w * p[j] + w[j] * p[j];
-            n.jobs.push_back(j);
-        }
+    void initializerootnode(PricerInfoBDD<T> &n) {
+        n.obj = pi[nbjobs];
     }
+
 };
 
-
-
-struct MaxReducedCostDbl: MaxReducedCostBaseDbl<MaxReducedCostDbl> {
-    MaxReducedCostDbl(double *_pi, int *_p, int *_w, int _nbjobs): MaxReducedCostBaseDbl<MaxReducedCostDbl>(_pi, _p, _w, _nbjobs) {
+struct DurationZDDdouble: DurationZDD<DurationZDDdouble, double> {
+    DurationZDDdouble(double *_pi, int *_p, int *_w, int _nbjobs, int H_max): DurationZDD<DurationZDDdouble,  double>(_pi, _p, _w, _nbjobs, H_max) {
     };
 };
 
-struct MaxReducedCostInt: public MaxReducedCostBaseInt<MaxReducedCostInt> {
-    MaxReducedCostInt(int *_pi, int *_p, int *_w, int _nbjobs): MaxReducedCostBaseInt<MaxReducedCostInt>(_pi, _p, _w, _nbjobs) {
+struct DurationBDDdouble: DurationBDD<DurationBDDdouble, double> {
+    DurationBDDdouble(double *_pi, int *_p, int *_w, int _nbjobs): DurationBDD<DurationBDDdouble, double>(_pi, _p, _w, _nbjobs) {
     };
 };
 
-struct MaxFarkasPricingDbl: public MaxFarkasPricingBaseDbl<MaxFarkasPricingDbl> {
-    MaxFarkasPricingDbl(double *_pi, int *_p, int *_w, int _nbjobs): MaxFarkasPricingBaseDbl<MaxFarkasPricingDbl>(_pi, _p, _w, _nbjobs) {
+struct DurationBDDint: DurationBDD<DurationBDDint, int> {
+    DurationBDDint(int *_pi, int *_p, int *_w, int _nbjobs): DurationBDD<DurationBDDint, int>(_pi, _p, _w, _nbjobs) {
     };
 };
 
-struct MaxFarkasPricingInt: public MaxFarkasPricingBaseInt<MaxFarkasPricingInt> {
-    MaxFarkasPricingInt(int *_pi, int *_p, int *_w, int _nbjobs): MaxFarkasPricingBaseInt<MaxFarkasPricingInt>(_pi, _p, _w, _nbjobs) {
+struct FarkasBDDdouble: Farkas<FarkasBDDdouble, double> {
+    FarkasBDDdouble(double *_pi, int *_p, int *_w, int _nbjobs): Farkas<FarkasBDDdouble, double>(_pi, _p, _w, _nbjobs) {
     };
 };
 
+struct FarkasBDDint: Farkas<FarkasBDDint, int> {
+    FarkasBDDint(int *_pi, int *_p, int *_w, int _nbjobs): Farkas<FarkasBDDint, int>(_pi, _p, _w, _nbjobs) {
+    };
+};
