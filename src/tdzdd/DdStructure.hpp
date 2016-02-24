@@ -553,7 +553,7 @@ public:
         
         template<typename S, typename T, typename R>
         R evaluate_reverse(DdEval<S, T, R> const & evaluator) const {
-            S eval(evaluator.entity()); // copied
+            S eval(evaluator.entity());
             bool msg = eval.showMessages();
             int n = root_.row();
 
@@ -573,6 +573,9 @@ public:
 
             DataTable<T> work(diagram->numRows());
 
+            /**
+             * Initialize nodes of the DD
+             */
             for (int i = n; i >= 0; i--) {
                 MyVector<Node<ARITY> > const& node = (*diagram)[i];
                 size_t const m = node.size();
@@ -581,16 +584,18 @@ public:
                     eval.initializenode(work[i][j]);
                 }
                 if(i == n) {
-                    for (size_t j = 0; j < m && i < n; ++j) {
+                    for (size_t j = 0; j < m; ++j) {
                         eval.initializerootnode(work[i][j]);
                     }
                 }
             }
 
+            /**
+             * Compute all the node of ZDD
+             */
             for (int i = n ; i > 0; i--) {
                 MyVector<Node<ARITY> > const& node = (*diagram)[i];
                 size_t const m = node.size();
-
                     for (size_t j = 0; j < m; ++j) {
                         DdValues<T, ARITY> values;
                         for (int b = 0; b < ARITY; ++b) {
@@ -604,6 +609,9 @@ public:
                 if (msg) mh.step();
             }
 
+            /**
+             * Return the optimal solution
+             */
             R retval = eval.getValue(work[0][1]);
 
             for (int i = n; i >= 0; i--) {
@@ -626,20 +634,12 @@ public:
                 mh.setSteps(n);
             }
 
-            eval.initialize(n);
-
-            // if (n == 0) {
-            //     T t;
-            //     eval.evalTerminal(t, root_.col());
-            //     return t;
-            // }
-
             DataTable<T> work(diagram->numRows());
 
             for (int i = n; i >= 0; i--) {
                 MyVector<Node<ARITY> > const& node = (*diagram)[i];
                 size_t const m = node.size();
-                work[i].resize(m);  
+                work[i].resize(m);
                 for (size_t j = 0; j < m && i < n; ++j) {
                     eval.initializenode(work[i][j]);
                 }
@@ -667,9 +667,7 @@ public:
                 if (msg) mh.step();
             }
 
-            R best_sol = eval.get_objective(work[0][1]);
-
-            std::cout << "test DP " <<best_sol << std::endl;
+            R best_sol = eval.get_objective(&(work[0][1]));
 
             for (int i = n; i >= 0; i--) {
                 work[i].clear();

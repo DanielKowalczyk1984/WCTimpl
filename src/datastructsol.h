@@ -101,7 +101,7 @@ typedef struct Scheduleset{
     int age;
     int totweight;
     int totwct;
-    GHashTable *completiontime;
+    //GHashTable *completiontime;
     int *members;
 } Scheduleset;
 
@@ -114,8 +114,8 @@ void Schedulesets_free(Scheduleset **set, int *nsets);
 int  COLORcopy_sets (Scheduleset **dsts,int* nsets,const Scheduleset *src_s, int src_nsets);
 
 /*Check if the coloring is feasible*/
-int COLORcheck_set(Scheduleset* set, int vcount, int ecount, const int elist[]);
-int COLORcheck_coloring(Scheduleset *set,int ccount, int vcount, int ecount, const int elist[]);
+int Scheduleset_check_set(Scheduleset* set, int vcount);
+int Scheduleset_check(Scheduleset *set,int ccount, int vcount);
 
 /*Transformation of covers*/
 int transform_into_coloring(int vcount, int *ncolors, Scheduleset **colorclasses);

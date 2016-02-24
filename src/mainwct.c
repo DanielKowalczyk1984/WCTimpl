@@ -33,6 +33,7 @@ static void usage(char* f) {
     fprintf(stderr, "   -r int  Scatter Search use: 0 = no scatter search(default), 1 = scatter search\n");
     fprintf(stderr, "   -B int  Branch and Bound use: 0 = no branch and bound(default), 1 = use branch and bound\n");
     fprintf(stderr, "   -t int  Dual Variable type: 0 = double(default), 1 = integer\n");
+    fprintf(stderr, "   -S int  Stabilization technique: 0 = no stabilization(default), 1 = stabilization wentgnes\n");
 }
 
 
@@ -103,6 +104,9 @@ static int parseargs(int ac, char **av, wctparms* parms) {
             val = wctparms_set_dual_var_type(parms, atoi(optarg));
             CCcheck_val(val, "Failed in wct_set_dual_var_type");
             break;
+        case 'S':
+            val = wctparms_set_stab_technique(parms, atoi(optarg));
+            CCcheck_val(val, "Failed in wctparms_set_stab_technique");
 
         default:
             usage(av[0]);
@@ -137,7 +141,6 @@ static int get_problem_name(char* pname,const char* efname)
     const char * fname = strrchr(efname,'/');
     char * lastdot = strrchr(efname,'.');
     if(!fname) {
-        /* no slashes in efname.*/
         fname = efname;
     } else {
         fname++;

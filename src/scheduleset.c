@@ -31,7 +31,6 @@ static int copy_Schedulesets( Scheduleset *dst, const Scheduleset *src, int nsrc
         } else {                                                            \
             dst->members = CC_SAFE_MALLOC(dst->count + 1, int);                 \
             CCcheck_NULL_2(dst->members, "Failed to allocate memory");      \
-            dst->completiontime = g_hash_table_new(g_direct_hash, g_direct_equal); \
             memcpy(dst->members, src->members, (dst->count + 1)*sizeof(int));     \
         }                                                                   \
         dst++;                                                              \
@@ -48,7 +47,6 @@ static int copy_Schedulesets( Scheduleset *dst, const Scheduleset *src, int nsrc
         } else {                                                            \
             dst[x].members = CC_SAFE_MALLOC(dst[x].count + 1, int);             \
             CCcheck_NULL_2(dst[x].members, "Failed to allocate memory");    \
-            dst[x].completiontime = g_hash_table_new(g_int_hash, g_int_equal);\
             memcpy(dst[x].members, src[x].members, (dst[x].count + 1)*sizeof(int));\
         }                                                                   \
     }
@@ -57,7 +55,6 @@ void Scheduleset_init( Scheduleset *set )
 {
     if ( set ) {
         set->members  = ( int * ) NULL;
-        set->completiontime = (GHashTable *) NULL;
         set->count    = 0;
         set->age      = 0;
         set->totweight = 0;
@@ -69,7 +66,6 @@ void Scheduleset_free( Scheduleset *set )
 {
     if ( set && set->members ) {
         CC_IFFREE( set->members, int );
-        g_hash_table_destroy(set->completiontime);
         set->members  = ( int * )NULL;
         set->count    = 0;
         set->totweight = 0;
@@ -351,15 +347,12 @@ void Scheduleset_permquicksort( int *perm, Scheduleset *cclasses, int ccount,
     Scheduleset_permquicksort( perm + i, cclasses, ccount - i, ( *functionPtr ) );
 }
 
-int COLORcheck_set( Scheduleset *set, int vcount, int ecount, const int elist[] )
+int Scheduleset_check_set( Scheduleset *set, int vcount )
 {
     int val = 0;
     int i;
     int *coloring = ( int * ) CC_SAFE_MALLOC( vcount, int );
     CCcheck_NULL_2( coloring, "Could not allocate *newsets" );
-    /*for (i = 0; i < vcount;++i) {
-        coloring[i] = 0;
-    }*/
     fill_int( coloring, vcount, 0 );
 
     for ( i = 0; i < set->count; ++i ) {
@@ -370,37 +363,24 @@ int COLORcheck_set( Scheduleset *set, int vcount, int ecount, const int elist[] 
         }
     }
 
-    for ( i = 0; i < ecount; ++i ) {
-        if ( coloring[elist[2 * i]] == 1 && coloring[elist[2 * i + 1]] == 1 ) {
-            fprintf( stderr, "ILLEGAL STABLE SET FOUND!\n" );
-            fflush( stdout );
-            val++;
-        }
-    }
-
 CLEAN:
-
-    if ( coloring ) {
-        free( coloring );
-    }
-
+    
+    CC_IFFREE(coloring, int);
     return val;
 }
 
 
-int  COLORcheck_coloring( Scheduleset *set, int ccount, int vcount, int ecount,
-                          const int elist[] )
+int  Scheduleset_check( Scheduleset *set, int ccount, int vcount)
 {
     int val = 0;
     int i;
     int *covered = ( int * ) CC_SAFE_MALLOC( vcount, int );
     CCcheck_NULL_2( covered, "Could not allocate *newsets" );
-    //for (i = 0; i < vcount;++i) {covered[i] = 0;}
     fill_int( covered, vcount, 0 );
 
     for ( i = 0; i < ccount; ++i ) {
         int j;
-        val =  COLORcheck_set( &( set[i] ), vcount, ecount, elist );
+        val =  Scheduleset_check_set( &( set[i] ), vcount);
         CCcheck_val_2( val, "Failed to verify stable set" );
 
         for ( j = 0; j < set[i].count; j++ ) {
@@ -487,8 +467,8 @@ int partlist_to_Scheduleset( partlist *part, int nbpart, int njobs, Scheduleset 
             temp_sets[k].count = g_queue_get_length( part[i].list );
             temp_sets[k].totweight = part[i].completiontime;
             temp_sets[k].members = CC_SAFE_MALLOC( temp_sets[k].count + 1, int );
+            temp_sets[k].totwct = 0;
             CCcheck_NULL( temp_sets[k].members, "Failed to allocate memory to members" );
-            temp_sets[k].completiontime = g_hash_table_new(g_direct_hash, g_direct_equal);
             GList *v = part[i].list->head;
             j = 0;
 
@@ -498,7 +478,6 @@ int partlist_to_Scheduleset( partlist *part, int nbpart, int njobs, Scheduleset 
                 temp_sets[k].members[j] = job->job;
                 completion += job->processingime;
                 temp_sets[k].totwct += job->weight*completion;
-                g_hash_table_insert(temp_sets[k].completiontime, GINT_TO_POINTER(job->job), GINT_TO_POINTER(completion));
                 v = g_list_next( v );
                 j++;
             }

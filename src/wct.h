@@ -280,6 +280,21 @@ int heur_exec(wctproblem *problem,wctdata * pd,int *result);
 void heur_init(wctdata * pd);
 void heur_free(wctdata * pd);
 
+/**
+ * solverwrapper.cc
+ */
+
+/**
+ * Stabilization techniques
+ */
+int solve_stab_bdd(wctdata *pd);
+
+/**
+ * solver zdd
+ */
+int solvedblzdd(wctdata *pd);
+int solvedblbdd(wctdata *pd);
+
 #ifdef __cplusplus
 }
 #endif

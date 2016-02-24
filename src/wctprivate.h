@@ -110,6 +110,7 @@ struct wctdata {
     double *x;
     double *coef;
     double *pi;
+    //PricerSolver
     PricerSolver *solver;
     //Colorset(Assignments)
     int ccount;
@@ -135,10 +136,11 @@ struct wctdata {
     /** Wentges smoothing technique */
     double *pi_in;
     double *pi_out;
+    double *pi_sep;
     double eta_in;
     double eta_out;
-    
-    //KPC instances
+    double eta_sep;
+    double alpha;
     
     
     // Best Solution

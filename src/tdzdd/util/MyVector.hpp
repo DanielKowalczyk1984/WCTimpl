@@ -164,7 +164,9 @@ public:
     }
 
     ~MyVector() {
-        clear();
+        if(capacity_ != 0) {
+            clear();
+        }
     }
 
     /**

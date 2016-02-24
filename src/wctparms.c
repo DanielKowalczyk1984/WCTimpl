@@ -131,3 +131,9 @@ int wctparms_set_dual_var_type(wctparms *parms, int type){
     parms->dual_var_type = type;
     return 0;
 }
+
+int wctparms_set_stab_technique(wctparms *parms, int stab_technique){
+    parms->stab_technique = stab_technique;
+    return 0;
+}
+

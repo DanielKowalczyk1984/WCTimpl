@@ -272,8 +272,8 @@ int construct_feasible_solutions(wctproblem *problem) {
   }
 
   CCutil_suspend_timer(timer);
-  CCutil_resume_timer(timer);
   printf("We needed %f seconds to construct %d solutions in %d\n", timer->cum_zeit, parms->nb_feas_sol, iterations);
+  CCutil_resume_timer(timer);
   if(parms->scatter_search) {
     SSCreate_refset(scatter_search);
     scatter_search->upperbound = problem->global_upper_bound;
@@ -286,7 +286,6 @@ int construct_feasible_solutions(wctproblem *problem) {
       solution *new_sol = (solution*)g_ptr_array_index(scatter_search->rs->list1 , i);
       solution_print(new_sol);
       partlist_to_Scheduleset(new_sol->part, pd->nmachines, pd->njobs, &(pd->newsets), &(pd->nnewsets));
-      getchar();
       add_newsets(pd);
     }
   }

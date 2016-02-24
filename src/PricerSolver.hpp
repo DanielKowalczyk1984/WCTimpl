@@ -13,23 +13,24 @@ public:
     int *w;
     int *r;
     int *d;
-    int nbjobs;
+    const int nbjobs;
     int H_max;
 
-    PricerSolver( int *_p, int *_w,  int *_r, int *_d,int njobs, int Hmin, int Hmax, bool print = false, bool reduce = false):p(_p),w(_w),r(_r),d(_d),nbjobs(njobs),H_max(Hmax) {
-        PricerSpec ps(p,r,d,nbjobs, Hmin,Hmax);
-        if(print) {
+    PricerSolver( int *_p, int *_w,  int *_r, int *_d, int njobs, int Hmin, int Hmax, bool print = false, bool reduce = false): p(_p), w(_w), r(_r), d(_d), nbjobs(njobs), H_max(Hmax) {
+        PricerSpec ps(p, r, d, nbjobs, Hmin, Hmax);
+        if (print) {
             std::ofstream file;
             file.open("PricerSpec.txt");
             ps.dumpDot(file);
             file.close();
         }
         dd = tdzdd::DdStructure<2>(ps);
-        if(reduce) {
+        printf("size of dd = %lu\n", dd.size());
+        if (reduce) {
             std::cout << "Reducing the size of DD structure" << std::endl;
             zdd = dd;
             zdd.zddReduce();
-            if(print) {
+            if (print) {
                 create_dot_zdd("DDStructure.txt");
             }
         }
@@ -106,7 +107,7 @@ public:
         return dd.evaluate_reverse(DurationBDDdouble(pi, p, w, nbjobs));
     }
 
-    double solve_duration_zdd_double(double *pi){
+    class Optimal_ZDD<double> solve_duration_zdd_double(double *pi){
         return zdd.evaluate_forward_DP(DurationZDDdouble(pi, p, w, nbjobs,H_max));
     }
 

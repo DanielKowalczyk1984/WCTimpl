@@ -48,18 +48,34 @@ enum dualvariablesType{
     Int = 1,
 };
 
+enum stab_techniques{
+    no_stab= 0,
+    stab_wentgnes = 1,
+};
+
 
 typedef struct wctparms{
+    /**
+     * General parameters
+     */
     int init_upper_bound;
     int branching_strategy;
     int rounding_strategy;
     int parallel_branching;
     int nb_feas_sol;
+    double branching_cpu_limit;
+    /**
+     * scatter search
+     */
     int combine_method;
     int scatter_search;
+    double scatter_search_cpu_limit;
+    /**
+     * column generation
+     */
     int branchandbound;
-    int symmetrybreaking;
     int dual_var_type;
+    int stab_technique;
     
     int delete_elists;
     int delete_cclasses;
@@ -72,9 +88,6 @@ typedef struct wctparms{
     char *backupdir;
     
     int upper_bounds_only;
-    double branching_cpu_limit;
-    double scatter_search_cpu_limit;
-    
     int nmachines;
 } wctparms;
 
@@ -89,11 +102,20 @@ int wctparms_set_branching_cpu_limit(wctparms *parms, double limit);
 int wctparms_set_branching_strategy(wctparms *parms, int strategy);
 int wctparms_set_rounding_strategy(wctparms *parms, int strategy);
 int wctparms_set_nb_feas_sol(wctparms *parms,int nb_sol);
-int wctparms_set_combine_method(wctparms *parms,int combine_method);
-int wctparms_set_scatter_search(wctparms* parms,int scatter);
+
+/**
+ * column generation
+ */
 int wctparms_set_branchandbound(wctparms *parms,int bound);
-int wctparms_set_scatter_search_cpu_limit(wctparms *parms,double limit);
 int wctparms_set_dual_var_type(wctparms *parms,int);
+int wctparms_set_stab_technique(wctparms *parms, int stab_technique);
+
+/**
+ * scatter search
+ */
+int wctparms_set_scatter_search(wctparms* parms,int scatter);
+int wctparms_set_combine_method(wctparms *parms,int combine_method);
+int wctparms_set_scatter_search_cpu_limit(wctparms *parms,double limit);
 
 /*Functions for defining the filesname*/
 int wctparms_set_outfile(wctparms *parms, const char *fname);

@@ -6,6 +6,8 @@
 
 int debug = 0;
 
+static const double min_ndelrow_ratio = 0.5;
+
 /*Information about debug*/
 int dbg_lvl()
 {
@@ -333,6 +335,10 @@ void lpwctdata_free( wctdata *pd )
         deletePricerSolver(pd->solver);
     }
 
+    CC_IFFREE(pd->pi_out, double);
+    CC_IFFREE(pd->pi_in, double);
+    CC_IFFREE(pd->pi_sep, double);
+
     heur_free( pd );
     Schedulesets_free( &( pd->newsets ), &( pd->nnewsets ) );
     Schedulesets_free( &( pd->cclasses ), &( pd->gallocated ) );
@@ -578,8 +584,6 @@ int compute_objective( wctdata *pd )
     //                            pd->kpc_pi_scalef );
     val = wctlp_objval( pd->LP, &( pd->LP_lower_bound ) );
     CCcheck_val_2( val, "pmclp_objval failed" );
-    printf("LP = %f %f\n", pd->LP_lower_bound, pd->LP_lower_bound_heur);
-    getchar();
     pd->lower_bound = ( int ) ceil( pd->dbl_safe_lower_bound );
 
     if ( dbg_lvl() > 0 )
@@ -779,7 +783,7 @@ static int test_theorem_ahv(wctdata* pd, const double x[], GList* branchjobs, in
         int found = 0;
         int C = 0 ;
         for ( i = 0; i < pd->ccount; ++i) {
-            C = GPOINTER_TO_INT(g_hash_table_lookup(pd->cclasses[i].completiontime, GINT_TO_POINTER(j)));
+            //C = GPOINTER_TO_INT(g_hash_table_lookup(pd->cclasses[i].completiontime, GINT_TO_POINTER(j)));
             if (x[i] <= 0.0 || !C) {
                 continue;
             }
@@ -1569,6 +1573,112 @@ CLEAN:
     return val;
 }
 
+static int grow_ages(wctdata *pd)
+{
+    int val = 0;
+    int i;
+    int *cstat;
+    cstat = (int *)CC_SAFE_MALLOC(pd->ccount, int);
+    CCcheck_NULL_2(cstat, "Failed to allocate cstat");
+    val = wctlp_basis_cols(pd->LP, cstat, 0);
+    CCcheck_val_2(val, "Failed in pmclp_basis_cols");
+    pd->dzcount = 0;
+
+    for(i = 0; i < pd->ccount; ++i) {
+        if(cstat[i] == wctlp_LOWER || cstat[i] == wctlp_FREE) {
+            pd->cclasses[i].age++;
+
+            if(pd->cclasses[i].age > pd->retirementage) {
+                pd->dzcount++;
+            }
+        } else {
+            pd->cclasses[i].age = 0;
+        }
+    }
+
+    /*    printf("%d out of %d are older than %d.\n", pd->dzcount, pd->ccount,  */
+    /*           pd->retirementage); */
+CLEAN:
+    CC_IFFREE(cstat, int);
+    return val;
+}
+
+static int delete_old_cclasses(wctdata *pd)
+{
+    int val   = 0;
+    int i;
+    int min_numdel = pd->njobs * min_ndelrow_ratio;
+    int first_del = -1;
+    int last_del  = -1;
+    /** pd->dzcount can be deprecated! */
+    pd->dzcount = 0;
+
+    for(i = 0; i < pd->ccount; ++i) {
+        if(pd->cclasses[i].age > pd->retirementage) {
+            pd->dzcount++;
+        }
+    }
+
+    if(pd->dzcount > min_numdel) {
+        int       new_ccount = 0;
+        Scheduleset *new_cclasses = (Scheduleset *) NULL;
+        assert(pd->gallocated >= pd->ccount);
+        new_cclasses = CC_SAFE_MALLOC(pd->gallocated, Scheduleset);
+        CCcheck_NULL_2(new_cclasses, "Failed to allocate new_cclasses");
+
+        for(i = 0; i < pd->gallocated; ++i) {
+            Scheduleset_init(new_cclasses + i);
+        }
+
+        for(i = 0; i < pd->ccount; ++i) {
+            if(pd->cclasses[i].age <= pd->retirementage) {
+                if(first_del != -1) {
+                    /** Delete recently found deletion range.*/
+                    val = wctlp_deletecols(pd->LP, first_del, last_del);
+                    CCcheck_val_2(val, "Failed in pmclp_deletecols");
+                    first_del = last_del = -1;
+                }
+
+                memcpy(new_cclasses + new_ccount, pd->cclasses + i, sizeof(Scheduleset));
+                new_ccount++;
+            } else {
+                Scheduleset_free(pd->cclasses + i);
+
+                if(first_del == -1) {
+                    first_del = new_ccount;
+                    last_del  = first_del;
+                } else {
+                    last_del++;
+                }
+            }
+        }
+
+        if(first_del != -1) {
+            /** Delete the final range. This can occur if the last
+             element is to be deleted, e.g. when no further columns were
+             added in a B&B branch.
+             */
+            wctlp_deletecols(pd->LP, first_del, last_del);
+            CCcheck_val_2(val, "Failed in pmclp_deletecols");
+        }
+
+        assert(pd->dzcount == pd->ccount - new_ccount);
+        CC_IFFREE(pd->cclasses, Scheduleset);
+        pd->cclasses = new_cclasses;
+        pd->ccount   = new_ccount;
+
+        if(dbg_lvl() > 0) {
+            printf("Deleted %d out of %d columns with age > %d.\n",
+                   pd->dzcount, pd->dzcount + pd->ccount, pd->retirementage);
+        }
+
+        pd->dzcount = 0;
+    }
+
+CLEAN:
+    return val;
+}
+
 int build_lp( wctdata *pd )
 {
     int val = 0;
@@ -1654,27 +1764,18 @@ CLEAN:
     return val;
 }
 
-int FarkasPricing(wctproblem *problem, wctdata *pd) {
-    int val = 0;
-
-    return val;
-}
-
-int Pricing(wctproblem *problem, wctdata *d) {
-    int val = 0;
-
-    return val;
-}
 
 int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
     int  j, val = 0;
-    wctparms *parms = &(problem->parms);
     int iterations = 0;
     int break_while_loop = 1;
+    int    nnonimprovements     = 0;
+    int status;
     double cur_cputime;
     double last_lower_bound = DBL_MAX;
-    int    nnonimprovements     = 0;
-    PricerSolver *solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+    wctparms *parms = &(problem->parms);
+    /* Construction of solver*/
+    pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
 
     if ( dbg_lvl() )
     {
@@ -1686,7 +1787,11 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
 
     /** Construct solutions if list of columns is empty */
     if ( !pd->ccount ) {
-
+        solution *new_sol;
+        new_sol = new_sol_init(pd->nmachines, pd->njobs);
+        construct_wspt(pd->jobarray, pd->njobs, pd->nmachines, new_sol);
+        partlist_to_Scheduleset(new_sol->part, pd->nmachines, pd->njobs, &(pd->cclasses), &(pd->ccount));
+        solution_free(new_sol);
     }
 
     assert( pd->gallocated >= pd->ccount );
@@ -1696,23 +1801,28 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
         val = build_lp( pd );
         CCcheck_val( val, "build_lp failed" );
     }
-    wctlp_write(pd->LP, "test.lp");
 
-    pd->kpc_pi = CC_SAFE_MALLOC( pd->njobs + 1, int );
-    CCcheck_NULL_2( pd->kpc_pi, "Failed to allocate memory to pd->kpc_pi" );
+    pd->pi_in = CC_SAFE_MALLOC(pd->njobs + 1, double);
+    CCcheck_NULL_2(pd->pi_in, "Failed to allocate memory");
+    fill_dbl(pd->pi_in, pd->njobs, 0.0);
+    pd->eta_in= 0.0;
+    pd->pi_out = CC_SAFE_MALLOC(pd->njobs + 1, double);
+    CCcheck_NULL_2(pd->pi_out, "Failed to allocate memory");
+    pd->pi_sep = CC_SAFE_MALLOC(pd->njobs + 1, double);
+    CCcheck_NULL_2(pd->pi_sep, "Failed to allocate memory");
 
     do
     {
-        /** Insert possibility to delete old columns ? */
+        iterations++;
+
+        if(pd->dzcount > pd->njobs*min_ndelrow_ratio) {
+            val = delete_old_cclasses(pd);
+        }
+        
         cur_cputime = CCutil_zeit();
-        int status;
         val = wctlp_optimize( pd->LP, &status );
         CCcheck_val_2( val, "pmclp_optimize failed" );
         cur_cputime = CCutil_zeit() - cur_cputime;
-        double test;
-        wctlp_objval(pd->LP, &test);
-        printf("test = %f\n", test);
-        wctlp_write(pd->LP, "why.lp");
 
         if ( dbg_lvl() )
         {
@@ -1720,56 +1830,47 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
             fflush( stdout );
         }
 
+        val = grow_ages(pd);
+        CCcheck_val_2(val, "Failed in grow_ages");
+
         if ( dbg_lvl() > 1 )
         {
             print_ages( pd );
         }
+        
+        val = wctlp_pi( pd->LP, pd->pi );
+        CCcheck_val_2( val, "pmclp_pi failed" );
+        make_pi_feasible(pd);
+        val = compute_objective(pd);
+        CCcheck_val_2(val, "Failed in compute_objective");
+        memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
+        pd->eta_out = pd->LP_lower_bound;
 
         switch(status) {
         case GRB_OPTIMAL:
-            val = wctlp_pi( pd->LP, pd->pi );
-            CCcheck_val_2( val, "pmclp_pi failed" );
-            iterations++;
             if ( iterations < pd->maxiterations )
             {
-                // if ( fabs( last_lower_bound - pd->dbl_est_lower_bound ) < 0.000001 ) {
-                //     nnonimprovements++;
-                // } else {
-                //     nnonimprovements = 0;
-                // }
-
-                make_pi_feasible( pd );
+                /** nnonimprovements? */
                 last_lower_bound = pd->dbl_safe_lower_bound;
                 CCutil_start_resume_time( &problem->tot_pricing );
                 /** Solve the pricing problem */
-                pd->newsets = CC_SAFE_MALLOC(1, Scheduleset);
-                Scheduleset_init(pd->newsets);
                 switch(parms->dual_var_type) {
                 case Dbl:
-                    solvedblbdd(solver, pd->pi, &(pd->newsets->members), &(pd->newsets->count), &(pd->newsets->totwct),&(pd->nnewsets));
-                    solvedblzdd(solver, pd->pi);
-
-                    calc(solver,pd->pi);
-                    compute_objective(pd);
-                    break;
+                    solvedblbdd(pd);
                 case Int:
-                    double2int( pd->kpc_pi, &( pd->kpc_pi_scalef ), pd->pi, pd->njobs );
-                    solveint(solver, pd->kpc_pi, &(pd->newsets->members), &(pd->newsets->count), &(pd->newsets->totwct), &(pd->nnewsets));
-                    val = compute_objective( pd );
-                    CCcheck_val_2( val, "compute_objective failed" );
-                    pd->dbl_est_lower_bound = pd->dbl_safe_lower_bound;
                     break;
                 }
-                CCutil_suspend_timer( &problem->tot_pricing );
 
+                CCutil_suspend_timer( &problem->tot_pricing );
                 for ( j = 0; j < pd->nnewsets; j++ )
                 {
                     val = wctlp_addcol(pd->LP, pd->newsets[j].count + 1, pd->newsets[j].members, pd->coef, pd->newsets[j].totwct, 0.0, 1.0, wctlp_CONT, NULL);
                     CCcheck_val_2( val, "pmclp_addcol failed" );
                 }
-
-                break_while_loop = ( ( pd->nnewsets == 0 ) || nnonimprovements > 5 );
+                
+                break_while_loop = ( pd->nnewsets == 0 || nnonimprovements > 5 );
                 add_newsets( pd );
+
             }
             break;
         case GRB_INFEASIBLE:
@@ -1786,7 +1887,6 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
 
     if ( iterations < pd->maxiterations && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit  )
     {
-        int status;
         val = wctlp_optimize( pd->LP, &status );
         CCcheck_val_2( val, "pmclp_optimize failed" );
         switch(status) {
@@ -1827,6 +1927,9 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
     fflush( stdout );
     CCutil_suspend_timer( &( problem->tot_lb_cpu_time ) );
 CLEAN:
+
+    deletePricerSolver(pd->solver);
+    pd->solver = (PricerSolver *) NULL;
     return val;
 }
 
