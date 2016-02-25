@@ -183,7 +183,7 @@ void SS_init( SS *problem, int b1, int b2, double timelimit )
     problem->jobarray = ( Job ** )NULL;
     problem->b1        = b1;
     problem->b2        = b2;
-    problem->timelimit = timelimit;
+    problem->timelimit = 120;
     problem->nmachines = 0;
     problem->njobs     = 0;
     problem->status    = init;
@@ -878,34 +878,26 @@ int combinePathRelinking(SS *scatter_search, GPtrArray *array, int *subsetsol, i
     GList *pool = (GList *) NULL;
     solution *prev = (solution *) NULL;
 
-    solution *sol_g = (solution *) NULL;
-    solution *sol_c = (solution *) NULL;
+    solution sol_g;
+    solution sol_c;
 
     solution *sol1 = (solution *)g_ptr_array_index(array, subsetsol[1] - 1);
     solution *sol2 = (solution *)g_ptr_array_index(array, subsetsol[2] - 1);
 
-    if ( sol1->iter < scatter_search->iter  && sol2->iter < scatter_search->iter ) {
-        val = 1;
-        goto CLEAN;
-    }
-
-    sol_g = CC_SAFE_MALLOC(1, solution);
-    CCcheck_NULL_2(sol_g, "Failed to allocate");
-    sol_c = CC_SAFE_MALLOC(1, solution);
-    CCcheck_NULL_2(sol_c, "Failed to allcocate");
-
     if (sol1->totalweightcomptime < sol2->totalweightcomptime) {
-        solution_copy(sol_g, *sol1);
-        solution_copy(sol_c, *sol2);
+        val = solution_copy(&sol_g, *sol1);
+        val = solution_copy(&sol_c, *sol2);
     } else {
-        solution_copy(sol_c, *sol1);
-        solution_copy(sol_g, *sol2);
+        val = solution_copy(&sol_c, *sol1);
+        val = solution_copy(&sol_g, *sol2);
     }
+
+
 
     for (i = 0; i < njobs; ++i)
     {
-        partlist *temp1 = sol_g->vlist[i].part;
-        partlist *temp2 = sol_c->vlist[i].part;
+        partlist *temp1 = sol_g.vlist[i].part;
+        partlist *temp2 = sol_c.vlist[i].part;
         if (temp1->key != temp2->key)
         {
             dist++;
@@ -913,7 +905,7 @@ int combinePathRelinking(SS *scatter_search, GPtrArray *array, int *subsetsol, i
         }
     }
 
-    prev = sol_c;
+    prev = &(sol_c);
     while (dist > 0) {
         Job *minjob = (Job *) NULL;
         partlist *minmach = (partlist *) NULL;
@@ -927,7 +919,7 @@ int combinePathRelinking(SS *scatter_search, GPtrArray *array, int *subsetsol, i
         for (it = list; it; it = it->next) {
             Job* j = (Job*)it->data;
             partlist* mach_c = sol->vlist[j->job].part;
-            partlist* mach_g = sol->part + sol_g->vlist[j->job].part->key;
+            partlist* mach_g = sol->part + sol_g.vlist[j->job].part->key;
             temp = moveSS(j, mach_c, mach_g);
             if (temp > max)
             {
@@ -954,7 +946,8 @@ int combinePathRelinking(SS *scatter_search, GPtrArray *array, int *subsetsol, i
         if (counter % 5 == 0)
         {
             solution *sol = (solution *)l->data;
-            localsearch_random_k(sol, scatter_search->lowerbound, 2);
+            //localsearch_random_k(sol, scatter_search->lowerbound, 1);
+            localsearch_wrap(sol, scatter_search->lowerbound, 0);
             solution_unique(sol);
         } else {
             solution *sol = (solution *)l->data;
@@ -1014,12 +1007,9 @@ int combinePathRelinking(SS *scatter_search, GPtrArray *array, int *subsetsol, i
     }
     g_list_free(pool);
 
-CLEAN:
 
-    solution_free(sol_g);
-    solution_free(sol_c);
-    CC_IFFREE(sol_g, solution);
-    CC_IFFREE(sol_c, solution)
+    solution_free(&sol_g);
+    solution_free(&sol_c);
 
     return val;
 }
@@ -1070,8 +1060,11 @@ int SSrun_scatter_searchPR( SS *scatter_search, CCutil_timer * timer) {
         while ( flag && scatter_search->status != opt && timer->cum_zeit < limit ) {
             int rval = 0;
 
-            combinePathRelinking(scatter_search, array, totsubset, &rval);
-            //printf("distance %d between solutions %d %d \n", distance_between(array, totsubset), totsubset[1]-1,totsubset[2]-1);
+            solution *sol1 = (solution *)g_ptr_array_index(array, totsubset[1] - 1);
+            solution *sol2 = (solution *)g_ptr_array_index(array, totsubset[2] - 1);
+            if ( sol1->iter >= scatter_search->iter  || sol2->iter >= scatter_search->iter ) {
+                combinePathRelinking(scatter_search, array, totsubset, &rval);
+            }
 
             if (rval) {
                 solution *temp = (solution *) g_ptr_array_index(array, 0);
@@ -1121,11 +1114,6 @@ static int select_parrent( GRand *Rand, int nbelements, int *sum, int totsum )
 {
     int val = -1;
     int counter = 0;
-    int *parents = ( int * )NULL;
-
-    if ( totsum <= 0 ) {
-        goto CLEAN;
-    }
 
     for ( int i = 0; i < nbelements; ++i ) {
         if ( sum[i] > 0 ) {
@@ -1133,12 +1121,18 @@ static int select_parrent( GRand *Rand, int nbelements, int *sum, int totsum )
         }
     }
 
-    if ( counter == 0 ) {
-        goto CLEAN;
-    }
 
     int temp = counter - 1;
-    parents = CC_SAFE_MALLOC( counter, int );
+    int *parents = ( int * )NULL;
+    if(counter > 0) {
+        parents = CC_SAFE_MALLOC( counter, int );
+    } else {
+        goto CLEAN;
+    }
+    
+    if (  totsum <= 0 ) {
+        goto CLEAN;
+    }
 
     for ( int i = 0; i < nbelements; ++i ) {
         if ( sum[i] > 0 ) {

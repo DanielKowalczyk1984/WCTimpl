@@ -570,29 +570,25 @@ int compute_objective( wctdata *pd )
 {
     int val = 0;
     int i;
-    pd->lower_scaled_bound = .0;
-    pd->LP_lower_bound_heur = .0;
+    pd->LP_lower_bound_dual = .0;
 
+    /** compute lower bound with the dual variables */
     for ( i = 0; i < pd->njobs; i++ )
     {
-        pd->LP_lower_bound_heur += ( double ) pd->pi[i];
+        pd->LP_lower_bound_dual += ( double ) pd->pi[i];
     }
+    pd->LP_lower_bound_dual += pd->nmachines*pd->pi[pd->njobs];
 
-    pd->LP_lower_bound_heur += pd->nmachines*pd->pi[pd->njobs];
-
-    // pd->dbl_safe_lower_bound = safe_lower_dbl( pd->lower_scaled_bound,
-    //                            pd->kpc_pi_scalef );
+    /** Get the LP lower bound and compute the lower bound of WCT */
     val = wctlp_objval( pd->LP, &( pd->LP_lower_bound ) );
     CCcheck_val_2( val, "pmclp_objval failed" );
-    pd->lower_bound = ( int ) ceil( pd->dbl_safe_lower_bound );
+    pd->lower_bound = ( int ) ceil( pd->LP_lower_bound );
 
-    if ( dbg_lvl() > 0 )
-    {
-        printf( "Current primal LP objective: %19.16f (%lld / %lld) (LP-solver %19.16f).\n",
-                pd->dbl_safe_lower_bound,
-                ( long long ) pd->lower_scaled_bound,
-                ( long long ) pd->kpc_pi_scalef, pd->LP_lower_bound );
-    }
+
+    //if ( dbg_lvl() > 0 )
+    //{
+        printf( "Current primal LP objective: %19.16f  (LP_dual-solver %19.16f).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual );
+    //}
 
 CLEAN:
     return val;
@@ -1815,10 +1811,12 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
     {
         iterations++;
 
+        /** delete old columns */
         if(pd->dzcount > pd->njobs*min_ndelrow_ratio) {
             val = delete_old_cclasses(pd);
         }
         
+        /** Compute LP relaxation */
         cur_cputime = CCutil_zeit();
         val = wctlp_optimize( pd->LP, &status );
         CCcheck_val_2( val, "pmclp_optimize failed" );
@@ -1838,9 +1836,12 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
             print_ages( pd );
         }
         
+        /** get the dual variables and make them feasible */
         val = wctlp_pi( pd->LP, pd->pi );
         CCcheck_val_2( val, "pmclp_pi failed" );
         make_pi_feasible(pd);
+
+        /** Compute the objective function */
         val = compute_objective(pd);
         CCcheck_val_2(val, "Failed in compute_objective");
         memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
@@ -2011,9 +2012,6 @@ int compute_schedule( wctproblem *problem )
     problem->first_lower_bound = problem->global_lower_bound;
     problem->first_rel_error = ( double )( problem->global_upper_bound -
                                            problem->global_lower_bound ) / ( ( double )problem->global_lower_bound );
-    for(int i = 0; i < root_pd->njobs; ++i) {
-        printf("%d %d %d\n", i,root_pd->jobarray[i].processingime,root_pd->jobarray[i].weight);
-    }
 
     /** Transform columns into maximal schedule with  respect to the properties of optimal solutions */
 

@@ -285,6 +285,7 @@ int program_header(int ac, char **av){
     for (i = 0; i < ac; ++i){
         printf(" %s",av[i]);
     }
+    printf("\n");
 
     dump_uname();
 

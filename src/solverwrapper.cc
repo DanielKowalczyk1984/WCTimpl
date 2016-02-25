@@ -154,7 +154,6 @@ extern "C" {
         int heading_in = 0;
         PricerSolver *solver = pd->solver;
         PricerInfoBDD<double> sol;
-        //printf("test %f %f\n",pd->eta_in, (pd->eta_in == 0) ? 0.0 : CC_OURABS((pd->eta_out - pd->eta_in)/(pd->eta_in)) );
         if(  (pd->eta_in == 0.0) ? 1 : CC_OURABS((pd->eta_out - pd->eta_in)/(pd->eta_in)) < 0.0005 || CC_OURABS((pd->eta_out - pd->eta_in)/(pd->eta_in)) > 0.1) {
             heading_in = 1;
         }
@@ -163,15 +162,13 @@ extern "C" {
             double result;
             sol = solver->solve_duration_bdd_double(pd->pi);
             result = compute_lagrange_bdd(sol, pd->pi, pd->njobs, pd->nmachines);
-            printf("test result = %f\n", result);
-            printf("test eta_in = %f\n", pd->eta_in);
 
             if(result > pd->eta_in) {
                 pd->eta_in = result;
                 memcpy(pd->pi_in, pd->pi, sizeof(double)*pd->njobs);
             }
 
-            if(sol.obj > pd->kpc_pi_scalef) {
+            if(sol.obj > 0.000001) {
                 val = construct_sol_bdd(&(pd->newsets), &(pd->nnewsets), sol, solver->nbjobs);
                 CCcheck_val_2(val, "Failed in construction of solution");
             } else {
