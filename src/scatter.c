@@ -183,7 +183,7 @@ void SS_init( SS *problem, int b1, int b2, double timelimit )
     problem->jobarray = ( Job ** )NULL;
     problem->b1        = b1;
     problem->b2        = b2;
-    problem->timelimit = 120;
+    problem->timelimit = timelimit;
     problem->nmachines = 0;
     problem->njobs     = 0;
     problem->status    = init;
@@ -851,8 +851,6 @@ int SSrun_scatter_search( SS *scatter_search, CCutil_timer * timer)
         g_ptr_array_free( list, TRUE );
     }
 
-    print_refset(scatter_search);
-
 CLEAN:
     CC_IFFREE( totsubset, int );
     return val;
@@ -946,8 +944,8 @@ int combinePathRelinking(SS *scatter_search, GPtrArray *array, int *subsetsol, i
         if (counter % 5 == 0)
         {
             solution *sol = (solution *)l->data;
-            //localsearch_random_k(sol, scatter_search->lowerbound, 1);
-            localsearch_wrap(sol, scatter_search->lowerbound, 0);
+            //localsearch_random_k(sol, scatter_search->lowerbound, 2);
+            localsearch_wrap(sol, scatter_search->lowerbound, 1);
             solution_unique(sol);
         } else {
             solution *sol = (solution *)l->data;
@@ -1062,7 +1060,7 @@ int SSrun_scatter_searchPR( SS *scatter_search, CCutil_timer * timer) {
 
             solution *sol1 = (solution *)g_ptr_array_index(array, totsubset[1] - 1);
             solution *sol2 = (solution *)g_ptr_array_index(array, totsubset[2] - 1);
-            if ( sol1->iter >= scatter_search->iter  || sol2->iter >= scatter_search->iter ) {
+            if ( sol1->iter >= scatter_search->iter || sol2->iter >= scatter_search->iter ) {
                 combinePathRelinking(scatter_search, array, totsubset, &rval);
             }
 

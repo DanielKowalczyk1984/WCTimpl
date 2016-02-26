@@ -589,6 +589,7 @@ int compute_objective( wctdata *pd )
     //{
         printf( "Current primal LP objective: %19.16f  (LP_dual-solver %19.16f).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual );
     //}
+    getchar();
 
 CLEAN:
     return val;
@@ -1855,10 +1856,16 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
                 last_lower_bound = pd->dbl_safe_lower_bound;
                 CCutil_start_resume_time( &problem->tot_pricing );
                 /** Solve the pricing problem */
-                switch(parms->dual_var_type) {
-                case Dbl:
+                switch(parms->stab_technique) {
+                case stab_wentgnes:
+                    // print_schedule(pd->newsets, pd->nnewsets);
+                    // Schedulesets_free(&(pd->newsets), &(pd->nnewsets));
+                    // solvedblbdd(pd);
+                    // print_schedule(pd->newsets, pd->nnewsets);
+                case no_stab:
+                    solve_dynamic_programming_ahv(pd);
+                    Schedulesets_free(&(pd->newsets), &(pd->nnewsets));
                     solvedblbdd(pd);
-                case Int:
                     break;
                 }
 

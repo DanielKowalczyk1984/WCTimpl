@@ -191,7 +191,7 @@ static int add_feasible_solution( wctproblem *problem, solution *new_sol)
   SS *scatter_search = &( problem->scatter_search );
 
   solution_calc(new_sol, root_pd->jobarray);
-  localsearch_wrap(new_sol, problem->global_lower_bound, 1);
+  localsearch_wrap(new_sol, problem->global_lower_bound, 0);
   solution_unique( new_sol );
 
   if ( !solution_in_pool( scatter_search, new_sol ) ) {
@@ -234,16 +234,16 @@ CLEAN:
 
 int construct_feasible_solutions(wctproblem *problem) {
   int val = 0;
-  wctparms *parms = &(problem->parms) ;
+  int iterations = 0;
   wctdata *pd = &(problem->root_pd);
+  wctparms *parms = &(problem->parms) ;
   SS *scatter_search = &(problem->scatter_search);
   CCutil_timer *timer = &(problem->tot_scatter_search);
-  int iterations = 0;
+  GRand *rand1 = g_rand_new_with_seed(1984);
+  GRand *rand2 = g_rand_new_with_seed(1654651);
 
   CCutil_start_timer(timer);
 
-  GRand *rand1 = g_rand_new_with_seed(1984);
-  GRand *rand2 = g_rand_new_with_seed(1654651);
   
   val = SSproblem_definition(scatter_search, 10, 8, parms->scatter_search_cpu_limit, parms->combine_method,
                              pd->njobs, pd->nmachines, pd->jobarray, problem->global_lower_bound);
@@ -272,7 +272,7 @@ int construct_feasible_solutions(wctproblem *problem) {
   }
 
   CCutil_suspend_timer(timer);
-  printf("We needed %f seconds to construct %d solutions in %d\n", timer->cum_zeit, parms->nb_feas_sol, iterations);
+  printf("We needed %f seconds to construct %d solutions in %d iterations\n", timer->cum_zeit, parms->nb_feas_sol, iterations);
   CCutil_resume_timer(timer);
   if(parms->scatter_search) {
     SSCreate_refset(scatter_search);
@@ -284,18 +284,18 @@ int construct_feasible_solutions(wctproblem *problem) {
     }
     for(unsigned i = 0; i < scatter_search->rs->list1->len ;i++) {
       solution *new_sol = (solution*)g_ptr_array_index(scatter_search->rs->list1 , i);
-      solution_print(new_sol);
       partlist_to_Scheduleset(new_sol->part, pd->nmachines, pd->njobs, &(pd->newsets), &(pd->nnewsets));
       add_newsets(pd);
     }
   }
-printf("upperbound = %d, lowerbound = %d\n", problem->global_upper_bound, problem->global_lower_bound);
+  
+  printf("upperbound = %d, lowerbound = %d\n", problem->global_upper_bound, problem->global_lower_bound);
 
 CLEAN:
   g_rand_free(rand1);
   g_rand_free(rand2);
   CCutil_stop_timer(&(problem->tot_scatter_search), 0);
-  printf("test scatter %f\n", problem->tot_scatter_search.cum_zeit);
+  printf("Construction of feasible solutions took %19.16f seconds\n", problem->tot_scatter_search.cum_zeit);
   return val;
 }
 

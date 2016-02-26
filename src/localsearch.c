@@ -454,7 +454,7 @@ int local_search_machine_general_first( solution *sol,int lowerbound, int k, int
     CCutil_stop_timer(&test, 0);
 
     if(dbg_lvl()) {
-        printf("local search %d  - %d -> number of iterations = %d,  running time = %f and objective = %d, time = %f, time per iteration = %f, improvement = %d\n",k,l, nbiter,0.0,sol->totalweightcomptime, test.cum_zeit,test.cum_zeit/nbiter, improvement);
+        printf("local search %d  - %d -> number of iterations = %d, running time = %f and objective = %d, time = %f, time per iteration = %f, improvement = %d\n",k,l, nbiter,0.0,sol->totalweightcomptime, test.cum_zeit,test.cum_zeit/nbiter, improvement);
     }
 
 
@@ -471,14 +471,14 @@ void localsearch_wrap(solution *sol, int lowerbound,int best){
     if (best)
     {
         local_search_machine_general_best(sol, lowerbound, 1, 0);
-        //local_search_machine_general_best(sol, lowerbound, 2, 0);
         local_search_machine_general_best(sol, lowerbound, 1, 1);
+        //local_search_machine_general_best(sol, lowerbound, 2, 0);
         //local_search_machine_general_best(sol, lowerbound, 2, 1);
     } else
     {
         local_search_machine_general_first(sol, lowerbound, 1, 0);
-        //local_search_machine_general_first(sol, lowerbound, 2, 0);
         local_search_machine_general_first(sol, lowerbound, 1, 1);
+        //local_search_machine_general_first(sol, lowerbound, 2, 0);
         //local_search_machine_general_first(sol, lowerbound, 2, 1);
     }
 }

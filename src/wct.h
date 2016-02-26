@@ -294,6 +294,7 @@ int solve_stab_bdd(wctdata *pd);
  */
 int solvedblzdd(wctdata *pd);
 int solvedblbdd(wctdata *pd);
+int solve_dynamic_programming_ahv(wctdata *pd);
 
 #ifdef __cplusplus
 }

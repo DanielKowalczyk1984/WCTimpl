@@ -34,9 +34,10 @@ extern "C" {
         return val;
     }
 
-    int construct_sol_zdd(Scheduleset **set, int *nnewsets, Optimal_ZDD<double> &sol, int nbjobs){
+    int construct_sol_zdd(Scheduleset **set, int *nnewsets, Optimal_ZDD<double> &sol, int nbjobs, bool reverse){
         int val = 0;
         int nbset = 1;
+        std::vector<int> *v = &(sol.jobs);
 
         Scheduleset *newset = CC_SAFE_MALLOC(1, Scheduleset);
         CCcheck_NULL_2(newset, "Failed to allocate memory newset");
@@ -44,7 +45,11 @@ extern "C" {
         Scheduleset_init(newset);
         newset->members = CC_SAFE_MALLOC(sol.jobs.size() + 1, int);
         CCcheck_NULL_2(newset->members, "Failed to allocate memory members");
-        std::copy(sol.jobs.begin(), sol.jobs.end(), newset->members);
+        if(reverse) {
+            std::copy(v->rbegin(), v->rend(), newset->members);
+        } else {
+            std::copy(v->begin(), v->end(), newset->members);
+        }
         newset->totwct = sol.cost;
         newset->count = sol.jobs.size();
         newset->members[sol.jobs.size()] = nbjobs;
@@ -71,7 +76,7 @@ extern "C" {
         Optimal_ZDD<double> s = pd->solver->solve_duration_zdd_double(pd->pi);
 
         if(s.obj > 0.00001) {
-            val = construct_sol_zdd(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
+            val = construct_sol_zdd(&(pd->newsets), &(pd->nnewsets), s, pd->njobs, false);
             CCcheck_val_2(val, "Failed in construct_sol_zdd");
         } else {
             pd->nnewsets = 0;
@@ -94,7 +99,21 @@ extern "C" {
 
         CLEAN:
         return val;
-        
+    }
+
+    int solve_dynamic_programming_ahv(wctdata *pd){
+        int val = 0;
+        Optimal_ZDD<double> s = pd->solver->dynamic_programming_ahv(pd->pi);
+
+        if(s.obj < -0.000001) {
+            val = construct_sol_zdd(&(pd->newsets), &(pd->nnewsets), s, pd->njobs, true);
+            CCcheck_val_2(val, "Failed in constructing sol");
+        } else {
+            pd->nnewsets = 0;
+        }
+
+        CLEAN:
+        return val;
     }
 
     void solvefarkasint(PricerSolver *solver, int *pi, int **sol,int *nsol, int* cost, int *newsol){
@@ -180,7 +199,6 @@ extern "C" {
             double alpha;
 
             do {
-                printf("Computining stab %f\n", k);
                 k += 1.0;
                 alpha = CC_MAX(0, 1.0 - k * (1 - pd->alpha));
                 double  result;
@@ -190,7 +208,6 @@ extern "C" {
                 result = compute_lagrange_bdd(sol, pd->pi_sep, pd->njobs, pd->nmachines);
 
                 if(result < pd->eta_sep) {
-                    printf("tets test\n");
                     val = construct_sol_bdd(&(pd->newsets), &(pd->nnewsets), sol, solver->nbjobs);
                     CCcheck_val_2(val, "Failed in construct_sol_combo");
 
@@ -219,5 +236,4 @@ extern "C" {
     CLEAN:
         return val;
     }
-
 }

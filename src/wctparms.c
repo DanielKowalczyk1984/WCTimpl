@@ -16,6 +16,7 @@ void wctparms_init(wctparms *parms){
     parms->scatter_search = 0;
     parms->branchandbound = no;
     parms->dual_var_type = Dbl;
+    parms->stab_technique = no_stab;
     
     parms->delete_elists = 1;
     parms->delete_cclasses = 0;
