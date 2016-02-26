@@ -34,6 +34,7 @@ class PricerSpec: public tdzdd::DdSpec<PricerSpec, int, 2>{
         }
 
         ~PricerSpec(){
+            
         }
 
         int getRoot(int & state) const{

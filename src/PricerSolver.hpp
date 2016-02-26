@@ -13,11 +13,26 @@ public:
     int *w;
     int *r;
     int *d;
+    int *delta;
     const int nbjobs;
     int H_min;
     int H_max;
 
     PricerSolver( int *_p, int *_w,  int *_r, int *_d, int njobs, int Hmin, int Hmax, bool print = false, bool reduce = false): p(_p), w(_w), r(_r), d(_d), nbjobs(njobs),H_min(Hmin),H_max(Hmax) {
+        delta = new int [nbjobs];
+        int *sum_p = new int [nbjobs];
+        sum_p[0] = p[0];
+        int max_d = d[0];
+        delta[0] = std::min(sum_p[0],max_d);
+        for (int i = 1; i < nbjobs; i++){
+            sum_p[i] = sum_p[i - 1] + p[i];
+            if (max_d < d[i])
+            {
+                max_d = d[i];
+            }
+            delta[i] = std::min(sum_p[i],max_d);
+        }
+
         PricerSpec ps(p, r, d, nbjobs, Hmin, Hmax);
         if (print) {
             std::ofstream file;
@@ -35,6 +50,7 @@ public:
                 create_dot_zdd("DDStructure.txt");
             }
         }
+        delete [] sum_p;
         delete [] ps.sum_p;
         delete [] ps.min_p;
     };
@@ -46,46 +62,8 @@ public:
         file.close();
     }
 
-    void calculate_reducedcost_iteration(double *pi){
-        
-        double_t min = .0;
-        for (int i = 0; i <= nbjobs; ++i)
-        {
-            std::cout << pi[i] << " ";
-        }
-        std::cout << std::endl;
-        std::vector<int> v;
-        int counter = 0;
-        for (tdzdd::DdStructure<2>::const_iterator it = dd.begin(); it != dd.end(); ++it)
-        {
-            counter++;
-            double_t obj = 0.0;
-            int time_ = 0;
-            for (std::vector<int>::const_iterator i = (*it).begin(); i != (*it).end(); ++i)
-            {
-                //std::cout << nbjobs - *i << " ";
-                time_ += p[nbjobs - *i];
-                obj += (double ) w[nbjobs - *i]* (double) time_ - pi[nbjobs - *i];
-            }
-            if(obj < min) {
-                min = obj;
-                v.clear();
-                for (std::vector<int>::const_iterator i = (*it).begin(); i != (*it).end(); ++i)
-                {
-                    v.push_back(nbjobs - *i);
-                }
-            }
-        }
-        
-        for (std::vector<int>::iterator i = v.begin(); i != v.end(); ++i)
-        {
-            std::cout << *i << " ";
-        }
-        std::cout << "min = " << min  <<  " count = " << counter << std::endl;
-    }
-
-    class Optimal_ZDD<double> dynamic_programming_ahv(double *pi){
-        Optimal_ZDD<double> opt_sol;
+    class Optimal_Solution<double> dynamic_programming_ahv(double *pi){
+        Optimal_Solution<double> opt_sol;
         opt_sol.cost = 0;
         double **F;
         bool **A;
@@ -102,20 +80,20 @@ public:
         F[0][0] = -pi[nbjobs];
         A[0][0] = false;
         for(int t = 1; t < H_max + 1; t++) {
-            F[0][t] = 271827676.0;
+            F[0][t] = DBL_MAX/2;
             A[0][t] = false;
         }
 
         for(int i = 1; i < nbjobs + 1; i++) {
             for(int t = 0; t < H_max + 1; t++) {
-                F[i][t] = 271827676.0;
+                F[i][t] = DBL_MAX/2;
                 A[i][t] = false;
             }
         }
 
         /** Recursion */
         for(int i = 1; i < nbjobs + 1; i++) {
-            for(int t = 0; t < H_max + 1; t++) {
+            for(int t = 0; t < H_max; t++) {
                 if(t >= r[i - 1] + p[i - 1] && t <= d[i - 1]) {
                     if(F[i - 1][t - p[i - 1]] + (double) w[i - 1]*t - pi[i - 1] < F[i - 1][t]) {
                         F[i][t] = F[i - 1][t - p[i - 1]] + (double) w[i - 1]*t - pi[i - 1];
@@ -132,9 +110,9 @@ public:
         }
 
         /** Find optimal solution */
-        min = F[nbjobs][H_min + 1];
+        min = F[nbjobs][0];
         opt_sol.obj = min;
-        for(int i = H_min + 1; i < H_max + 1; ++i) {
+        for(int i =  1; i < H_max + 1; i++) {
             if(F[nbjobs][i] < min) {
                 min = F[nbjobs][i];
                 t_min = i;
@@ -161,31 +139,13 @@ public:
         return opt_sol;
     }
 
-    class PricerInfoBDD<double> solveDbl(double *pi){
-        return dd.evaluate(DurationBDDdouble(pi, p, w, nbjobs));
-    }
 
-    class PricerInfoBDD<int> solveInt(int* pi){
-        return dd.evaluate(DurationBDDint(pi, p, w, nbjobs));
-    }
 
-    class PricerInfoBDD<double> solvefarkasDbl(double *pi){
-        return dd.evaluate(FarkasBDDdouble(pi, p, w, nbjobs));
-    }
-
-    class PricerInfoBDD<int> solvefarkasInt(int* pi){
-        return dd.evaluate(FarkasBDDint(pi, p, w, nbjobs));
-    }
-
-    class PricerInfoBDD<double> solveDblBDD(double *pi){
-        return dd.evaluate(DurationBDDdouble(pi, p, w, nbjobs));
-    }
-
-    class PricerInfoBDD<double> solve_duration_bdd_double(double *pi){
+    class Optimal_Solution<double> solve_duration_bdd_double(double *pi){
         return dd.evaluate_reverse(DurationBDDdouble(pi, p, w, nbjobs));
     }
 
-    class Optimal_ZDD<double> solve_duration_zdd_double(double *pi){
+    class Optimal_Solution<double> solve_duration_zdd_double(double *pi){
         return zdd.evaluate_forward_DP(DurationZDDdouble(pi, p, w, nbjobs,H_max));
     }
 
@@ -202,7 +162,7 @@ public:
     }
 
     ~PricerSolver(){
-        
+        delete [] delta;
     };
 
     

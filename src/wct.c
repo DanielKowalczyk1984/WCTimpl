@@ -589,7 +589,6 @@ int compute_objective( wctdata *pd )
     //{
         printf( "Current primal LP objective: %19.16f  (LP_dual-solver %19.16f).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual );
     //}
-    getchar();
 
 CLEAN:
     return val;
@@ -1863,28 +1862,26 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
                     // solvedblbdd(pd);
                     // print_schedule(pd->newsets, pd->nnewsets);
                 case no_stab:
-                    solve_dynamic_programming_ahv(pd);
-                    Schedulesets_free(&(pd->newsets), &(pd->nnewsets));
                     solvedblbdd(pd);
                     break;
                 }
-
-                CCutil_suspend_timer( &problem->tot_pricing );
-                for ( j = 0; j < pd->nnewsets; j++ )
-                {
-                    val = wctlp_addcol(pd->LP, pd->newsets[j].count + 1, pd->newsets[j].members, pd->coef, pd->newsets[j].totwct, 0.0, 1.0, wctlp_CONT, NULL);
-                    CCcheck_val_2( val, "pmclp_addcol failed" );
-                }
-                
-                break_while_loop = ( pd->nnewsets == 0 || nnonimprovements > 5 );
-                add_newsets( pd );
-
             }
             break;
         case GRB_INFEASIBLE:
+            if(iterations < pd->maxiterations) {
+                
+            }
             break;
         }
 
+        for ( j = 0; j < pd->nnewsets; j++ )
+        {
+            val = wctlp_addcol(pd->LP, pd->newsets[j].count + 1, pd->newsets[j].members, pd->coef, pd->newsets[j].totwct, 0.0, 1.0, wctlp_CONT, NULL);
+            CCcheck_val_2( val, "pmclp_addcol failed" );
+        }
+                
+        break_while_loop = ( pd->nnewsets == 0 || nnonimprovements > 5 );
+        add_newsets( pd );
 
         CCutil_suspend_timer( &( problem->tot_cputime ) );
         CCutil_resume_timer( &( problem->tot_cputime ) );

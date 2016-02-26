@@ -556,7 +556,6 @@ public:
             S eval(evaluator.entity());
             bool msg = eval.showMessages();
             int n = root_.row();
-
             MessageHandler mh;
             if (msg) {
                 mh.begin(typenameof(eval));
@@ -565,11 +564,11 @@ public:
 
             eval.initialize(n);
 
-            if (n == 0) {
+            /*if (n == 0) {
                 T t;
                 eval.evalTerminal(t, root_.col());
                 return t;
-            }
+            }*/
 
             DataTable<T> work(diagram->numRows());
 
@@ -612,7 +611,7 @@ public:
             /**
              * Return the optimal solution
              */
-            R retval = eval.getValue(work[0][1]);
+            R retval = eval.get_objective(&work[0][1]);
 
             for (int i = n; i >= 0; i--) {
                 work[i].clear();

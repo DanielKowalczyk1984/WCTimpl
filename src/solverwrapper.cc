@@ -3,80 +3,47 @@
 #include <iostream>
 #include <vector>
 
+template<typename T = double,bool reverse = false>
+int construct_sol(Scheduleset **set, int *nnewsets, Optimal_Solution<T> &sol, int nbjobs){
+    int val = 0;
+    int nbset = 1;
+    std::vector<int> *v = &(sol.jobs);
+
+    Scheduleset *newset = CC_SAFE_MALLOC(1, Scheduleset);
+    CCcheck_NULL_2(newset, "Failed to allocate memory newset");
+
+    Scheduleset_init(newset);
+    newset->members = CC_SAFE_MALLOC(sol.jobs.size() + 1, int);
+    CCcheck_NULL_2(newset->members, "Failed to allocate memory members");
+    if(reverse) {
+        std::copy(v->rbegin(), v->rend(), newset->members);
+    } else {
+        std::copy(v->begin(), v->end(), newset->members);
+    }
+    newset->totwct = sol.cost;
+    newset->count = sol.jobs.size();
+    newset->members[sol.jobs.size()] = nbjobs;
+    *set= newset;
+        *nnewsets = 1;
+
+    CLEAN:
+    if(val) {
+        Schedulesets_free(&(newset), &(nbset));
+    }
+    return val;
+}
+
 extern "C" {
     PricerSolver *newSolver(int *p, int *w, int *r, int *d, int nbjobs, int Hmin, int Hmax) {
         return new PricerSolver(p, w, r, d, nbjobs, Hmin, Hmax,false,true);
     }
 
-    int construct_sol_bdd(Scheduleset **set, int *nnewsets, PricerInfoBDD<double> &sol, int nbjobs){
-        int val = 0;
-        int nbset = 1;
-        std::vector<int> *v = &(sol.jobs);
-
-        Scheduleset *newset = CC_SAFE_MALLOC(1, Scheduleset);
-        CCcheck_NULL_2(newset, "Failed to allocate memory newset");
-
-        Scheduleset_init(newset);
-        newset->members = CC_SAFE_MALLOC(sol.jobs.size() + 1, int);
-        CCcheck_NULL_2(newset->members, "Failed to allocate memory members");
-        std::copy(v->begin(), v->end(), newset->members);
-        newset->totwct = sol.cost;
-        newset->count = v->size();
-        newset->members[v->size()] = nbjobs;
-        *set= newset;
-        *nnewsets = 1;
-
-        CLEAN:
-        if(val) {
-            Schedulesets_free(&(newset), &(nbset));
-        }
-
-        return val;
-    }
-
-    int construct_sol_zdd(Scheduleset **set, int *nnewsets, Optimal_ZDD<double> &sol, int nbjobs, bool reverse){
-        int val = 0;
-        int nbset = 1;
-        std::vector<int> *v = &(sol.jobs);
-
-        Scheduleset *newset = CC_SAFE_MALLOC(1, Scheduleset);
-        CCcheck_NULL_2(newset, "Failed to allocate memory newset");
-
-        Scheduleset_init(newset);
-        newset->members = CC_SAFE_MALLOC(sol.jobs.size() + 1, int);
-        CCcheck_NULL_2(newset->members, "Failed to allocate memory members");
-        if(reverse) {
-            std::copy(v->rbegin(), v->rend(), newset->members);
-        } else {
-            std::copy(v->begin(), v->end(), newset->members);
-        }
-        newset->totwct = sol.cost;
-        newset->count = sol.jobs.size();
-        newset->members[sol.jobs.size()] = nbjobs;
-        *set= newset;
-        *nnewsets = 1;
-
-        CLEAN:
-        if(val) {
-            Schedulesets_free(&(newset), &(nbset));
-        }
-        return val;
-    }
-
-    void solveint(PricerSolver *solver, int *pi, int **sol, int *nsol, int *cost,int *newsol) {
-
-    }
-
-    void calc(PricerSolver *solver, double *pi){
-        solver->calculate_reducedcost_iteration(pi);
-    }
-
     int solvedblzdd(wctdata *pd) {
         int val = 0;
-        Optimal_ZDD<double> s = pd->solver->solve_duration_zdd_double(pd->pi);
+        Optimal_Solution<double> s = pd->solver->solve_duration_zdd_double(pd->pi);
 
         if(s.obj > 0.00001) {
-            val = construct_sol_zdd(&(pd->newsets), &(pd->nnewsets), s, pd->njobs, false);
+            val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
             CCcheck_val_2(val, "Failed in construct_sol_zdd");
         } else {
             pd->nnewsets = 0;
@@ -88,10 +55,10 @@ extern "C" {
 
     int solvedblbdd(wctdata *pd){
         int val = 0;
-        PricerInfoBDD<double> s = pd->solver->solve_duration_bdd_double(pd->pi);
+        Optimal_Solution<double> s = pd->solver->solve_duration_bdd_double(pd->pi);
 
         if(s.obj > 0.00001) {
-            val = construct_sol_bdd(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
+            val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
             CCcheck_val_2(val, "Failed to construct_sol_bdd");
         } else {
             pd->nnewsets = 0;
@@ -103,10 +70,10 @@ extern "C" {
 
     int solve_dynamic_programming_ahv(wctdata *pd){
         int val = 0;
-        Optimal_ZDD<double> s = pd->solver->dynamic_programming_ahv(pd->pi);
+        Optimal_Solution<double> s = pd->solver->dynamic_programming_ahv(pd->pi);
 
         if(s.obj < -0.000001) {
-            val = construct_sol_zdd(&(pd->newsets), &(pd->nnewsets), s, pd->njobs, true);
+            val = construct_sol<double,true>(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
             CCcheck_val_2(val, "Failed in constructing sol");
         } else {
             pd->nnewsets = 0;
@@ -114,10 +81,6 @@ extern "C" {
 
         CLEAN:
         return val;
-    }
-
-    void solvefarkasint(PricerSolver *solver, int *pi, int **sol,int *nsol, int* cost, int *newsol){
-        
     }
 
     void solvefarkasdbl(PricerSolver *solver, double *pi, int **sol,int *nsol, int* cost, int *newsol){
@@ -145,7 +108,7 @@ extern "C" {
         *eta_sep = alpha * (*eta_in) + beta * (*eta_out);
     }
 
-    double compute_lagrange_bdd(PricerInfoBDD<double> &sol, double *pi, int nbjobs, int nbmachines){
+    double compute_lagrange_bdd(Optimal_Solution<double> &sol, double *pi, int nbjobs, int nbmachines){
         double result = 0.0;
         double a = 0.0;
         int i;
@@ -172,7 +135,7 @@ extern "C" {
         int val = 0;
         int heading_in = 0;
         PricerSolver *solver = pd->solver;
-        PricerInfoBDD<double> sol;
+        Optimal_Solution<double> sol;
         if(  (pd->eta_in == 0.0) ? 1 : CC_OURABS((pd->eta_out - pd->eta_in)/(pd->eta_in)) < 0.0005 || CC_OURABS((pd->eta_out - pd->eta_in)/(pd->eta_in)) > 0.1) {
             heading_in = 1;
         }
@@ -188,7 +151,7 @@ extern "C" {
             }
 
             if(sol.obj > 0.000001) {
-                val = construct_sol_bdd(&(pd->newsets), &(pd->nnewsets), sol, solver->nbjobs);
+                val = construct_sol(&(pd->newsets), &(pd->nnewsets), sol, solver->nbjobs);
                 CCcheck_val_2(val, "Failed in construction of solution");
             } else {
                 pd->nnewsets = 0;
@@ -208,7 +171,7 @@ extern "C" {
                 result = compute_lagrange_bdd(sol, pd->pi_sep, pd->njobs, pd->nmachines);
 
                 if(result < pd->eta_sep) {
-                    val = construct_sol_bdd(&(pd->newsets), &(pd->nnewsets), sol, solver->nbjobs);
+                    val = construct_sol(&(pd->newsets), &(pd->nnewsets), sol, solver->nbjobs);
                     CCcheck_val_2(val, "Failed in construct_sol_combo");
 
                     if(result > pd->eta_in) {
@@ -221,7 +184,7 @@ extern "C" {
                     result = compute_lagrange_bdd(sol, pd->pi_out, pd->njobs, pd->nmachines);
 
                     if(result < pd->eta_out) {
-                        val = construct_sol_bdd(&(pd->newsets), &(pd->nnewsets), sol, solver->nbjobs);
+                        val = construct_sol(&(pd->newsets), &(pd->nnewsets), sol, solver->nbjobs);
                         CCcheck_val_2(val, "Failed in construct_sol_combo");
                     }
 

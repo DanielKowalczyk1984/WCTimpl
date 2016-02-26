@@ -54,13 +54,41 @@ public:
     };
 };
 
+/**
+ * BDD
+ */
 template<typename T>
-class Optimal_ZDD{
+class PricerInfoBDD {
+public:
+    T obj;
+    std::vector<int> jobs;
+    int sum_w;
+    int sum_p;
+    int cost;
+
+    PricerInfoBDD& operator=( const PricerInfoBDD& other ) {
+        sum_w = other.sum_w;
+        sum_p = other.sum_p;
+        cost = other.cost;
+        obj = other.obj;
+        jobs.clear();
+        jobs = other.jobs;
+        return *this;
+    };
+
+    friend std::ostream& operator<<(std::ostream& os, PricerInfoBDD<T> const& o) {
+        os << "max = " << o.obj << "," << std::endl << "cost = " << o.cost << std::endl;
+        return os;
+    }
+};
+
+template<typename T>
+class Optimal_Solution{
     public:
         T obj;
         std::vector<int> jobs;
         int cost;
-        Optimal_ZDD(PricerInfoZDD<T> *node, const int L){
+        Optimal_Solution(PricerInfoZDD<T> *node, const int L){
             int it_max = node->get_max(L);
             boost::dynamic_bitset<> *ptr_max = &node->A[it_max];
             size_t it = ptr_max->find_first();
@@ -74,19 +102,26 @@ class Optimal_ZDD{
             }
         }
 
-        Optimal_ZDD(){
+        Optimal_Solution(PricerInfoBDD<T> *node){
+            obj = node->obj;
+            jobs = node->jobs;
+            cost = node->cost;
+        }
+
+        Optimal_Solution(){
 
         }
 
-        Optimal_ZDD& operator=(const Optimal_ZDD& other){
+        Optimal_Solution& operator=(const Optimal_Solution& other){
             obj = other.obj;
             cost = other.cost;
             jobs = other.jobs;
+            return *this;
         }
 };
 
 template<typename E, typename T>
-class DurationZDD: public tdzdd::DdEval<E, PricerInfoZDD<T>, Optimal_ZDD<T> > {
+class DurationZDD: public tdzdd::DdEval<E, PricerInfoZDD<T>, Optimal_Solution<T> > {
     T *pi;
     int *p;
     int *w;
@@ -153,8 +188,8 @@ public:
         }
     }
 
-    Optimal_ZDD<T> get_objective(PricerInfoZDD<T> *n){
-        Optimal_ZDD<T> sol(n, L);
+    Optimal_Solution<T> get_objective(PricerInfoZDD<T> *n){
+        Optimal_Solution<T> sol(n, L);
         return sol;
     }
 };
@@ -216,37 +251,11 @@ public:
     }*/
 };
 
-/**
- * BDD
- */
-template<typename T>
-class PricerInfoBDD {
-public:
-    T obj;
-    std::vector<int> jobs;
-    int sum_w;
-    int sum_p;
-    int cost;
 
-    PricerInfoBDD& operator=( const PricerInfoBDD& other ) {
-        sum_w = other.sum_w;
-        sum_p = other.sum_p;
-        cost = other.cost;
-        obj = other.obj;
-        jobs.clear();
-        jobs = other.jobs;
-        return *this;
-    };
-
-    friend std::ostream& operator<<(std::ostream& os, PricerInfoBDD<T> const& o) {
-        os << "max = " << o.obj << "," << std::endl << "cost = " << o.cost << std::endl;
-        return os;
-    }
-};
 
 
 template<typename E, typename T>
-class DurationBDD: public tdzdd::DdEval<E, PricerInfoBDD<T> > {
+class DurationBDD: public tdzdd::DdEval<E, PricerInfoBDD<T>, Optimal_Solution<T> > {
     T *pi;
     int *p;
     int *w;
@@ -295,6 +304,11 @@ public:
 
     void initializerootnode(PricerInfoBDD<T> &n) {
         n.obj = pi[nbjobs];
+    }
+
+    Optimal_Solution<T> get_objective(PricerInfoBDD<T> *n){
+        Optimal_Solution<T> sol(n);
+        return sol;
     }
 };
 

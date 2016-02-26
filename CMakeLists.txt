@@ -10,7 +10,9 @@ include(FindFiles/FindGlib.cmake)
 
 include(FindFiles/FindGurobi.cmake)
 
-include_directories(${GUROBI_INCLUDE_DIR} ${GLIB_INCLUDE_DIRS})
+find_package(Boost 1.60.0)
+
+include_directories(${GUROBI_INCLUDE_DIR} ${GLIB_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -24,4 +26,4 @@ set(GLOB headers "src/*.h" ${GUROBI_INCLUDE_DIR} "src/*.hpp")
 
 add_executable(wct ${SOURCE} ${headers})
 
-target_link_libraries(wct ${GUROBI_LIBRARY} ${GLIB_LIBRARIES} -lm -lpthread -lgurobi60)
+target_link_libraries(wct ${GUROBI_LIBRARY} ${GLIB_LIBRARIES} ${Boost_LIBRARIES} -lm -lpthread -lgurobi60)
