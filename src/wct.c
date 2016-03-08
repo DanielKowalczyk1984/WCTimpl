@@ -1866,8 +1866,8 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
                 case stab_wentgnes:
                     break;
                 case no_stab:
-                    solve_weight_dbl_zdd(pd);
-                    //solve_weight_dbl_bdd(pd);
+                    //solve_weight_dbl_zdd(pd);
+                    solve_weight_dbl_bdd(pd);
                     //solve_dynamic_programming_ahv(pd);
                     break;
                 }

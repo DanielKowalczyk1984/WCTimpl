@@ -112,6 +112,17 @@ public:
         os << "max = " << o.obj << "," << std::endl << "cost = " << o.cost << std::endl;
         return os;
     }
+
+    void init_terminal_node(int one){
+        obj = one ? 0.0:-1871286761.0;
+    }
+
+    void init_node(int weight){
+        sum_p = weight;
+        take = false;
+    }
+
+
 };
 
 template<typename T>
@@ -120,10 +131,10 @@ public:
     T* obj;
     bool* take;
     const std::vector<int> *weight;
-    PricerWeightZDD(std::vector<int> *_weight): weight(_weight){
+    PricerWeightZDD(std::vector<int> *_weight):obj(0), take(0), weight(_weight){
     };
 
-    PricerWeightZDD(){
+    PricerWeightZDD():obj(0), take(0), weight(0){
     };
 
     ~PricerWeightZDD(){
@@ -134,6 +145,25 @@ public:
         if(take != 0) {
             delete [] take;
             take = 0;
+        }
+    }
+
+    void alloc_node( const std::vector<int> *v){
+        int max = *std::max_element(v->begin(), v->end());
+        obj = new T[max + 1];
+        take = new bool[max + 1];
+        weight = v;
+        for (std::vector<int>::const_iterator i = v->begin(); i != v->end(); ++i){
+            take[*i] = false;
+        }
+    }
+
+    void alloc_terminal_node(int H_min, int H_max, int H, int one){
+        int end = one ? H_max + 1 : H;
+        obj = new T[end];
+        take = new bool[end];
+        for(int i = one ? H_min : 0; i < H_max + 1 ; i++) {
+            obj[i] = one ? 0:-1871286761.0;
         }
     }
 
@@ -321,8 +351,8 @@ public:
         : pi(_pi), p(_p), w(_w),r(_r),d(_d), nbjobs(_nbjobs) {
     };
 
-    void evalTerminal( PricerWeightBDD<T>& n, bool one) {
-        n.obj = one ? pi[nbjobs]:-1871286761.0;
+    void evalTerminal( PricerWeightBDD<T>& n) {
+        n.obj = pi[nbjobs];
         n.cost = 0.0;
         n.sum_w = 0.0;
         n.sum_p = 0.0;
@@ -343,8 +373,7 @@ public:
         }
     }
 
-    void initializenode(PricerWeightBDD<T> &n, int weight){
-        n.sum_p = weight;
+    void initializenode(PricerWeightBDD<T> &n){
         n.take = false;
     }
 
@@ -387,12 +416,9 @@ public:
         : pi(_pi), p(_p), w(_w),r(_r),d(_d), nbjobs(_nbjobs),H_min(Hmin), H_max(Hmax) {
     };
 
-    void evalTerminal( PricerWeightZDD<T>* n, bool one) {
-        int end = one ? H_max + 1 : 2*H_max;
-        n->obj = new T[end];
-        n->take = new bool[end];
-        for(int i = one ? H_min : 0; i < H_max + 1 ; i++) {
-            n->obj[i] = one ? pi[nbjobs]:-1871286761.0;
+    void evalTerminal( PricerWeightZDD<T> &n) {
+        for(int i = H_min ; i < H_max  + 1; i++) {
+            n.obj[i] = pi[nbjobs];
         }
     }
 
@@ -414,11 +440,7 @@ public:
         }
     }
 
-    void initializenode(PricerWeightZDD<T> &n, const std::vector<int> *weight){
-        n.weight = weight;
-        int max = *std::max_element(n.weight->begin(), n.weight->end());
-        n.obj = new T[max + 1];
-        n.take = new bool[max + 1];
+    void initializenode(PricerWeightZDD<T> &n){
         for (std::vector<int>::const_iterator i = n.weight->begin(); i != n.weight->end(); ++i){
             n.take[*i] = false;
         }

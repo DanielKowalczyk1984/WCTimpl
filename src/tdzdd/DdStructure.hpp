@@ -551,7 +551,7 @@ public:
     }
         
             template<typename S, typename T, typename R>
-            R evaluate_weight(DdEval<S,T,R> const& evaluator) const {
+            R evaluate_weight(DdEval<S,T,R> const& evaluator, DataTable<T> &work) const {
                 S eval(evaluator.entity()); // copied
                 bool msg = eval.showMessages();
                 int n = root_.row();
@@ -562,33 +562,15 @@ public:
                     mh.setSteps(n);
                 }
 
-                eval.initialize(n);
-
-                // if (n == 0) {
-                //     T t;
-                //     eval.evalTerminal(t, root_.col());
-                //     return t;
-                // }
-
-                DataTable<T> work(diagram->numRows());
-                {
-                    size_t const m = (*diagram)[0].size();
-                    assert(m >= 2);
-                    work[0].resize(m);
-                    for (size_t j = 0; j < m; ++j) {
-                        eval.evalTerminal(work[0][j], j);
-                    }
-                }
+                eval.evalTerminal(work[0][1]);
 
                 for (int i = 1; i <= n; ++i) {
                     MyVector<Node<ARITY> > const& node = (*diagram)[i];
                     size_t const m = node.size();
-                    work[i].resize(m);
-
 
                     for (size_t j = 0; j < m; ++j) {
                         DdValues<T,ARITY> values;
-                        eval.initializenode(work[i][j],node[j].weight);
+                        eval.initializenode(work[i][j]);
                         for (int b = 0; b < ARITY; ++b) {
                             NodeId f = node[j].branch[b];
                             values.setReference(b, &(work[f.row()][f.col()]));
@@ -596,12 +578,6 @@ public:
                         }
                         eval.evalNode(&(work[i][j]), i, values);
                     }
-
-                    // MyVector<int> const& levels = diagram->lowerLevels(i);
-                    // for (int const* t = levels.begin(); t != levels.end(); ++t) {
-                    //     work[*t].clear();
-                    //     eval.destructLevel(*t);
-                    // }
 
                     if (msg) mh.step();
                 }
@@ -611,8 +587,8 @@ public:
                 return retval;
             }
 
-            template<typename S, typename T, typename R>
-            R evaluate_weight_ZDD(DdEval<S,T,R> const& evaluator) const {
+            /*template<typename S, typename T, typename R>
+            R evaluate_weight_ZDD(DdEval<S,T,R> const& evaluator, DataTable<T> &work) const {
                 S eval(evaluator.entity()); // copied
                 bool msg = eval.showMessages();
                 int n = root_.row();
@@ -623,27 +599,15 @@ public:
                     mh.setSteps(n);
                 }
 
-                eval.initialize(n);
-
-                DataTable<T> work(diagram->numRows());
-                {
-                    size_t const m = (*diagram)[0].size();
-                    assert(m >= 2);
-                    work[0].resize(m);
-                    for (size_t j = 0; j < m; ++j) {
-                        eval.evalTerminal(&(work[0][j]), j);
-                    }
-                }
+                eval.evalTerminal(work[0][1]);
 
                 for (int i = 1; i <= n; ++i) {
                     MyVector<Node<ARITY> > const& node = (*diagram)[i];
                     size_t const m = node.size();
-                    work[i].resize(m);
-
 
                     for (size_t j = 0; j < m; ++j) {
                         DdValues<T,ARITY> values;
-                        eval.initializenode(work[i][j],&(node[j].vec_weight));
+                        eval.initializenode(work[i][j]);
                         for (int b = 0; b < ARITY; ++b) {
                             NodeId f = node[j].branch[b];
                             values.setReference(b, &(work[f.row()][f.col()]));
@@ -652,19 +616,13 @@ public:
                         eval.evalNode(&(work[i][j]), i, values);
                     }
 
-                    // MyVector<int> const& levels = diagram->lowerLevels(i);
-                    // for (int const* t = levels.begin(); t != levels.end(); ++t) {
-                    //     work[*t].clear();
-                    //     eval.destructLevel(*t);
-                    // }
-
                     if (msg) mh.step();
                 }
 
                 R retval = eval.get_objective(getDiagram(),&work,&root_);
                 if (msg) mh.end();
                 return retval;
-            }
+            }*/
 
         template<typename S, typename T, typename R>
         R evaluate_reverse(DdEval<S, T, R> const & evaluator) const {
