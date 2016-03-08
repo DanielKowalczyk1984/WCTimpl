@@ -28,6 +28,7 @@
 #include <cmath>
 #include <ostream>
 #include <stdexcept>
+#include <map>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -57,6 +58,7 @@ protected:
     union SpecNode {
         NodeId* srcPtr;
         int64_t code;
+        int indegree = 0;
     };
 
     static NodeId*& srcPtr(SpecNode* p) {
@@ -201,6 +203,7 @@ class DdBuilder: DdBuilderBase {
     typedef S Spec;
     typedef MyHashTable<SpecNode*,Hasher<Spec>,Hasher<Spec> > UniqTable;
     static int const AR = Spec::ARITY;
+    typedef typename Spec::State T;
 
     Spec spec;
     int const specNodeSize;
@@ -208,6 +211,7 @@ class DdBuilder: DdBuilderBase {
     DdSweeper<AR> sweeper;
 
     MyVector<MyList<SpecNode> > snodeTable;
+    std::map<SpecNode*, int> indegree;
 
     void init(int n) {
         snodeTable.resize(n + 1);
@@ -281,10 +285,12 @@ public:
 
                 if (pp == p) {
                     nodeId(p) = *srcPtr(p) = NodeId(i, m++);
+                    indegree[pp] = 1;
                 }
                 else {
                     *srcPtr(p) = nodeId(pp);
                     nodeId(p) = 0;
+                    indegree[pp]++;
                 }
             }
 //#ifdef DEBUG
@@ -292,9 +298,8 @@ public:
 //            mh << "table_size[" << i << "] = " << uniq.tableSize() << "\n";
 //#endif
         }
-
         output[i].resize(m);
-        Node<AR>* q = output[i].data() + j0;
+        Node<AR,T>* q = output[i].data() + j0;
         SpecNode* pp = snodeTable[i - 1].alloc_front(specNodeSize);
 
         for (; !snodes.empty(); snodes.pop_front()) {
@@ -305,10 +310,12 @@ public:
             }
 
             bool allZero = true;
+            q->weight = spec.getState(state(p));
+            q->var = i;
+            q->indegree = indegree[p];
 
             for (int b = 0; b < AR; ++b) {
                 spec.get_copy(state(pp), state(p));
-                q->weight = spec.getState(state(p));
                 int ii = spec.get_child(state(pp), i, b);
 
                 if (ii <= 0) {

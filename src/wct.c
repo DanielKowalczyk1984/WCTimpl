@@ -270,6 +270,10 @@ void wctdata_init( wctdata *pd )
     pd->coef = ( double *) NULL;
     pd->pi = ( double *) NULL;
     pd->kpc_pi = ( int *)NULL;
+    /**init stab data */
+    pd->pi_in = (double *) NULL;
+    pd->pi_out = (double *) NULL;
+    pd->pi_sep = (double *) NULL;
     /*Initialization pricing_problem*/
     pd->solver = (PricerSolver*) NULL;
 
@@ -1773,6 +1777,9 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
     /* Construction of solver*/
     pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
 
+    CCutil_timer test;
+    CCutil_init_timer(&test, NULL);
+
     if ( dbg_lvl() )
     {
         printf( "Starting compute_lower_bound with lb %d and ub %d at depth %d(id = %d, opt_track = %d)\n",
@@ -1847,22 +1854,21 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
         memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
         pd->eta_out = pd->LP_lower_bound;
 
+        CCutil_start_resume_time( &problem->tot_pricing );
         switch(status) {
         case GRB_OPTIMAL:
             if ( iterations < pd->maxiterations )
             {
                 /** nnonimprovements? */
                 last_lower_bound = pd->dbl_safe_lower_bound;
-                CCutil_start_resume_time( &problem->tot_pricing );
                 /** Solve the pricing problem */
                 switch(parms->stab_technique) {
                 case stab_wentgnes:
-                    // print_schedule(pd->newsets, pd->nnewsets);
-                    // Schedulesets_free(&(pd->newsets), &(pd->nnewsets));
-                    // solvedblbdd(pd);
-                    // print_schedule(pd->newsets, pd->nnewsets);
+                    break;
                 case no_stab:
-                    solvedblbdd(pd);
+                    solve_weight_dbl_zdd(pd);
+                    //solve_weight_dbl_bdd(pd);
+                    //solve_dynamic_programming_ahv(pd);
                     break;
                 }
             }
@@ -1873,7 +1879,8 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
             }
             break;
         }
-
+        
+        CCutil_suspend_timer(&problem->tot_pricing);
         for ( j = 0; j < pd->nnewsets; j++ )
         {
             val = wctlp_addcol(pd->LP, pd->newsets[j].count + 1, pd->newsets[j].members, pd->coef, pd->newsets[j].totwct, 0.0, 1.0, wctlp_CONT, NULL);
@@ -1928,6 +1935,7 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
     } else  {
         pd->status = LP_bound_estimated;
     }
+    printf("iterations = %d\n", iterations);
 
     fflush( stdout );
     CCutil_suspend_timer( &( problem->tot_lb_cpu_time ) );

@@ -941,11 +941,10 @@ int combinePathRelinking(SS *scatter_search, GPtrArray *array, int *subsetsol, i
     while (l != NULL)
     {
         GList *next = l->next;
-        if (counter % 5 == 0)
+        if (counter % 10 == 0)
         {
             solution *sol = (solution *)l->data;
-            //localsearch_random_k(sol, scatter_search->lowerbound, 2);
-            localsearch_wrap(sol, scatter_search->lowerbound, 1);
+            localsearch_wrap(sol, scatter_search->lowerbound, 0);
             solution_unique(sol);
         } else {
             solution *sol = (solution *)l->data;

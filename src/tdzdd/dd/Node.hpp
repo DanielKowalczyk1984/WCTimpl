@@ -27,6 +27,7 @@
 #include <cassert>
 #include <stdint.h>
 #include <ostream>
+#include <vector>
 
 namespace tdzdd {
 
@@ -131,12 +132,15 @@ public:
     }
 };
 
-template<int ARITY>
+template<int ARITY, typename T = int>
 struct Node {
     NodeId branch[ARITY];
-    int weight;
+    T weight;
+    int indegree;
+    int var;
+    std::vector<T> vec_weight;
 
-    Node() {
+    Node(): indegree(0),var(0) {
     }
 
     Node(NodeId f0, NodeId f1) {

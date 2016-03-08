@@ -42,7 +42,6 @@ class DdValues {
     int level[ARITY];
 
 public:
-    int weight;
     /**
      * Returns the value of the b-th child.
      * @param b branch index.
@@ -80,10 +79,6 @@ public:
     void setLevel(int b, int i) {
         assert(0 <= b && b < ARITY);
         level[b] = i;
-    }
-
-    void setWeight( int w){
-        weight = w;
     }
 
     friend std::ostream& operator<<(std::ostream& os, DdValues const& o) {

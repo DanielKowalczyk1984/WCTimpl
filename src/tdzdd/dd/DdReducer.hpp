@@ -27,6 +27,7 @@
 #include <cassert>
 #include <cmath>
 #include <ostream>
+#include <iostream>
 #include <stdexcept>
 
 #ifdef _OPENMP
@@ -307,14 +308,17 @@ private:
                 assert(f0.row() == i);
                 assert(newId[j] == 0);
                 newId[j] = newId[f0.col()];
-            }
+                nt[newId[j].col()].vec_weight.push_back(tt[j].weight);
+             }
             else if ((BDD && f1 == f0) || (ZDD && f1 == 0)) { // forwarded
                 assert(newId[j].row() < i);
             }
             else {
                 assert(newId[j].row() == i);
-                size_t k = newId[j].col();
+                size_t k;
+                k = newId[j].col();
                 nt[k] = tt[j];
+                nt[k].vec_weight.push_back(tt[j].weight);
             }
         }
 

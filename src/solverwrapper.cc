@@ -87,6 +87,34 @@ extern "C" {
         
     }
 
+    int solve_weight_dbl_bdd(wctdata *pd){
+        int val = 0;
+        Optimal_Solution<double> s = pd->solver->solve_weight_bdd_double(pd->pi);
+
+        if(s.obj > 0.000001) {
+            val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
+            CCcheck_val_2(val, "Failed in construction")
+        } else {
+            pd->nnewsets = 0;
+        }
+        CLEAN:
+        return val;
+    }
+
+    int solve_weight_dbl_zdd(wctdata *pd){
+        int val = 0;
+        Optimal_Solution<double> s = pd->solver->solve_weight_zdd_double(pd->pi);
+
+        if(s.obj > 0.000001) {
+            val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
+            CCcheck_val_2(val, "Failed in construction")
+        } else {
+            pd->nnewsets = 0;
+        }
+        CLEAN:
+        return val;
+    }
+
 
     void deletePricerSolver(PricerSolver *solver) {
         if (solver)

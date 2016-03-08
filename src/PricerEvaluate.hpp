@@ -1,9 +1,13 @@
 #include "tdzdd/DdEval.hpp"
+#include "tdzdd/dd/NodeTable.hpp"
 #include <cfloat>
 #include <climits>
 #include <vector>
 #include <algorithm>
+#include <array>
 #include <boost/dynamic_bitset.hpp>
+#include <boost/unordered_map.hpp>
+
 
 /**
  * ZDD
@@ -80,6 +84,59 @@ public:
         os << "max = " << o.obj << "," << std::endl << "cost = " << o.cost << std::endl;
         return os;
     }
+};
+
+template<typename T>
+class PricerWeightBDD {
+public:
+    T obj;
+    bool take;
+    int sum_w;
+    int sum_p;
+    int cost;
+
+    PricerWeightBDD(): obj(0), take(false), sum_w(0), sum_p(0), cost(0){
+
+    }
+
+    PricerWeightBDD& operator=( const PricerWeightBDD& other ) {
+        sum_w = other.sum_w;
+        sum_p = other.sum_p;
+        cost = other.cost;
+        obj = other.obj;
+        take = other.take;
+        return *this;
+    };
+
+    friend std::ostream& operator<<(std::ostream& os, PricerWeightBDD<T> const& o) {
+        os << "max = " << o.obj << "," << std::endl << "cost = " << o.cost << std::endl;
+        return os;
+    }
+};
+
+template<typename T>
+class PricerWeightZDD {
+public:
+    T* obj;
+    bool* take;
+    const std::vector<int> *weight;
+    PricerWeightZDD(std::vector<int> *_weight): weight(_weight){
+    };
+
+    PricerWeightZDD(){
+    };
+
+    ~PricerWeightZDD(){
+        if(obj != 0) {
+            delete[] obj;
+            obj = 0;
+        }
+        if(take != 0) {
+            delete [] take;
+            take = 0;
+        }
+    }
+
 };
 
 template<typename T>
@@ -195,66 +252,6 @@ public:
 };
 
 template<typename E, typename T>
-class WeightZDD: public tdzdd::DdEval<E, PricerInfoZDD<T>, T> {
-    T *pi;
-    int *p;
-    int *w;
-    int nbjobs;
-    int L;
-
-public:
-    WeightZDD(T *_pi, int *_p, int *_w, int _nbjobs, int _L)
-        : pi(_pi), p(_p), w(_w), nbjobs(_nbjobs), L(_L) {
-    };
-
-    void evalTerminal( PricerInfoZDD<T>& n, bool one) {
-        n.obj = one ? 0 : -1871286761.0;
-        n.cost = 0;
-        n.sum_w = 0;
-        n.jobs.resize(0);
-    }
-
-    void evalNode( PricerInfoZDD<T> &n, int i, tdzdd::DdValues<PricerInfoZDD<T>, 2>  &  values) const {
-        int j = nbjobs - i;
-        assert(j >= 0 && j <= nbjobs - 1);
-        PricerInfoZDD<T> *n0 = values.get_ptr(0);
-        PricerInfoZDD<T> *n1 = values.get_ptr(1);
-
-        for(unsigned i = 0; i < L + 1; ++i) {
-            if(i >= w[j]) {
-                if(n0->obj[i - w[j]] > n1->obj[i - w[j]] - p[j]*i + pi[j]) {
-                    n.obj[i - w[j]] = n0->obj[j];
-                    n.A[i - w[j]][j] = false;
-                } else {
-                    n.obj[i] = n1->obj[i] - p[j]*i + pi[j];
-                    n.A[i][j] = true;
-                }
-            } else {
-                n.obj[i] = n0->obj[i];
-                n.A[i][j] = false;
-            }
-        }
-    }
-
-    void initializenode(PricerInfoZDD<T> &n) {
-        n.obj = new T [L + 1];
-        n.cost = new int [L + 1];
-        n.A = new boost::dynamic_bitset<> [L + 1];
-        for(unsigned i = 0; i < L + 1; ++i) {
-            n.obj[i] = -10983290.0;
-            n.A[i].resize(nbjobs);
-        }
-    }
-
-    /*T get_objective(PricerInfoZDD<T> &n){
-        return n.get_max(L);
-    }*/
-};
-
-
-
-
-template<typename E, typename T>
 class DurationBDD: public tdzdd::DdEval<E, PricerInfoBDD<T>, Optimal_Solution<T> > {
     T *pi;
     int *p;
@@ -284,7 +281,6 @@ public:
             n0->obj = n.obj;
             n0->cost = n.cost;
             n0->sum_p = n.sum_p;
-            n0->jobs.clear();
             n0->jobs = n.jobs;
         }
 
@@ -292,7 +288,6 @@ public:
             n1->obj = n.obj - (T) w[j] * (n.sum_p + p[j]) + pi[j];
             n1->cost = n.cost + w[j] * (n.sum_p + p[j]);
             n1->sum_p = n.sum_p + p[j];
-            n1->jobs.clear();
             n1->jobs = n.jobs;
             n1->jobs.push_back(j);
         }
@@ -313,41 +308,142 @@ public:
 };
 
 template<typename E, typename T>
-class WeightBDD: public tdzdd::DdEval<E, PricerInfoBDD<T> > {
+class WeightBDD: public tdzdd::DdEval<E, PricerWeightBDD<T>, Optimal_Solution<T> > {
     T *pi;
     int *p;
     int *w;
+    int *r;
+    int *d;
     int nbjobs;
 
 public:
-    WeightBDD(T *_pi, int *_p, int *_w, int _nbjobs)
-        : pi(_pi), p(_p), w(_w), nbjobs(_nbjobs) {
+    WeightBDD(T *_pi, int *_p, int *_w, int *_r, int *_d, int _nbjobs)
+        : pi(_pi), p(_p), w(_w),r(_r),d(_d), nbjobs(_nbjobs) {
     };
 
-    void evalTerminal( PricerInfoBDD<T>& n, bool one) {
-        n.obj = one ? 0 : -1871286761.0;
-        n.cost = 0;
-        n.sum_w = 0;
-        n.jobs.resize(0);
+    void evalTerminal( PricerWeightBDD<T>& n, bool one) {
+        n.obj = one ? pi[nbjobs]:-1871286761.0;
+        n.cost = 0.0;
+        n.sum_w = 0.0;
+        n.sum_p = 0.0;
     }
 
-    void evalNode( PricerInfoBDD<T> &n, int i, tdzdd::DdValues<PricerInfoBDD<T>, 2>  &  values) const {
+    void evalNode( PricerWeightBDD<T> *n, int i, tdzdd::DdValues<PricerWeightBDD<T>, 2>  &  values) const {
         int j = nbjobs - i;
         assert(j >= 0 && j <= nbjobs - 1);
-        PricerInfoBDD<T> *n0 = values.get_ptr(0);
-        PricerInfoBDD<T> *n1 = values.get_ptr(1);
+        PricerWeightBDD<T> n0 = values.get(0);
+        PricerWeightBDD<T> n1 = values.get(1);
 
-        if(n0->obj > n1->obj - p[j]*( n1->sum_w + w[j]) + pi[j]) {
-            n = *n0;
+        if(n0.obj >= n1.obj - (T) w[j]*( n->sum_p + p[j]) + pi[j] ) {
+            n->obj = n0.obj;
+            n->take = false;
         } else {
-            n.obj = n1->obj - (T)p[j]*( n1->sum_w + w[j]) + pi[j];
-            n.sum_p = n1->sum_p + p[j];
-            n.sum_w = n1->sum_w + w[j];
-            n.cost = n1->cost + (T)p[j]*( n1->sum_w + w[j]);
-            n.jobs.clear();
-            n.jobs = n1->jobs;
-            n.jobs.push_back(j);
+            n->obj = n1.obj - (T) w[j]*( n->sum_p + p[j]) + pi[j];
+            n->take = true;
         }
+    }
+
+    void initializenode(PricerWeightBDD<T> &n, int weight){
+        n.sum_p = weight;
+        n.take = false;
+    }
+
+    Optimal_Solution<T> get_objective( tdzdd::NodeTableHandler<2> diagram, tdzdd::DataTable<PricerWeightBDD<T>> *data_table, const tdzdd::NodeId *f){
+        Optimal_Solution<T> sol;
+        sol.obj = (*data_table)[f->row()][f->col()].obj;
+        tdzdd::NodeId cur_node = *f;
+        sol.cost = 0;
+        int C = 0;
+        int j = nbjobs - cur_node.row();
+        while(cur_node.row() != 0 || cur_node.col() != 0) {
+            if((*data_table)[cur_node.row()][cur_node.col()].take &&  r[j] <= C && C + p[j] <= d[j] ) {
+                sol.jobs.push_back(j);
+                cur_node = diagram.privateEntity().child(cur_node, 1);
+                C += p[j];
+                sol.cost += w[j]*C;
+                j = nbjobs - cur_node.row();
+            } else {
+                cur_node = diagram.privateEntity().child(cur_node, 0);
+                j = nbjobs - cur_node.row();
+            }
+        }
+        return sol;
+    }
+};
+
+template<typename E, typename T>
+class WeightZDD: public tdzdd::DdEval<E, PricerWeightZDD<T>, Optimal_Solution<T> > {
+    T *pi;
+    int *p;
+    int *w;
+    int *r;
+    int *d;
+    int nbjobs;
+    int H_min;
+    int H_max;
+
+public:
+    WeightZDD(T *_pi, int *_p, int *_w, int *_r, int *_d, int _nbjobs, int Hmin,int Hmax)
+        : pi(_pi), p(_p), w(_w),r(_r),d(_d), nbjobs(_nbjobs),H_min(Hmin), H_max(Hmax) {
+    };
+
+    void evalTerminal( PricerWeightZDD<T>* n, bool one) {
+        int end = one ? H_max + 1 : 2*H_max;
+        n->obj = new T[end];
+        n->take = new bool[end];
+        for(int i = one ? H_min : 0; i < H_max + 1 ; i++) {
+            n->obj[i] = one ? pi[nbjobs]:-1871286761.0;
+        }
+    }
+
+    void evalNode( PricerWeightZDD<T> *n, int i, tdzdd::DdValues<PricerWeightZDD<T>, 2>  &  values) const {
+        int j = nbjobs - i;
+        assert(j >= 0 && j <= nbjobs - 1);
+        PricerWeightZDD<T> *n0 = values.get_ptr(0);
+        PricerWeightZDD<T> *n1 = values.get_ptr(1);
+        std::vector<int>::const_iterator it = n->weight->begin();
+
+        for(; it != n->weight->end(); it++){
+            if(n0->obj[*it] >= n1->obj[*it + p[j]] - (T) w[j]*( *it + p[j]) + pi[j] ) {
+                n->obj[*it] = n0->obj[*it];
+                n->take[*it] = false;
+            } else {
+                n->obj[*it] = n1->obj[*it + p[j]] - (T) w[j]*( *it + p[j]) + pi[j];
+                n->take[*it] = true;
+            }
+        }
+    }
+
+    void initializenode(PricerWeightZDD<T> &n, const std::vector<int> *weight){
+        n.weight = weight;
+        int max = *std::max_element(n.weight->begin(), n.weight->end());
+        n.obj = new T[max + 1];
+        n.take = new bool[max + 1];
+        for (std::vector<int>::const_iterator i = n.weight->begin(); i != n.weight->end(); ++i){
+            n.take[*i] = false;
+        }
+    }
+
+    Optimal_Solution<T> get_objective( tdzdd::NodeTableHandler<2> diagram, tdzdd::DataTable<PricerWeightZDD<T>> *data_table, const tdzdd::NodeId *f){
+        Optimal_Solution<T> sol;
+        int C = 0;
+        sol.obj = (*data_table)[f->row()][f->col()].obj[C];
+        sol.cost = 0;
+        tdzdd::NodeId cur_node = *f;
+        int j = nbjobs - cur_node.row();
+        while(cur_node.row() != 0 ) {
+            if((*data_table)[cur_node.row()][cur_node.col()].take[C] &&  r[j] <= C && C + p[j] <= d[j] ) {
+                sol.jobs.push_back(j);
+                cur_node = diagram.privateEntity().child(cur_node, 1);
+                C += p[j];
+                sol.cost += w[j]*C;
+                j = nbjobs - cur_node.row();
+            } else {
+                cur_node = diagram.privateEntity().child(cur_node, 0);
+                j = nbjobs - cur_node.row();
+            }
+        }
+        return sol;
     }
 };
 
@@ -417,17 +513,17 @@ struct DurationBDDdouble: DurationBDD<DurationBDDdouble, double> {
     };
 };
 
-struct DurationBDDint: DurationBDD<DurationBDDint, int> {
-    DurationBDDint(int *_pi, int *_p, int *_w, int _nbjobs): DurationBDD<DurationBDDint, int>(_pi, _p, _w, _nbjobs) {
+struct WeightBDDdouble: WeightBDD<WeightBDDdouble, double> {
+    WeightBDDdouble(double *_pi, int *_p, int *_w, int *r, int *d, int _nbjobs): WeightBDD<WeightBDDdouble, double>(_pi, _p, _w, r,d, _nbjobs){
+    };
+};
+
+struct WeightZDDdouble: WeightZDD<WeightZDDdouble, double> {
+    WeightZDDdouble(double *_pi, int *_p, int *_w, int *r, int *d, int _nbjobs,int Hmin,int Hmax): WeightZDD<WeightZDDdouble, double>(_pi, _p, _w, r,d, _nbjobs,Hmin,Hmax){
     };
 };
 
 struct FarkasBDDdouble: Farkas<FarkasBDDdouble, double> {
     FarkasBDDdouble(double *_pi, int *_p, int *_w, int _nbjobs): Farkas<FarkasBDDdouble, double>(_pi, _p, _w, _nbjobs) {
-    };
-};
-
-struct FarkasBDDint: Farkas<FarkasBDDint, int> {
-    FarkasBDDint(int *_pi, int *_p, int *_w, int _nbjobs): Farkas<FarkasBDDint, int>(_pi, _p, _w, _nbjobs) {
     };
 };

@@ -191,7 +191,7 @@ static int add_feasible_solution( wctproblem *problem, solution *new_sol)
   SS *scatter_search = &( problem->scatter_search );
 
   solution_calc(new_sol, root_pd->jobarray);
-  localsearch_wrap(new_sol, problem->global_lower_bound, 0);
+  //localsearch_wrap(new_sol, problem->global_lower_bound, 0);
   solution_unique( new_sol );
 
   if ( !solution_in_pool( scatter_search, new_sol ) ) {
@@ -273,6 +273,7 @@ int construct_feasible_solutions(wctproblem *problem) {
 
   CCutil_suspend_timer(timer);
   printf("We needed %f seconds to construct %d solutions in %d iterations\n", timer->cum_zeit, parms->nb_feas_sol, iterations);
+  printf("upperbound = %d, lowerbound = %d\n", problem->global_upper_bound, problem->global_lower_bound);
   CCutil_resume_timer(timer);
   if(parms->scatter_search) {
     SSCreate_refset(scatter_search);
@@ -289,7 +290,6 @@ int construct_feasible_solutions(wctproblem *problem) {
     }
   }
   
-  printf("upperbound = %d, lowerbound = %d\n", problem->global_upper_bound, problem->global_lower_bound);
 
 CLEAN:
   g_rand_free(rand1);

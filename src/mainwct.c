@@ -287,8 +287,8 @@ int main(int ac, char **av) {
     for(i = 0; i < pd->njobs; i++) {
         pd->orig_node_ids[i] = i;
     }
-    printf("Reading and preprocessing of the data took %f\n", CCutil_zeit()-start_time );
     Preprocessdata(pd);
+    printf("Reading and preprocessing of the data took %f\n", CCutil_zeit()-start_time );
 
     /** Computing initial lowerbound */
     problem.global_lower_bound = lowerbound_eei(pd->jobarray, pd->njobs, pd->nmachines);
@@ -304,7 +304,7 @@ int main(int ac, char **av) {
 
     /** Print all the information to screen and csv */
     //print_to_csv(&problem);
-    //print_to_screen(&problem);
+    print_to_screen(&problem);
 
 CLEAN:
     wctproblem_free(&problem);

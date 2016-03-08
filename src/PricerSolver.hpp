@@ -17,6 +17,8 @@ public:
     const int nbjobs;
     int H_min;
     int H_max;
+    tdzdd::DataTable<PricerWeightBDD<double>> zdd_table;
+    tdzdd::DataTable<PricerWeightZDD<double>> dd_table;
 
     PricerSolver( int *_p, int *_w,  int *_r, int *_d, int njobs, int Hmin, int Hmax, bool print = false, bool reduce = false): p(_p), w(_w), r(_r), d(_d), nbjobs(njobs),H_min(Hmin),H_max(Hmax) {
         delta = new int [nbjobs];
@@ -41,11 +43,11 @@ public:
             file.close();
         }
         dd = tdzdd::DdStructure<2>(ps);
-        printf("size of dd = %lu\n", dd.size());
         if (reduce) {
-            std::cout << "Reducing the size of DD structure" << std::endl;
             zdd = dd;
             zdd.zddReduce();
+            std::cout << "Reducing the size of DD structure:" <<  std::endl;
+            std::cout << "DD = " << dd.size() << " " << "ZDD = " << zdd.size() << std::endl;
             if (print) {
                 create_dot_zdd("DDStructure.txt");
             }
@@ -58,8 +60,12 @@ public:
     void create_dot_zdd(const char* name){
         std::ofstream file;
         file.open(name);    
-        dd.dumpDot(file);
+        zdd.dumpDot(file);
         file.close();
+    }
+
+    void init_table(){
+        
     }
 
     class Optimal_Solution<double> dynamic_programming_ahv(double *pi){
@@ -93,17 +99,18 @@ public:
 
         /** Recursion */
         for(int i = 1; i < nbjobs + 1; i++) {
+            int j = i - 1;
             for(int t = 0; t < H_max; t++) {
-                if(t >= r[i - 1] + p[i - 1] && t <= d[i - 1]) {
-                    if(F[i - 1][t - p[i - 1]] + (double) w[i - 1]*t - pi[i - 1] < F[i - 1][t]) {
-                        F[i][t] = F[i - 1][t - p[i - 1]] + (double) w[i - 1]*t - pi[i - 1];
+                if(t >= r[j] + p[j] && t <= d[j]) {
+                    if(F[j][t - p[j]] + (double) w[j]*t - pi[j] < F[j][t]) {
+                        F[i][t] = F[j][t - p[j]] + (double) w[j]*t - pi[j];
                         A[i][t] = true;
                     } else {
-                        F[i][t] = F[i - 1][t];
+                        F[i][t] = F[j][t];
                         A[i][t] = false;
                     }
                 } else {
-                    F[i][t] = F[i - 1][t];
+                    F[i][t] = F[j][t];
                     A[i][t] = false;
                 }
             }
@@ -112,7 +119,7 @@ public:
         /** Find optimal solution */
         min = F[nbjobs][0];
         opt_sol.obj = min;
-        for(int i =  1; i < H_max + 1; i++) {
+        for(int i =  H_min; i < H_max + 1; i++) {
             if(F[nbjobs][i] < min) {
                 min = F[nbjobs][i];
                 t_min = i;
@@ -147,6 +154,14 @@ public:
 
     class Optimal_Solution<double> solve_duration_zdd_double(double *pi){
         return zdd.evaluate_forward_DP(DurationZDDdouble(pi, p, w, nbjobs,H_max));
+    }
+
+    class Optimal_Solution<double> solve_weight_bdd_double(double *pi){
+        return dd.evaluate_weight(WeightBDDdouble(pi,p,w,r,d,nbjobs));
+    }
+
+    class Optimal_Solution<double> solve_weight_zdd_double(double *pi){
+        return zdd.evaluate_weight_ZDD(WeightZDDdouble(pi,p,w,r,d,nbjobs,H_min,H_max));
     }
 
     void addRestriction(){
