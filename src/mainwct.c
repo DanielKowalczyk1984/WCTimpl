@@ -43,7 +43,7 @@ static int parseargs(int ac, char **av, wctparms* parms) {
     int val = 0;
     int debug = dbg_lvl();
 
-    while((c = getopt(ac,av,"db:o:r:f:u:s:l:L:R:C:B:t:z:")) != EOF) {
+    while((c = getopt(ac,av,"db:o:r:f:u:s:l:L:R:C:B:t:z:S:")) != EOF) {
         switch(c) {
         case 'd':
             ++(debug);
@@ -108,6 +108,7 @@ static int parseargs(int ac, char **av, wctparms* parms) {
         case 'S':
             val = wctparms_set_stab_technique(parms, atoi(optarg));
             CCcheck_val(val, "Failed in wctparms_set_stab_technique");
+            break;
         case 'z':
             val = wctparms_set_solver(parms, atoi(optarg));
             CCcheck_val(val, "Failed in wctparms_set_solver");
