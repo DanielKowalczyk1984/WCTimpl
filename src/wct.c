@@ -1860,19 +1860,30 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
         CCutil_start_resume_time( &problem->tot_pricing );
         switch(status) {
         case GRB_OPTIMAL:
-            if ( iterations < pd->maxiterations )
-            {
+            if ( iterations < pd->maxiterations ){
                 /** nnonimprovements? */
                 last_lower_bound = pd->dbl_safe_lower_bound;
                 /** Solve the pricing problem */
                 switch(parms->stab_technique) {
                 case stab_wentgnes:
+                    val = solve_stab(pd,parms);
+                    CCcheck_val_2(val, "Failed in solve_stab");
                     break;
                 case no_stab:
-                    //solve_weight_dbl_zdd(pd);
-                    solve_weight_dbl_bdd(pd);
-                    //solve_dynamic_programming_ahv(pd);
-                    break;
+                    switch(parms->solver){
+                    case bdd_solver:
+                        val = solve_weight_dbl_bdd(pd);
+                        CCcheck_val_2(val, "Failed solve_weight_dbl_bdd");
+                        break;
+                    case zdd_solver:
+                        val =solve_weight_dbl_zdd(pd);
+                        CCcheck_val_2(val, "Failed solve_weight_dbl_zdd")
+                        break;
+                    case DP_solver:
+                        val = solve_dynamic_programming_ahv(pd);
+                        CCcheck_val_2(val, "Failed in solve_dynamic_programming_ahv")
+                        break;
+                    }
                 }
             }
             break;
@@ -1899,6 +1910,8 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
                         break_while_loop = ( pd->nnewsets == 0 || nnonimprovements > 5 );
                         break;
                 }
+            case GRB_INFEASIBLE:
+                break;
         }
         add_newsets( pd );
 

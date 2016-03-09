@@ -111,7 +111,7 @@ static int parseargs(int ac, char **av, wctparms* parms) {
         case 'z':
             val = wctparms_set_solver(parms, atoi(optarg));
             CCcheck_val(val, "Failed in wctparms_set_solver");
-
+            break;
         default:
             usage(av[0]);
             val = 1;

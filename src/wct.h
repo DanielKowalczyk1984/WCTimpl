@@ -287,7 +287,7 @@ void heur_free(wctdata * pd);
 /**
  * Stabilization techniques
  */
-int solve_stab_bdd(wctdata *pd);
+int solve_stab(wctdata *pd, wctparms *parms);
 
 /**
  * solver zdd
