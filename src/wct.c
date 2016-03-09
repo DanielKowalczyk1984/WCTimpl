@@ -274,6 +274,7 @@ void wctdata_init( wctdata *pd )
     pd->pi_in = (double *) NULL;
     pd->pi_out = (double *) NULL;
     pd->pi_sep = (double *) NULL;
+    pd->alpha = 0.8;
     /*Initialization pricing_problem*/
     pd->solver = (PricerSolver*) NULL;
     pd->nnonimprovements = 0;
@@ -592,10 +593,10 @@ int compute_objective( wctdata *pd )
     }
 
 
-    //if ( dbg_lvl() > 0 )
-    //{
+    if ( dbg_lvl() > 0 )
+    {
         printf( "Current primal LP objective: %19.16f  (LP_dual-bound %19.16f, lowerbound = %d).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual, pd->lower_bound );
-    //}
+    }
 
 CLEAN:
     return val;
