@@ -53,6 +53,14 @@ enum stab_techniques{
     stab_wentgnes = 1,
 };
 
+enum pricing_solver
+{
+    min_solver =0,
+    bdd_solver = min_solver,
+    zdd_solver = 1,
+    DP_solver = 2,
+};
+
 
 typedef struct wctparms{
     /**
@@ -76,6 +84,7 @@ typedef struct wctparms{
     int branchandbound;
     int dual_var_type;
     int stab_technique;
+    int solver;
     
     int delete_elists;
     int delete_cclasses;
@@ -109,6 +118,7 @@ int wctparms_set_nb_feas_sol(wctparms *parms,int nb_sol);
 int wctparms_set_branchandbound(wctparms *parms,int bound);
 int wctparms_set_dual_var_type(wctparms *parms,int);
 int wctparms_set_stab_technique(wctparms *parms, int stab_technique);
+int wctparms_set_solver(wctparms *parms, int solver);
 
 /**
  * scatter search

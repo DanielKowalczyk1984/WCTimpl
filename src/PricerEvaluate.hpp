@@ -427,22 +427,21 @@ public:
         assert(j >= 0 && j <= nbjobs - 1);
         PricerWeightZDD<T> *n0 = values.get_ptr(0);
         PricerWeightZDD<T> *n1 = values.get_ptr(1);
-        std::vector<int>::const_iterator it = n->weight->begin();
 
-        for(; it != n->weight->end(); it++){
-            if(n0->obj[*it] >= n1->obj[*it + p[j]] - (T) w[j]*( *it + p[j]) + pi[j] ) {
-                n->obj[*it] = n0->obj[*it];
-                n->take[*it] = false;
+        for(auto &it: *(n->weight)){
+            if(n0->obj[it] >= n1->obj[it + p[j]] - (T) w[j]*( it + p[j]) + pi[j] ) {
+                n->obj[it] = n0->obj[it];
+                n->take[it] = false;
             } else {
-                n->obj[*it] = n1->obj[*it + p[j]] - (T) w[j]*( *it + p[j]) + pi[j];
-                n->take[*it] = true;
+                n->obj[it] = n1->obj[it + p[j]] - (T) w[j]*( it + p[j]) + pi[j];
+                n->take[it] = true;
             }
         }
     }
 
     void initializenode(PricerWeightZDD<T> &n){
-        for (std::vector<int>::const_iterator i = n.weight->begin(); i != n.weight->end(); ++i){
-            n.take[*i] = false;
+        for (auto &i: *(n.weight)){
+            n.take[i] = false;
         }
     }
 

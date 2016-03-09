@@ -448,181 +448,144 @@ public:
      * @param evaluator the driver class that implements DdEval interface.
      * @return value at the root.
      */
-    template<typename S, typename T, typename R>
-    R evaluate(DdEval<S,T,R> const& evaluator) const {
-        S eval(evaluator.entity()); // copied
-        bool msg = eval.showMessages();
-        int n = root_.row();
+        template<typename S, typename T, typename R>
+        R evaluate(DdEval<S, T, R> const & evaluator) const {
+            S eval(evaluator.entity()); // copied
+            bool msg = eval.showMessages();
+            int n = root_.row();
 
-        MessageHandler mh;
-        if (msg) {
-            mh.begin(typenameof(eval));
+            MessageHandler mh;
+            if (msg) {
+                mh.begin(typenameof(eval));
 #ifdef _OPENMP
-            if (useMP) mh << " " << omp_get_max_threads() << "x";
+                if (useMP) mh << " " << omp_get_max_threads() << "x";
 #endif
-            mh.setSteps(n);
-        }
-
-#ifdef _OPENMP
-        int threads = useMP ? omp_get_max_threads() : 0;
-        MyVector<S> evals(threads, eval);
-#endif
-        eval.initialize(n);
-#ifdef _OPENMP
-        if (useMP)
-#pragma omp parallel
-        {
-            int k = omp_get_thread_num();
-            evals[k].initialize(n);
-        }
-#endif
-
-        if (n == 0) {
-            T t;
-            eval.evalTerminal(t, root_.col());
-            return t;
-        }
-
-        DataTable<T> work(diagram->numRows());
-        {
-            size_t const m = (*diagram)[0].size();
-            assert(m >= 2);
-            work[0].resize(m);
-            for (size_t j = 0; j < m; ++j) {
-                eval.evalTerminal(work[0][j], j);
+                mh.setSteps(n);
             }
-        }
 
-        for (int i = 1; i <= n; ++i) {
-            MyVector<Node<ARITY> > const& node = (*diagram)[i];
-            size_t const m = node.size();
-            work[i].resize(m);
-
+#ifdef _OPENMP
+            int threads = useMP ? omp_get_max_threads() : 0;
+            MyVector<S> evals(threads, eval);
+#endif
+            eval.initialize(n);
 #ifdef _OPENMP
             if (useMP)
-#pragma omp parallel
+                #pragma omp parallel
             {
                 int k = omp_get_thread_num();
+                evals[k].initialize(n);
+            }
+#endif
 
-#pragma omp for schedule(static)
+            if (n == 0) {
+                T t;
+                eval.evalTerminal(t, root_.col());
+                return t;
+            }
+
+            DataTable<T> work(diagram->numRows());
+            {
+                size_t const m = (*diagram)[0].size();
+                assert(m >= 2);
+                work[0].resize(m);
                 for (size_t j = 0; j < m; ++j) {
-                    DdValues<T,ARITY> values;
+                    eval.evalTerminal(work[0][j], j);
+                }
+            }
+
+            for (int i = 1; i <= n; ++i) {
+                MyVector<Node<ARITY> > const& node = (*diagram)[i];
+                size_t const m = node.size();
+                work[i].resize(m);
+
+#ifdef _OPENMP
+                if (useMP)
+                    #pragma omp parallel
+                {
+                    int k = omp_get_thread_num();
+
+                    #pragma omp for schedule(static)
+                    for (size_t j = 0; j < m; ++j) {
+                        DdValues<T, ARITY> values;
+                        for (int b = 0; b < ARITY; ++b) {
+                            NodeId f = node[j].branch[b];
+                            values.setReference(b, work[f.row()][f.col()]);
+                            values.setLevel(b, f.row());
+                        }
+                        evals[k].evalNode(work[i][j], i, values);
+                    }
+                }
+                else
+#endif
+                    for (size_t j = 0; j < m; ++j) {
+                        DdValues<T, ARITY> values;
+                        for (int b = 0; b < ARITY; ++b) {
+                            NodeId f = node[j].branch[b];
+                            values.setReference(b, work[f.row()][f.col()]);
+                            values.setLevel(b, f.row());
+                        }
+                        eval.evalNode(&(work[i][j]), i, values);
+                    }
+
+                // MyVector<int> const& levels = diagram->lowerLevels(i);
+                // for (int const* t = levels.begin(); t != levels.end(); ++t) {
+                //     work[*t].clear();
+                //     eval.destructLevel(*t);
+                // }
+#ifdef _OPENMP
+                if (useMP)
+                    #pragma omp parallel
+                {
+                    int k = omp_get_thread_num();
+                    for (int const* t = levels.begin(); t != levels.end(); ++t) {
+                        evals[k].destructLevel(*t);
+                    }
+                }
+#endif
+                if (msg) mh.step();
+            }
+
+            R retval = eval.getValue(work[root_.row()][root_.col()]);
+            if (msg) mh.end();
+            return retval;
+        }
+
+        template<typename S, typename T, typename R>
+        R evaluate_weight(DdEval<S, T, R> const & evaluator, DataTable<T> &work) const {
+            S eval(evaluator.entity()); // copied
+            bool msg = eval.showMessages();
+            int n = root_.row();
+
+            MessageHandler mh;
+            if (msg) {
+                mh.begin(typenameof(eval));
+                mh.setSteps(n);
+            }
+
+            eval.evalTerminal(work[0][1]);
+
+            for (int i = 1; i <= n; ++i) {
+                MyVector<Node<ARITY> > const& node = (*diagram)[i];
+                size_t const m = node.size();
+
+                for (size_t j = 0; j < m; ++j) {
+                    DdValues<T, ARITY> values;
+                    eval.initializenode(work[i][j]);
                     for (int b = 0; b < ARITY; ++b) {
                         NodeId f = node[j].branch[b];
-                        values.setReference(b, work[f.row()][f.col()]);
+                        values.setReference(b, &(work[f.row()][f.col()]));
                         values.setLevel(b, f.row());
                     }
-                    evals[k].evalNode(work[i][j], i, values);
+                    eval.evalNode(&(work[i][j]), i, values);
                 }
-            }
-            else
-#endif
-            for (size_t j = 0; j < m; ++j) {
-                DdValues<T,ARITY> values;
-                for (int b = 0; b < ARITY; ++b) {
-                    NodeId f = node[j].branch[b];
-                    values.setReference(b, work[f.row()][f.col()]);
-                    values.setLevel(b, f.row());
-                }
-                eval.evalNode(&(work[i][j]), i, values);
+
+                if (msg) mh.step();
             }
 
-            // MyVector<int> const& levels = diagram->lowerLevels(i);
-            // for (int const* t = levels.begin(); t != levels.end(); ++t) {
-            //     work[*t].clear();
-            //     eval.destructLevel(*t);
-            // }
-#ifdef _OPENMP
-            if (useMP)
-#pragma omp parallel
-            {
-                int k = omp_get_thread_num();
-                for (int const* t = levels.begin(); t != levels.end(); ++t) {
-                    evals[k].destructLevel(*t);
-                }
-            }
-#endif
-            if (msg) mh.step();
+            R retval = eval.get_objective(getDiagram(), &work, &root_);
+            if (msg) mh.end();
+            return retval;
         }
-
-        R retval = eval.getValue(work[root_.row()][root_.col()]);
-        if (msg) mh.end();
-        return retval;
-    }
-        
-            template<typename S, typename T, typename R>
-            R evaluate_weight(DdEval<S,T,R> const& evaluator, DataTable<T> &work) const {
-                S eval(evaluator.entity()); // copied
-                bool msg = eval.showMessages();
-                int n = root_.row();
-
-                MessageHandler mh;
-                if (msg) {
-                    mh.begin(typenameof(eval));
-                    mh.setSteps(n);
-                }
-
-                eval.evalTerminal(work[0][1]);
-
-                for (int i = 1; i <= n; ++i) {
-                    MyVector<Node<ARITY> > const& node = (*diagram)[i];
-                    size_t const m = node.size();
-
-                    for (size_t j = 0; j < m; ++j) {
-                        DdValues<T,ARITY> values;
-                        eval.initializenode(work[i][j]);
-                        for (int b = 0; b < ARITY; ++b) {
-                            NodeId f = node[j].branch[b];
-                            values.setReference(b, &(work[f.row()][f.col()]));
-                            values.setLevel(b, f.row());
-                        }
-                        eval.evalNode(&(work[i][j]), i, values);
-                    }
-
-                    if (msg) mh.step();
-                }
-
-                R retval = eval.get_objective(getDiagram(),&work,&root_);
-                if (msg) mh.end();
-                return retval;
-            }
-
-            /*template<typename S, typename T, typename R>
-            R evaluate_weight_ZDD(DdEval<S,T,R> const& evaluator, DataTable<T> &work) const {
-                S eval(evaluator.entity()); // copied
-                bool msg = eval.showMessages();
-                int n = root_.row();
-
-                MessageHandler mh;
-                if (msg) {
-                    mh.begin(typenameof(eval));
-                    mh.setSteps(n);
-                }
-
-                eval.evalTerminal(work[0][1]);
-
-                for (int i = 1; i <= n; ++i) {
-                    MyVector<Node<ARITY> > const& node = (*diagram)[i];
-                    size_t const m = node.size();
-
-                    for (size_t j = 0; j < m; ++j) {
-                        DdValues<T,ARITY> values;
-                        eval.initializenode(work[i][j]);
-                        for (int b = 0; b < ARITY; ++b) {
-                            NodeId f = node[j].branch[b];
-                            values.setReference(b, &(work[f.row()][f.col()]));
-                            values.setLevel(b, f.row());
-                        }
-                        eval.evalNode(&(work[i][j]), i, values);
-                    }
-
-                    if (msg) mh.step();
-                }
-
-                R retval = eval.get_objective(getDiagram(),&work,&root_);
-                if (msg) mh.end();
-                return retval;
-            }*/
 
         template<typename S, typename T, typename R>
         R evaluate_reverse(DdEval<S, T, R> const & evaluator) const {
@@ -651,11 +614,11 @@ public:
             for (int i = n; i >= 0; i--) {
                 MyVector<Node<ARITY> > const& node = (*diagram)[i];
                 size_t const m = node.size();
-                work[i].resize(m);  
+                work[i].resize(m);
                 for (size_t j = 0; j < m && i < n; j++) {
                     eval.initializenode(work[i][j]);
                 }
-                if(i == n) {
+                if (i == n) {
                     for (size_t j = 0; j < m; j++) {
                         eval.initializerootnode(work[i][j]);
                     }
@@ -668,15 +631,15 @@ public:
             for (int i = n ; i > 0; i--) {
                 MyVector<Node<ARITY> > const& node = (*diagram)[i];
                 size_t const m = node.size();
-                    for (size_t j = 0; j < m; j++) {
-                        DdValues<T, ARITY> values;
-                        for (int b = 0; b < ARITY; b++) {
-                            NodeId f = node[j].branch[b];
-                            values.setReference(b, &work[f.row()][f.col()]);
-                            values.setLevel(b, f.row());
-                        }
-                        eval.evalNode(work[i][j], i, values);
+                for (size_t j = 0; j < m; j++) {
+                    DdValues<T, ARITY> values;
+                    for (int b = 0; b < ARITY; b++) {
+                        NodeId f = node[j].branch[b];
+                        values.setReference(b, &work[f.row()][f.col()]);
+                        values.setLevel(b, f.row());
                     }
+                    eval.evalNode(work[i][j], i, values);
+                }
 
                 if (msg) mh.step();
             }
@@ -715,26 +678,26 @@ public:
                 for (size_t j = 0; j < m && i < n; ++j) {
                     eval.initializenode(work[i][j]);
                 }
-                if(i == n) {
+                if (i == n) {
                     for (size_t j = 0; j < m ; ++j) {
                         eval.initializerootnode(work[i][j]);
                     }
                 }
-            }            
+            }
 
             for (int i = n ; i > 0; i--) {
                 MyVector<Node<ARITY> > const& node = (*diagram)[i];
                 size_t const m = node.size();
 
-                    for (size_t j = 0; j < m; ++j) {
-                        DdValues<T, ARITY> values;
-                        for (int b = 0; b < ARITY; ++b) {
-                            NodeId f = node[j].branch[b];
-                            values.setReference(b, &work[f.row()][f.col()]);
-                            values.setLevel(b, f.row());
-                        }
-                        eval.evalNode(work[i][j], i, values);
+                for (size_t j = 0; j < m; ++j) {
+                    DdValues<T, ARITY> values;
+                    for (int b = 0; b < ARITY; ++b) {
+                        NodeId f = node[j].branch[b];
+                        values.setReference(b, &work[f.row()][f.col()]);
+                        values.setLevel(b, f.row());
                     }
+                    eval.evalNode(work[i][j], i, values);
+                }
 
                 if (msg) mh.step();
             }

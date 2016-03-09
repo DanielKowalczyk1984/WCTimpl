@@ -134,6 +134,7 @@ struct wctdata {
     double LP_lower_bound;
     double LP_lower_bound_heur;
     double LP_lower_bound_dual;
+    int nnonimprovements;
     /** Wentges smoothing technique */
     double *pi_in;
     double *pi_out;

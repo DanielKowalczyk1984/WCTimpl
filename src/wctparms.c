@@ -17,6 +17,7 @@ void wctparms_init(wctparms *parms){
     parms->branchandbound = no;
     parms->dual_var_type = Dbl;
     parms->stab_technique = no_stab;
+    parms->solver = min_solver;
     
     parms->delete_elists = 1;
     parms->delete_cclasses = 0;
@@ -135,6 +136,11 @@ int wctparms_set_dual_var_type(wctparms *parms, int type){
 
 int wctparms_set_stab_technique(wctparms *parms, int stab_technique){
     parms->stab_technique = stab_technique;
+    return 0;
+}
+
+int wctparms_set_solver(wctparms *parms, int solver){
+    parms->solver = solver;
     return 0;
 }
 

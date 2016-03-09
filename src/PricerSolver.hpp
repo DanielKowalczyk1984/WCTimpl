@@ -44,7 +44,6 @@ public:
         }
         dd = tdzdd::DdStructure<2>(ps);
         init_table_bdd();
-        printf("test\n");
         if (reduce) {
             zdd = dd;
             zdd.zddReduce();

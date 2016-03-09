@@ -91,7 +91,7 @@ extern "C" {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_bdd_double(pd->pi);
 
-        if(s.obj > 0.000001) {
+        if(s.obj > 0.0001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
             CCcheck_val_2(val, "Failed in construction")
         } else {
@@ -105,7 +105,7 @@ extern "C" {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_zdd_double(pd->pi);
 
-        if(s.obj > 0.000001) {
+        if(s.obj > 0.0001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
             CCcheck_val_2(val, "Failed in construction")
         } else {

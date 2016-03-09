@@ -34,6 +34,7 @@ static void usage(char* f) {
     fprintf(stderr, "   -B int  Branch and Bound use: 0 = no branch and bound(default), 1 = use branch and bound\n");
     fprintf(stderr, "   -t int  Dual Variable type: 0 = double(default), 1 = integer\n");
     fprintf(stderr, "   -S int  Stabilization technique: 0 = no stabilization(default), 1 = stabilization wentgnes\n");
+    fprintf(stderr, "   -z int  pricing solver technique: 0 = BDD(default), 1 = ZDD, 2 = DP\n");
 }
 
 
@@ -42,7 +43,7 @@ static int parseargs(int ac, char **av, wctparms* parms) {
     int val = 0;
     int debug = dbg_lvl();
 
-    while((c = getopt(ac,av,"db:o:r:f:u:s:l:L:R:C:B:t:")) != EOF) {
+    while((c = getopt(ac,av,"db:o:r:f:u:s:l:L:R:C:B:t:z:")) != EOF) {
         switch(c) {
         case 'd':
             ++(debug);
@@ -107,6 +108,9 @@ static int parseargs(int ac, char **av, wctparms* parms) {
         case 'S':
             val = wctparms_set_stab_technique(parms, atoi(optarg));
             CCcheck_val(val, "Failed in wctparms_set_stab_technique");
+        case 'z':
+            val = wctparms_set_solver(parms, atoi(optarg));
+            CCcheck_val(val, "Failed in wctparms_set_solver");
 
         default:
             usage(av[0]);
@@ -139,7 +143,7 @@ static int get_problem_name(char* pname,const char* efname)
     int    rval = 0;
     int    len = 0;
     const char * fname = strrchr(efname,'/');
-    char * lastdot = strrchr(efname,'.');
+    const char * lastdot = strrchr(efname,'.');
     if(!fname) {
         fname = efname;
     } else {

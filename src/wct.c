@@ -258,7 +258,7 @@ void wctdata_init( wctdata *pd )
 
 
     pd->upper_bound = INT_MAX;
-    pd->lower_bound = 0;
+    pd->lower_bound = INT_MAX;
     pd->dbl_safe_lower_bound = 0.0;
     pd->dbl_est_lower_bound = 0.0;
     pd->lower_scaled_bound = 1;
@@ -276,6 +276,7 @@ void wctdata_init( wctdata *pd )
     pd->pi_sep = (double *) NULL;
     /*Initialization pricing_problem*/
     pd->solver = (PricerSolver*) NULL;
+    pd->nnonimprovements = 0;
 
     /*Initialization of Scheduleset*/
     pd->ccount = 0;
@@ -586,12 +587,14 @@ int compute_objective( wctdata *pd )
     /** Get the LP lower bound and compute the lower bound of WCT */
     val = wctlp_objval( pd->LP, &( pd->LP_lower_bound ) );
     CCcheck_val_2( val, "pmclp_objval failed" );
-    pd->lower_bound = ( int ) ceil( pd->LP_lower_bound );
+    if(pd->lower_bound > ( int ) ceil( pd->LP_lower_bound )) {
+        pd->lower_bound = ( int ) ceil( pd->LP_lower_bound );
+    }
 
 
     //if ( dbg_lvl() > 0 )
     //{
-        printf( "Current primal LP objective: %19.16f  (LP_dual-solver %19.16f).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual );
+        printf( "Current primal LP objective: %19.16f  (LP_dual-bound %19.16f, lowerbound = %d).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual, pd->lower_bound );
     //}
 
 CLEAN:
@@ -1886,8 +1889,17 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
             val = wctlp_addcol(pd->LP, pd->newsets[j].count + 1, pd->newsets[j].members, pd->coef, pd->newsets[j].totwct, 0.0, 1.0, wctlp_CONT, NULL);
             CCcheck_val_2( val, "pmclp_addcol failed" );
         }
-                
-        break_while_loop = ( pd->nnewsets == 0 || nnonimprovements > 5 );
+        switch(status){
+            case GRB_OPTIMAL:
+                switch(parms->stab_technique){
+                    case stab_wentgnes:
+                        break_while_loop = ( CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001 || pd->nnonimprovements > 5); 
+                        break;
+                    case no_stab:
+                        break_while_loop = ( pd->nnewsets == 0 || nnonimprovements > 5 );
+                        break;
+                }
+        }
         add_newsets( pd );
 
         CCutil_suspend_timer( &( problem->tot_cputime ) );
