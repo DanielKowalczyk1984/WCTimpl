@@ -125,6 +125,30 @@ extern "C" {
         }
     }
 
+    void compute_subgradient(Optimal_Solution<double> &sol, double *sub_gradient, int nbjobs, int nbmachines){
+        fill_dbl(sub_gradient, nbjobs, 0.0);
+        sub_gradient[nbjobs] = nbmachines;
+        for(auto &v: sol.jobs){
+            sub_gradient[v] -= 1.0;
+        }
+        sub_gradient[nbjobs] -= 1.0;
+    }
+
+    void adjust_alpha(double *pi_out, double *pi_in, double *subgradient, int nbjobs, double &alpha){
+        double sum = 0.0;
+
+        for(int i = 0; i <nbjobs; ++i) {
+            sum += subgradient[i]*(pi_out[i] - pi_in[i]);
+        }
+
+        if(sum > 0) {
+            alpha = alpha + (1 - alpha)*0.1;
+        } else {
+            alpha = CC_MAX(0,alpha - 0.01);
+        }
+
+    }
+
     void compute_pi_eta_sep(int vcount, double *pi_sep, double *eta_sep, double alpha, double *pi_in, double *eta_in, double *pi_out, double *eta_out)
     {
         int i;
@@ -187,7 +211,7 @@ extern "C" {
             }
             break;
             case DP_solver:
-            if(sol.obj > 0.000001) {
+            if(sol.obj < -0.000001) {
                 val = construct_sol<double,true>(&(pd->newsets), &(pd->nnewsets), sol, pd->njobs);
                 CCcheck_val_2(val, "Failed in construction of solution");
             } else {
@@ -205,19 +229,21 @@ extern "C" {
         PricerSolver *solver = pd->solver;
         Optimal_Solution<double> sol;
         
-        heading_in =  (pd->eta_in == 0.0) ? 1 : !(CC_OURABS((pd->eta_out - pd->eta_in)/(pd->eta_in)) < 2.0);
+        heading_in =  (pd->eta_in == 0.0) ? 1 : !(CC_OURABS((pd->eta_out - pd->eta_in)/(pd->eta_in)) < 8.0);
 
         if(heading_in) {
             double result;
             compute_sol_stab(solver, parms, pd->pi, &sol);
+            //compute_subgradient(sol, pd->subgradient, pd->njobs, pd->nmachines);
+            //adjust_alpha(pd->pi_out, pd->pi_in, pd->subgradient, pd->njobs, pd->alpha);
             result = compute_lagrange_bdd(sol, pd->pi, pd->njobs, pd->nmachines);
 
             if(result > pd->eta_in) {
                 pd->eta_in = result;
-                memcpy(pd->pi_in, pd->pi, sizeof(double)*pd->njobs);
+                memcpy(pd->pi_in, pd->pi, sizeof(double)*pd->njobs + 1);
             }
 
-            val = construct_sol_stab(pd, parms,sol);
+            val = construct_sol_stab(pd, parms,sol); 
             CCcheck_val_2(val, "Failed in construct solution");
 
         } else {
@@ -226,7 +252,7 @@ extern "C" {
 
             do {
                 k += 1.0;
-                alpha = CC_MAX(0, 1.0 - k * (1 - pd->alpha));
+                alpha = CC_MAX(0, 1.0 - k * (1.0 - pd->alpha));
                 double  result;
 
                 compute_pi_eta_sep(pd->njobs, pd->pi_sep, &(pd->eta_sep), alpha, pd->pi_in, &(pd->eta_in), pd->pi_out, &(pd->eta_out));
@@ -235,29 +261,32 @@ extern "C" {
 
                 if(result < pd->eta_sep) {
                     val = construct_sol_stab(pd, parms, sol);
-                    CCcheck_val_2(val, "Failed in construct_sol_stab"); 
+                    CCcheck_val_2(val, "Failed in construct_sol_stab");
+                    // compute_subgradient(sol, pd->subgradient, pd->njobs, pd->nmachines);
+                    // adjust_alpha(pd->pi_out, pd->pi_in, pd->subgradient, pd->njobs, alpha);
 
                     if(result > pd->eta_in) {
                         pd->eta_in = result;
-                        memcpy(pd->pi_in, pd->pi_sep, sizeof(double)*pd->njobs);
+                        memcpy(pd->pi_in, pd->pi_sep, sizeof(double)*pd->njobs + 1);
                     }
                 } else {
                     pd->eta_in = result;
-                    memcpy(pd->pi_in, pd->pi_sep, sizeof(double)*pd->njobs);
-                    result = compute_lagrange_bdd(sol, pd->pi_out, pd->njobs, pd->nmachines);
+                    memcpy(pd->pi_in, pd->pi_sep, sizeof(double)*pd->njobs + 1);
+                    //result = compute_lagrange_bdd(sol, pd->pi_out, pd->njobs, pd->nmachines);
 
-                    if(result < pd->eta_out) {
-                        val = construct_sol_stab(pd, parms, sol);
-                        CCcheck_val_2(val, "Failed in construct_sol_stab"); 
-                    }
+                    // if(result < pd->eta_out) {
+                    //     val = construct_sol_stab(pd, parms, sol);
+                    //     CCcheck_val_2(val, "Failed in construct_sol_stab"); 
+                    // }
 
                 }
-            } while(pd->nnewsets == 0 && alpha > 0.0);
+            } while(pd->nnewsets == 0 && alpha > 0.0);/** mispricing check */
+            //pd->alpha = alpha;
         }
 
-        if(dbg_lvl() > 1) {
-            printf("heading = %d, result of primal bound and Lagragian bound: out =%f, in = %f\n",heading_in, pd->eta_out, pd->eta_in);
-        }
+        //if(dbg_lvl() > 1) {
+            printf("heading = %d, alpha = %f, result of primal bound and Lagragian bound: out =%f, in = %f\n",heading_in, pd->alpha, pd->eta_out, pd->eta_in);
+        //}
 
     CLEAN:
         return val;

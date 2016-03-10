@@ -131,8 +131,6 @@ public:
     T* obj;
     bool* take;
     const std::vector<int> *weight;
-    PricerWeightZDD(std::vector<int> *_weight):obj(0), take(0), weight(_weight){
-    };
 
     PricerWeightZDD():obj(0), take(0), weight(0){
     };
@@ -153,8 +151,8 @@ public:
         obj = new T[max + 1];
         take = new bool[max + 1];
         weight = v;
-        for (std::vector<int>::const_iterator i = v->begin(); i != v->end(); ++i){
-            take[*i] = false;
+        for (auto &i: *v){
+            take[i] = false;
         }
     }
 

@@ -139,6 +139,7 @@ struct wctdata {
     double *pi_in;
     double *pi_out;
     double *pi_sep;
+    double *subgradient;
     double eta_in;
     double eta_out;
     double eta_sep;

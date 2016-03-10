@@ -75,7 +75,7 @@ public:
         /** Allocate memory to terminal nodes */
         zdd_table[0].resize(m);
         for (size_t j = 0; j < m; ++j) {
-            zdd_table[0][j].alloc_terminal_node(H_min, H_max, 1000, j);
+            zdd_table[0][j].alloc_terminal_node(H_min, H_max, 2000, j);
         }
 
         /** Allocate memory to the other nodes */

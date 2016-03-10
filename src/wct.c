@@ -105,7 +105,6 @@ int read_problem( char *f, int *njobs, int **durationlist, int **weightlist )
             duration[curjob] = curduration;
             data = strtok( NULL, delim );
             curjob++;
-
         }
     }
 
@@ -274,6 +273,7 @@ void wctdata_init( wctdata *pd )
     pd->pi_in = (double *) NULL;
     pd->pi_out = (double *) NULL;
     pd->pi_sep = (double *) NULL;
+    pd->subgradient = (double *) NULL;
     pd->alpha = 0.8;
     /*Initialization pricing_problem*/
     pd->solver = (PricerSolver*) NULL;
@@ -306,44 +306,39 @@ void wctdata_init( wctdata *pd )
 
 void lpwctdata_free( wctdata *pd )
 {
-    if ( pd->LP )
-    {
+    if ( pd->LP ){
         wctlp_free( &( pd->LP ) );
     }
 
-    if ( pd->coef )
-    {
+    if ( pd->coef ){
         free( pd->coef );
         pd->coef = ( double *)NULL;
     }
 
-    if ( pd->pi )
-    {
+    if ( pd->pi ){
         free( pd->pi );
         pd->pi = ( double *) NULL;
     }
 
-    if ( pd->x )
-    {
+    if ( pd->x ){
         free( pd->x );
         pd->x = ( double *)NULL;
     }
 
 
-    if ( pd->kpc_pi )
-    {
+    if ( pd->kpc_pi ){
         free( pd->kpc_pi );
         pd->kpc_pi = ( int *)NULL;
     }
 
-    if (pd->solver)
-    {
+    if (pd->solver){
         deletePricerSolver(pd->solver);
     }
 
     CC_IFFREE(pd->pi_out, double);
     CC_IFFREE(pd->pi_in, double);
     CC_IFFREE(pd->pi_sep, double);
+    CC_IFFREE(pd->subgradient, double);
 
     heur_free( pd );
     Schedulesets_free( &( pd->newsets ), &( pd->nnewsets ) );
@@ -1817,6 +1812,8 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
     CCcheck_NULL_2(pd->pi_out, "Failed to allocate memory");
     pd->pi_sep = CC_SAFE_MALLOC(pd->njobs + 1, double);
     CCcheck_NULL_2(pd->pi_sep, "Failed to allocate memory");
+    pd->subgradient = CC_SAFE_MALLOC(pd->njobs + 1, double);
+    CCcheck_NULL_2(pd->subgradient, "Failed to allocate memory");
 
     do
     {
