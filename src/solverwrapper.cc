@@ -25,7 +25,7 @@ int construct_sol(Scheduleset **set, int *nnewsets, Optimal_Solution<T> &sol, in
     newset->count = sol.jobs.size();
     newset->members[sol.jobs.size()] = nbjobs;
     *set= newset;
-        *nnewsets = 1;
+    *nnewsets = 1;
 
     CLEAN:
     if(val) {
