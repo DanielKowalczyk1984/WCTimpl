@@ -208,12 +208,13 @@ void wctproblem_init( wctproblem *problem )
     problem->found = 0;
 
     /*CPU timer initialisation*/
-    CCutil_init_timer( &( problem->tot_branching_cputime ),
-                       "tot_branching_cputime" );
     CCutil_init_timer( &( problem->tot_cputime ), "tot_cputime" );
-    CCutil_init_timer( &( problem->tot_lb_cpu_time ), "tot_lb_cpu_time" );
-    CCutil_init_timer( &( problem->tot_lb ), "tot_lb" );
     CCutil_init_timer( &( problem->tot_scatter_search ), "tot_scatter_search" );
+    CCutil_init_timer( &( problem->tot_branch_and_bound ), "tot_branch_and_bound" );
+    CCutil_init_timer( &( problem->tot_lb_lp_root), "tot_lb_lp_root");
+    CCutil_init_timer( &( problem->tot_build_dd), "tot_build_dd");
+    CCutil_init_timer( &( problem->tot_lb_lp ), "tot_lb_lp" );
+    CCutil_init_timer( &( problem->tot_lb ), "tot_lb" );
     CCutil_init_timer( &( problem->tot_pricing ), "tot_pricing" );
 
     /* Scatter sear init*/
@@ -274,6 +275,7 @@ void wctdata_init( wctdata *pd )
     pd->pi_out = (double *) NULL;
     pd->pi_sep = (double *) NULL;
     pd->subgradient = (double *) NULL;
+    pd->subgradient_in = (double *) NULL;
     pd->alpha = 0.8;
     /*Initialization pricing_problem*/
     pd->solver = (PricerSolver*) NULL;
@@ -339,6 +341,7 @@ void lpwctdata_free( wctdata *pd )
     CC_IFFREE(pd->pi_in, double);
     CC_IFFREE(pd->pi_sep, double);
     CC_IFFREE(pd->subgradient, double);
+    CC_IFFREE(pd->subgradient_in, double);
 
     heur_free( pd );
     Schedulesets_free( &( pd->newsets ), &( pd->nnewsets ) );
@@ -1507,12 +1510,12 @@ int sequential_branching( wctproblem *problem )
     pmcheap *br_heap = problem->br_heap;
     wctparms *parms = &( problem->parms );
     printf( "ENTERED SEQUANTIAL BRANCHING:\n" );
-    CCutil_suspend_timer( &problem->tot_branching_cputime );
+    CCutil_suspend_timer( &problem->tot_branch_and_bound );
 
     while ( ( pd = ( wctdata *) pmcheap_min( br_heap ) )
-            && problem->tot_branching_cputime.cum_zeit < parms->branching_cpu_limit )
+            && problem->tot_branch_and_bound.cum_zeit < parms->branching_cpu_limit )
     {
-        CCutil_resume_timer( &problem->tot_branching_cputime );
+        CCutil_resume_timer( &problem->tot_branch_and_bound );
         int i;
         pd->upper_bound = problem->global_upper_bound;
         if ( pd->lower_bound >= pd->upper_bound)
@@ -1556,10 +1559,10 @@ int sequential_branching( wctproblem *problem )
             /** Check for integer solutions */
         }
 
-        CCutil_suspend_timer( &problem->tot_branching_cputime );
+        CCutil_suspend_timer( &problem->tot_branch_and_bound );
     }
 
-    CCutil_resume_timer( &problem->tot_branching_cputime );
+    CCutil_resume_timer( &problem->tot_branch_and_bound );
 
     if ( pd )
     {
@@ -1774,10 +1777,9 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
     double last_lower_bound = DBL_MAX;
     wctparms *parms = &(problem->parms);
     /* Construction of solver*/
+    CCutil_start_resume_time(&(problem->tot_build_dd));
     pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
-
-    CCutil_timer test;
-    CCutil_init_timer(&test, NULL);
+    CCutil_suspend_timer(&(problem->tot_build_dd));
 
     if ( dbg_lvl() )
     {
@@ -1785,7 +1787,7 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
                 pd->lower_bound, pd->upper_bound, pd->depth, pd->id, pd->opt_track );
     }
 
-    CCutil_start_timer( &( problem->tot_lb_cpu_time ) );
+    CCutil_start_resume_time( &( problem->tot_lb_lp ) );
 
     /** Construct solutions if list of columns is empty */
     if ( !pd->ccount ) {
@@ -1808,12 +1810,15 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
     CCcheck_NULL_2(pd->pi_in, "Failed to allocate memory");
     fill_dbl(pd->pi_in, pd->njobs, 0.0);
     pd->eta_in= 0.0;
+    pd->subgradient_in = CC_SAFE_MALLOC(pd->njobs + 1, double);
+    CCcheck_NULL_2(pd->subgradient_in, "Failed to allocate memory");
     pd->pi_out = CC_SAFE_MALLOC(pd->njobs + 1, double);
     CCcheck_NULL_2(pd->pi_out, "Failed to allocate memory");
     pd->pi_sep = CC_SAFE_MALLOC(pd->njobs + 1, double);
     CCcheck_NULL_2(pd->pi_sep, "Failed to allocate memory");
     pd->subgradient = CC_SAFE_MALLOC(pd->njobs + 1, double);
     CCcheck_NULL_2(pd->subgradient, "Failed to allocate memory");
+
 
     do
     {
@@ -1961,7 +1966,7 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
     printf("iterations = %d\n", iterations);
 
     fflush( stdout );
-    CCutil_suspend_timer( &( problem->tot_lb_cpu_time ) );
+    CCutil_suspend_timer( &( problem->tot_lb_lp ) );
 CLEAN:
 
     deletePricerSolver(pd->solver);
@@ -2051,24 +2056,26 @@ int compute_schedule( wctproblem *problem )
     /** Transform columns into maximal schedule with  respect to the properties of optimal solutions */
 
     /** Add maximal schedule sets with respect to the properties of optimal solutions */
-    //prune_duplicated_sets( root_pd );
+    prune_duplicated_sets( root_pd );
 
     if ( root_pd->status >= LP_bound_computed )
     {
         val = prefill_heap( root_pd, problem );
         CCcheck_val( val, "Failed in prefill_heap" );
     } else {
+        CCutil_start_timer(&(problem->tot_lb_lp_root));
         val = compute_lower_bound( problem, root_pd );
         CCcheck_val_2( val, "Failed in compute_lower_bound" );
+        CCutil_stop_timer(&(problem->tot_lb_lp_root), 0);
 
         //val = insert_into_branching_heap( root_pd, problem );
         CCcheck_val_2( val, "insert_into_branching_heap failed" );
     }
 
-    CCutil_start_resume_time( &( problem->tot_branching_cputime ) );
+    CCutil_start_resume_time( &( problem->tot_branch_and_bound ) );
     //val = sequential_branching( problem );
     CCcheck_val( val, "Failed in sequential_branching" );
-    CCutil_suspend_timer( &( problem->tot_branching_cputime ) );
+    CCutil_suspend_timer( &( problem->tot_branch_and_bound ) );
 
 
 CLEAN:

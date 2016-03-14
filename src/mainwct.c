@@ -190,7 +190,7 @@ static int print_to_csv(wctproblem *problem) {
         fprintf( file, "%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n", "NameInstance","tot_Real_time", "tot_cputime",
                  "tot_lb", "tot_feasible_cputime",
                  "tot_lb_cpu_time",
-                 "tot_branching_cpu_time", "tot_scatter_search","tot_kpc",
+                 "tot_branch_and_bound", "tot_scatter_search","tot_kpc",
                  "rel_error", "status","global_lower_bound","global_upper_bound",
                  "first_lower_bound","first_upper_bound","first_rel_error",
                  "maxdepth" );
@@ -201,8 +201,8 @@ static int print_to_csv(wctproblem *problem) {
             problem->real_time,
             problem->tot_cputime.cum_zeit,
             problem->tot_lb.cum_zeit,
-            problem->tot_lb_cpu_time.cum_zeit,
-            problem->tot_branching_cputime.cum_zeit,
+            problem->tot_lb_lp.cum_zeit,
+            problem->tot_branch_and_bound.cum_zeit,
             problem->tot_scatter_search.cum_zeit,
             problem->tot_pricing.cum_zeit,
             problem->rel_error,
@@ -230,21 +230,21 @@ static int print_to_screen(wctproblem *problem) {
     case meta_heur:
         printf("The suboptimal schedule with relative error %f is given by:\n",(double) (problem->global_upper_bound - problem->global_lower_bound)/(problem->global_lower_bound));
         //print_schedule(problem->bestschedule, problem->nbestschedule);
-        printf("Compute_schedule took %f seconds(tot_scatter_search %f, tot_branching_cputime %f, tot_lb_cpu_time %f) and %f seconds in real time\n",
+        printf("Compute_schedule took %f seconds(tot_scatter_search %f, tot_branch_and_bound %f, tot_lb_cpu_time %f) and %f seconds in real time\n",
                problem->tot_cputime.cum_zeit,
                problem->tot_scatter_search.cum_zeit,
-               problem->tot_branching_cputime.cum_zeit,
-               problem->tot_lb_cpu_time.cum_zeit,
+               problem->tot_branch_and_bound.cum_zeit,
+               problem->tot_lb_lp.cum_zeit,
                problem->real_time);
         break;
     case optimal:
         printf("The optimal schedule is given by:\n");
         print_schedule(problem->bestschedule, problem->nbestschedule);
-        printf("Compute_schedule took %f seconds(tot_scatter_search %f, tot_branching_cputime %f, tot_lb_cpu_time %f) and %f seconds in real time\n",
+        printf("Compute_schedule took %f seconds(tot_scatter_search %f, tot_branch_and_bound %f, tot_lb_cpu_time %f) and %f seconds in real time\n",
                problem->tot_cputime.cum_zeit,
                problem->tot_scatter_search.cum_zeit,
-               problem->tot_branching_cputime.cum_zeit,
-               problem->tot_lb_cpu_time.cum_zeit,
+               problem->tot_branch_and_bound.cum_zeit,
+               problem->tot_lb_lp.cum_zeit,
                problem->real_time);
         break;
     }

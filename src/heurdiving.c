@@ -564,7 +564,6 @@ int heur_compute_lower_bound( wctproblem *problem, wctdata *pd )
     }
 
     
-    CCutil_start_timer( &( problem->tot_lb_cpu_time ) );
     start_time = CCutil_zeit();
     assert( pd->ccount );
     assert( pd->gallocated >= pd->ccount );
@@ -654,7 +653,6 @@ int heur_compute_lower_bound( wctproblem *problem, wctdata *pd )
     }
 
     fflush( stdout );
-    CCutil_suspend_timer( &( problem->tot_lb_cpu_time ) );
 CLEAN:
 
     return val;

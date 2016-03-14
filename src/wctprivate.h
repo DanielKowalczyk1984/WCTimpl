@@ -140,6 +140,7 @@ struct wctdata {
     double *pi_out;
     double *pi_sep;
     double *subgradient;
+    double *subgradient_in;
     double eta_in;
     double eta_out;
     double eta_sep;
@@ -219,12 +220,17 @@ struct wctproblem{
     int mult_key;
     int found;
     /*Cpu time measurement*/
+    CCutil_timer tot_build_dd;  
+
     CCutil_timer tot_cputime;
-    CCutil_timer tot_branching_cputime;
+    CCutil_timer tot_branch_and_bound;
     CCutil_timer tot_lb;
-    CCutil_timer tot_lb_cpu_time;
-    CCutil_timer tot_scatter_search;
+
+    CCutil_timer tot_lb_lp_root;
+    CCutil_timer tot_lb_lp;
     CCutil_timer tot_pricing;
+    
+    CCutil_timer tot_scatter_search;
     double real_time;
 };
 
