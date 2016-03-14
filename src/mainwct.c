@@ -21,20 +21,15 @@
 static void usage(char* f) {
     fprintf(stderr, "Usage %s: [-see below-] adjlist_file NrMachines\n",f);
     fprintf(stderr, "   -d      turn on the debugging\n");
-    fprintf(stderr, "   -b d    write intermediate solutions to dir d\n");
-    fprintf(stderr, "   -o f    write coloring to file f\n");
     fprintf(stderr, "   -f n    Number of feasible solutions that have to be constructed\n");
-    fprintf(stderr, "   -u int  initial upper bound\n");
-    fprintf(stderr, "   -s int  Node selection: 0= none, 1= minimum lower bound(default), 2 = DFS\n");
-    fprintf(stderr, "   -l dbl  cpu time limit for branching\n");
-    fprintf(stderr, "   -L dbl  cpu time limit for scatter search\n");
-    fprintf(stderr, "   -R int  Rounding Strategy: 0 = neighbor_rounding(default), 1 = neighbor rounding, 2 = no_rounding\n");
-    fprintf(stderr, "   -C int  Combine Method: 0 = Pathrelinking, 1 = PM\n");
-    fprintf(stderr, "   -r int  Scatter Search use: 0 = no scatter search(default), 1 = scatter search\n");
+    fprintf(stderr, "   -s int  Node selection: 0 = none, 1= minimum lower bound(default), 2 = DFS\n");
+    fprintf(stderr, "   -l dbl  Cpu time limit for branching\n");
+    fprintf(stderr, "   -L dbl  Cpu time limit for scatter search\n");
+    fprintf(stderr, "   -C int  Combine method scatter search: 0 = Pathrelinking, 1 = PM\n");
+    fprintf(stderr, "   -r int  Scatter search use: 0 = no scatter search(default), 1 = scatter search\n");
     fprintf(stderr, "   -B int  Branch and Bound use: 0 = no branch and bound(default), 1 = use branch and bound\n");
-    fprintf(stderr, "   -t int  Dual Variable type: 0 = double(default), 1 = integer\n");
     fprintf(stderr, "   -S int  Stabilization technique: 0 = no stabilization(default), 1 = stabilization wentgnes\n");
-    fprintf(stderr, "   -z int  pricing solver technique: 0 = BDD(default), 1 = ZDD, 2 = DP\n");
+    fprintf(stderr, "   -z int  Pricing solver technique: 0 = BDD(default), 1 = ZDD, 2 = DP\n");
 }
 
 
@@ -43,19 +38,11 @@ static int parseargs(int ac, char **av, wctparms* parms) {
     int val = 0;
     int debug = dbg_lvl();
 
-    while((c = getopt(ac,av,"db:o:r:f:u:s:l:L:R:C:B:t:z:S:")) != EOF) {
+    while((c = getopt(ac,av,"dr:f:s:l:L:C:B:z:S:")) != EOF) {
         switch(c) {
         case 'd':
             ++(debug);
             set_dbg_lvl(debug);
-            break;
-        case 'b':
-            val = wctparms_set_backupdir(parms,optarg);
-            CCcheck_val(val,"Failed backupdir");
-            break;
-        case 'o':
-            val = wctparms_set_outfile(parms,optarg);
-            CCcheck_val(val,"Failed set outfile");
             break;
         case 'r':
             val = wctparms_set_scatter_search(parms,atoi(optarg));
@@ -65,21 +52,9 @@ static int parseargs(int ac, char **av, wctparms* parms) {
             val = wctparms_set_nb_feas_sol(parms, atoi(optarg));
             CCcheck_val(val, "Failed number feasible solutions");
             break;
-        case 'R':
-            val = wctparms_set_rounding_strategy(parms,atoi(optarg));
-            CCcheck_val(val,"Failed set_rounding_strategy");
-            break;
-        case 'w':
-            val = wctparms_set_cclasses_outfile(parms,optarg);
-            CCcheck_val(val,"Failed cclasses_outfile");
-            break;
         case 'c':
             val = wctparms_set_color_infile(parms,optarg);
             CCcheck_val(val,"Failed set_color_infile");
-            break;
-        case 'u':
-            val = wctparms_set_init_upper_bound(parms,atoi(optarg));
-            CCcheck_val(val,"Failed set init_upper_bound");
             break;
         case 's':
             val = wctparms_set_branching_strategy(parms,atoi(optarg));
@@ -100,10 +75,6 @@ static int parseargs(int ac, char **av, wctparms* parms) {
         case 'B':
             val = wctparms_set_branchandbound(parms, atoi(optarg));
             CCcheck_val(val, "Failed wctparms_set_branchandbound");
-            break;
-        case 't':
-            val = wctparms_set_dual_var_type(parms, atoi(optarg));
-            CCcheck_val(val, "Failed in wct_set_dual_var_type");
             break;
         case 'S':
             val = wctparms_set_stab_technique(parms, atoi(optarg));
