@@ -25,14 +25,9 @@ int construct_sol(Scheduleset **set, int *nnewsets, Optimal_Solution<T> &sol, in
     newset->totwct = sol.cost;
     newset->count = sol.jobs.size();
     newset->members[sol.jobs.size()] = nbjobs;
-<<<<<<< HEAD
-    *set= newset;
-    *nnewsets = 1;
-=======
     *set = newset;
     *nnewsets = 1;
 CLEAN:
->>>>>>> Hybrid_smoothing
 
     if (val) {
         Schedulesets_free(&(newset), &(nbset));
