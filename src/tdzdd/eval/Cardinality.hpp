@@ -31,155 +31,176 @@
 #include "../util/MemoryPool.hpp"
 #include "../util/MyVector.hpp"
 
-namespace tdzdd {
+namespace tdzdd
+{
 
-template<typename E, typename T, bool BDD>
-class CardinalityBase: public DdEval<E,T> {
-    int numVars;
-    int topLevel;
+    template<typename E, typename T, bool BDD>
+    class CardinalityBase: public DdEval<E, T>
+    {
+            int numVars;
+            int topLevel;
 
-public:
-    CardinalityBase(int numVars = 0)
-            : numVars(numVars), topLevel(0) {
-    }
-
-    void initialize(int level) {
-        topLevel = level;
-    }
-
-    void evalTerminal(T& n, bool one) const {
-        n = one ? 1 : 0;
-    }
-
-    template<int ARITY>
-    void evalNode(T& n, int i, DdValues<T,ARITY> const& values) const {
-        if (BDD) {
-            n = 0;
-            for (int b = 0; b < ARITY; ++b) {
-                T tmp = values.get(b);
-                int ii = values.getLevel(b);
-                while (++ii < i) {
-                    tmp *= 2;
-                }
-                n += tmp;
+        public:
+            CardinalityBase(int numVars = 0)
+                : numVars(numVars), topLevel(0)
+            {
             }
-        }
-        else {
-            n = 0;
-            for (int b = 0; b < ARITY; ++b) {
-                n += values.get(b);
+
+            void initialize(int level)
+            {
+                topLevel = level;
             }
-        }
-    }
 
-    T getValue(T const& n) {
-        if (BDD) {
-            T tmp = n;
-            for (int i = topLevel; i < numVars; ++i) {
-                tmp *= 2;
+            void evalTerminal(T &n, bool one) const
+            {
+                n = one ? 1 : 0;
             }
-            return tmp;
-        }
-        else {
-            return n;
-        }
-    }
-};
 
-template<typename E, bool BDD>
-class CardinalityBase<E,std::string,BDD> :
-        public DdEval<E,BigNumber,std::string> {
-    int numVars;
-    int topLevel;
-    MemoryPools pools;
-    BigNumber tmp1;
-    BigNumber tmp2;
+            template<int ARITY>
+            void evalNode(T &n, int i, DdValues<T, ARITY> const &values) const
+            {
+                if (BDD) {
+                    n = 0;
 
-public:
-    CardinalityBase(int numVars = 0)
-            : numVars(numVars), topLevel(0) {
-    }
+                    for (int b = 0; b < ARITY; ++b) {
+                        T tmp = values.get(b);
+                        int ii = values.getLevel(b);
 
-    void initialize(int level) {
-        topLevel = level;
-        pools.resize(topLevel + 1);
+                        while (++ii < i) {
+                            tmp *= 2;
+                        }
 
-        size_t max = topLevel / 63 + 1;
-        tmp1.setArray(pools[topLevel].template allocate<uint64_t>(max));
-        tmp2.setArray(pools[topLevel].template allocate<uint64_t>(max));
-    }
+                        n += tmp;
+                    }
+                } else {
+                    n = 0;
 
-    void evalTerminal(BigNumber& n, int value) {
-        n.setArray(pools[0].template allocate<uint64_t>(1));
-        n.store(value);
-    }
-
-    template<int ARITY>
-    void evalNode(BigNumber& n, int i, DdValues<BigNumber,ARITY> const& values) {
-        assert(size_t(i) <= pools.size());
-        if (BDD) {
-            int w = tmp1.store(0);
-            for (int b = 0; b < ARITY; ++b) {
-                tmp2.store(values.get(b));
-                tmp2.shiftLeft(i - values.getLevel(b) - 1);
-                w = tmp1.add(tmp2);
-            }
-            n.setArray(pools[i].template allocate<uint64_t>(w));
-            n.store(tmp1);
-        }
-        else {
-            int w;
-            if (ARITY <= 0) {
-                w = tmp1.store(0);
-            }
-            else {
-                w = tmp1.store(values.get(0));
-                for (int b = 1; b < ARITY; ++b) {
-                    w = tmp1.add(values.get(b));
+                    for (int b = 0; b < ARITY; ++b) {
+                        n += values.get(b);
+                    }
                 }
             }
-            n.setArray(pools[i].template allocate<uint64_t>(w));
-            n.store(tmp1);
+
+            T getValue(T const &n)
+            {
+                if (BDD) {
+                    T tmp = n;
+
+                    for (int i = topLevel; i < numVars; ++i) {
+                        tmp *= 2;
+                    }
+
+                    return tmp;
+                } else {
+                    return n;
+                }
+            }
+    };
+
+    template<typename E, bool BDD>
+    class CardinalityBase<E, std::string, BDD> :
+        public DdEval<E, BigNumber, std::string>
+    {
+            int numVars;
+            int topLevel;
+            MemoryPools pools;
+            BigNumber tmp1;
+            BigNumber tmp2;
+
+        public:
+            CardinalityBase(int numVars = 0)
+                : numVars(numVars), topLevel(0)
+            {
+            }
+
+            void initialize(int level)
+            {
+                topLevel = level;
+                pools.resize(topLevel + 1);
+                size_t max = topLevel / 63 + 1;
+                tmp1.setArray(pools[topLevel].template allocate<uint64_t>(max));
+                tmp2.setArray(pools[topLevel].template allocate<uint64_t>(max));
+            }
+
+            void evalTerminal(BigNumber &n, int value)
+            {
+                n.setArray(pools[0].template allocate<uint64_t>(1));
+                n.store(value);
+            }
+
+            template<int ARITY>
+            void evalNode(BigNumber &n, int i, DdValues<BigNumber, ARITY> const &values)
+            {
+                assert(size_t(i) <= pools.size());
+
+                if (BDD) {
+                    int w = tmp1.store(0);
+
+                    for (int b = 0; b < ARITY; ++b) {
+                        tmp2.store(values.get(b));
+                        tmp2.shiftLeft(i - values.getLevel(b) - 1);
+                        w = tmp1.add(tmp2);
+                    }
+
+                    n.setArray(pools[i].template allocate<uint64_t>(w));
+                    n.store(tmp1);
+                } else {
+                    int w;
+
+                    if (ARITY <= 0) {
+                        w = tmp1.store(0);
+                    } else {
+                        w = tmp1.store(values.get(0));
+
+                        for (int b = 1; b < ARITY; ++b) {
+                            w = tmp1.add(values.get(b));
+                        }
+                    }
+
+                    n.setArray(pools[i].template allocate<uint64_t>(w));
+                    n.store(tmp1);
+                }
+            }
+
+            std::string getValue(BigNumber const &n)
+            {
+                if (BDD) {
+                    tmp1.store(n);
+                    tmp1.shiftLeft(numVars - topLevel);
+                    return tmp1;
+                } else {
+                    return n;
+                }
+            }
+
+            void destructLevel(int i)
+            {
+                pools[i].clear();
+            }
+    };
+
+    /**
+     * BDD evaluator that counts the number of elements.
+     * @tparam T data type for counting the number,
+     *          which can be integral, real, or std::string.
+     * @tparam ARITY arity of the nodes.
+     */
+    template<typename T = std::string>
+    struct BddCardinality: public CardinalityBase<BddCardinality<T>, T, true> {
+        BddCardinality(int numVars)
+            : CardinalityBase<BddCardinality<T>, T, true>(numVars)
+        {
         }
-    }
+    };
 
-    std::string getValue(BigNumber const& n) {
-        if (BDD) {
-            tmp1.store(n);
-            tmp1.shiftLeft(numVars - topLevel);
-            return tmp1;
-        }
-        else {
-            return n;
-        }
-    }
-
-    void destructLevel(int i) {
-        pools[i].clear();
-    }
-};
-
-/**
- * BDD evaluator that counts the number of elements.
- * @tparam T data type for counting the number,
- *          which can be integral, real, or std::string.
- * @tparam ARITY arity of the nodes.
- */
-template<typename T = std::string>
-struct BddCardinality: public CardinalityBase<BddCardinality<T>,T,true> {
-    BddCardinality(int numVars)
-            : CardinalityBase<BddCardinality<T>,T,true>(numVars) {
-    }
-};
-
-/**
- * ZDD evaluator that counts the number of elements.
- * @tparam T data type for counting the number,
- *          which can be integral, real, or std::string.
- * @tparam ARITY arity of the nodes.
- */
-template<typename T = std::string>
-struct ZddCardinality: public CardinalityBase<ZddCardinality<T>,T,false> {
-};
+    /**
+     * ZDD evaluator that counts the number of elements.
+     * @tparam T data type for counting the number,
+     *          which can be integral, real, or std::string.
+     * @tparam ARITY arity of the nodes.
+     */
+    template<typename T = std::string>
+    struct ZddCardinality: public CardinalityBase<ZddCardinality<T>, T, false> {
+    };
 
 } // namespace tdzdd

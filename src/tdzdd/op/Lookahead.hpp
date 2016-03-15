@@ -30,158 +30,191 @@
 
 #include "../DdSpec.hpp"
 
-namespace tdzdd {
+namespace tdzdd
+{
 
-template<typename S>
-class BddLookahead: public DdSpecBase<BddLookahead<S>,S::ARITY> {
-    typedef S Spec;
+    template<typename S>
+    class BddLookahead: public DdSpecBase<BddLookahead<S>, S::ARITY>
+    {
+            typedef S Spec;
 
-    Spec spec;
-    std::vector<char> work0;
-    std::vector<char> work1;
+            Spec spec;
+            std::vector<char> work0;
+            std::vector<char> work1;
 
-    int lookahead(void* p, int level) {
-        while (level >= 1) {
-            spec.get_copy(work0.data(), p);
-            int level0 = spec.get_child(work0.data(), level, 0);
+            int lookahead(void *p, int level)
+            {
+                while (level >= 1) {
+                    spec.get_copy(work0.data(), p);
+                    int level0 = spec.get_child(work0.data(), level, 0);
 
-            for (int b = 1; b < Spec::ARITY; ++b) {
-                spec.get_copy(work1.data(), p);
-                int level1 = spec.get_child(work1.data(), level, b);
-                if (!(level0 == level1
-                        && (level0 <= 0
-                                || spec.equal_to(work0.data(), work1.data(),
-                                        level0)))) {
+                    for (int b = 1; b < Spec::ARITY; ++b) {
+                        spec.get_copy(work1.data(), p);
+                        int level1 = spec.get_child(work1.data(), level, b);
+
+                        if (!(level0 == level1
+                                && (level0 <= 0
+                                    || spec.equal_to(work0.data(), work1.data(),
+                                                     level0)))) {
+                            spec.destruct(work0.data());
+                            spec.destruct(work1.data());
+                            return level;
+                        }
+
+                        spec.destruct(work1.data());
+                    }
+
+                    spec.destruct(p);
+                    spec.get_copy(p, work0.data());
                     spec.destruct(work0.data());
-                    spec.destruct(work1.data());
-                    return level;
+                    level = level0;
                 }
-                spec.destruct(work1.data());
+
+                return level;
             }
 
-            spec.destruct(p);
-            spec.get_copy(p, work0.data());
-            spec.destruct(work0.data());
-            level = level0;
-        }
-
-        return level;
-    }
-
-public:
-    BddLookahead(S const& s)
-            : spec(s), work0(spec.datasize()), work1(spec.datasize()) {
-    }
-
-    int datasize() const {
-        return spec.datasize();
-    }
-
-    int get_root(void* p) {
-        return lookahead(p, spec.get_root(p));
-    }
-
-    int get_child(void* p, int level, int b) {
-        return lookahead(p, spec.get_child(p, level, b));
-    }
-
-    void get_copy(void* to, void const* from) {
-        spec.get_copy(to, from);
-    }
-
-    void destruct(void* p) {
-        spec.destruct(p);
-    }
-
-    void destructLevel(int level) {
-        spec.destructLevel(level);
-    }
-
-    size_t hash_code(void const* p, int level) const {
-        return spec.hash_code(p, level);
-    }
-
-    bool equal_to(void const* p, void const* q, int level) const {
-        return spec.equal_to(p, q, level);
-    }
-
-    void print_state(std::ostream& os, void const* p) const {
-        spec.print_state(os, p);
-    }
-
-    void print_level(std::ostream& os, int level) const {
-        spec.print_level(os, level);
-    }
-};
-
-template<typename S>
-class ZddLookahead: public DdSpecBase<ZddLookahead<S>,S::ARITY> {
-    typedef S Spec;
-
-    Spec spec;
-    std::vector<char> work;
-
-    int lookahead(void* p, int level) {
-        void* const q = work.data();
-        while (level >= 1) {
-            for (int b = 1; b < Spec::ARITY; ++b) {
-                spec.get_copy(q, p);
-                if (spec.get_child(q, level, b) != 0) {
-                    spec.destruct(q);
-                    return level;
-                }
-                spec.destruct(q);
+        public:
+            BddLookahead(S const &s)
+                : spec(s), work0(spec.datasize()), work1(spec.datasize())
+            {
             }
-            level = spec.get_child(p, level, 0);
-        }
 
-        return level;
-    }
+            int datasize() const
+            {
+                return spec.datasize();
+            }
 
-public:
-    ZddLookahead(S const& s)
-            : spec(s), work(spec.datasize()) {
-    }
+            int get_root(void *p)
+            {
+                return lookahead(p, spec.get_root(p));
+            }
 
-    int datasize() const {
-        return spec.datasize();
-    }
+            int get_child(void *p, int level, int b)
+            {
+                return lookahead(p, spec.get_child(p, level, b));
+            }
 
-    int get_root(void* p) {
-        return lookahead(p, spec.get_root(p));
-    }
+            void get_copy(void *to, void const *from)
+            {
+                spec.get_copy(to, from);
+            }
 
-    int get_child(void* p, int level, int b) {
-        return lookahead(p, spec.get_child(p, level, b));
-    }
+            void destruct(void *p)
+            {
+                spec.destruct(p);
+            }
 
-    void get_copy(void* to, void const* from) {
-        spec.get_copy(to, from);
-    }
+            void destructLevel(int level)
+            {
+                spec.destructLevel(level);
+            }
 
-    void destruct(void* p) {
-        spec.destruct(p);
-    }
+            size_t hash_code(void const *p, int level) const
+            {
+                return spec.hash_code(p, level);
+            }
 
-    void destructLevel(int level) {
-        spec.destructLevel(level);
-    }
+            bool equal_to(void const *p, void const *q, int level) const
+            {
+                return spec.equal_to(p, q, level);
+            }
 
-    size_t hash_code(void const* p, int level) const {
-        return spec.hash_code(p, level);
-    }
+            void print_state(std::ostream &os, void const *p) const
+            {
+                spec.print_state(os, p);
+            }
 
-    bool equal_to(void const* p, void const* q, int level) const {
-        return spec.equal_to(p, q, level);
-    }
+            void print_level(std::ostream &os, int level) const
+            {
+                spec.print_level(os, level);
+            }
+    };
 
-    void print_state(std::ostream& os, void const* p) const {
-        spec.print_state(os, p);
-    }
+    template<typename S>
+    class ZddLookahead: public DdSpecBase<ZddLookahead<S>, S::ARITY>
+    {
+            typedef S Spec;
 
-    void print_level(std::ostream& os, int level) const {
-        spec.print_level(os, level);
-    }
-};
+            Spec spec;
+            std::vector<char> work;
+
+            int lookahead(void *p, int level)
+            {
+                void *const q = work.data();
+
+                while (level >= 1) {
+                    for (int b = 1; b < Spec::ARITY; ++b) {
+                        spec.get_copy(q, p);
+
+                        if (spec.get_child(q, level, b) != 0) {
+                            spec.destruct(q);
+                            return level;
+                        }
+
+                        spec.destruct(q);
+                    }
+
+                    level = spec.get_child(p, level, 0);
+                }
+
+                return level;
+            }
+
+        public:
+            ZddLookahead(S const &s)
+                : spec(s), work(spec.datasize())
+            {
+            }
+
+            int datasize() const
+            {
+                return spec.datasize();
+            }
+
+            int get_root(void *p)
+            {
+                return lookahead(p, spec.get_root(p));
+            }
+
+            int get_child(void *p, int level, int b)
+            {
+                return lookahead(p, spec.get_child(p, level, b));
+            }
+
+            void get_copy(void *to, void const *from)
+            {
+                spec.get_copy(to, from);
+            }
+
+            void destruct(void *p)
+            {
+                spec.destruct(p);
+            }
+
+            void destructLevel(int level)
+            {
+                spec.destructLevel(level);
+            }
+
+            size_t hash_code(void const *p, int level) const
+            {
+                return spec.hash_code(p, level);
+            }
+
+            bool equal_to(void const *p, void const *q, int level) const
+            {
+                return spec.equal_to(p, q, level);
+            }
+
+            void print_state(std::ostream &os, void const *p) const
+            {
+                spec.print_state(os, p);
+            }
+
+            void print_level(std::ostream &os, int level) const
+            {
+                spec.print_level(os, level);
+            }
+    };
 
 } // namespace tdzdd

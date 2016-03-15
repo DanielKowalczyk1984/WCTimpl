@@ -28,92 +28,101 @@
 #include "op/Lookahead.hpp"
 #include "op/Unreduction.hpp"
 
-namespace tdzdd {
+namespace tdzdd
+{
 
-/**
- * Returns a BDD specification for logical AND of two BDD specifications.
- * @param spec1 the first BDD specification.
- * @param spec2 the second BDD specification.
- * @return BDD specification for logical AND of @p spec1 and @p spec2.
- */
-template<typename S1, typename S2>
-BddAnd<S1,S2> bddAnd(S1 const& spec1, S2 const& spec2) {
-    return BddAnd<S1,S2>(spec1, spec2);
-}
+    /**
+     * Returns a BDD specification for logical AND of two BDD specifications.
+     * @param spec1 the first BDD specification.
+     * @param spec2 the second BDD specification.
+     * @return BDD specification for logical AND of @p spec1 and @p spec2.
+     */
+    template<typename S1, typename S2>
+    BddAnd<S1, S2> bddAnd(S1 const &spec1, S2 const &spec2)
+    {
+        return BddAnd<S1, S2>(spec1, spec2);
+    }
 
-/**
- * Returns a BDD specification for logical OR of two BDD specifications.
- * @param spec1 the first BDD specification.
- * @param spec2 the second BDD specification.
- * @return BDD specification for logical OR of @p spec1 and @p spec2.
- */
-template<typename S1, typename S2>
-BddOr<S1,S2> bddOr(S1 const& spec1, S2 const& spec2) {
-    return BddOr<S1,S2>(spec1, spec2);
-}
+    /**
+     * Returns a BDD specification for logical OR of two BDD specifications.
+     * @param spec1 the first BDD specification.
+     * @param spec2 the second BDD specification.
+     * @return BDD specification for logical OR of @p spec1 and @p spec2.
+     */
+    template<typename S1, typename S2>
+    BddOr<S1, S2> bddOr(S1 const &spec1, S2 const &spec2)
+    {
+        return BddOr<S1, S2>(spec1, spec2);
+    }
 
-/**
- * Returns a ZDD specification for set intersection of two ZDD specifications.
- * @param spec1 the first ZDD specification.
- * @param spec2 the second ZDD specification.
- * @return ZDD specification for set intersection of @p spec1 and @p spec2.
- */
-template<typename S1, typename S2>
-ZddIntersection<S1,S2> zddIntersection(S1 const& spec1, S2 const& spec2) {
-    return ZddIntersection<S1,S2>(spec1, spec2);
-}
+    /**
+     * Returns a ZDD specification for set intersection of two ZDD specifications.
+     * @param spec1 the first ZDD specification.
+     * @param spec2 the second ZDD specification.
+     * @return ZDD specification for set intersection of @p spec1 and @p spec2.
+     */
+    template<typename S1, typename S2>
+    ZddIntersection<S1, S2> zddIntersection(S1 const &spec1, S2 const &spec2)
+    {
+        return ZddIntersection<S1, S2>(spec1, spec2);
+    }
 
-/**
- * Returns a ZDD specification for set union of two ZDD specifications.
- * @param spec1 the first ZDD specification.
- * @param spec2 the second ZDD specification.
- * @return ZDD specification for set union of @p spec1 and @p spec2.
- */
-template<typename S1, typename S2>
-ZddUnion<S1,S2> zddUnion(S1 const& spec1, S2 const& spec2) {
-    return ZddUnion<S1,S2>(spec1, spec2);
-}
+    /**
+     * Returns a ZDD specification for set union of two ZDD specifications.
+     * @param spec1 the first ZDD specification.
+     * @param spec2 the second ZDD specification.
+     * @return ZDD specification for set union of @p spec1 and @p spec2.
+     */
+    template<typename S1, typename S2>
+    ZddUnion<S1, S2> zddUnion(S1 const &spec1, S2 const &spec2)
+    {
+        return ZddUnion<S1, S2>(spec1, spec2);
+    }
 
-/**
- * Optimizes a BDD specification in terms of the BDD node deletion rule.
- * @param spec original BDD specification.
- * @return optimized BDD specification.
- */
-template<typename S>
-BddLookahead<S> bddLookahead(S const& spec) {
-    return BddLookahead<S>(spec);
-}
+    /**
+     * Optimizes a BDD specification in terms of the BDD node deletion rule.
+     * @param spec original BDD specification.
+     * @return optimized BDD specification.
+     */
+    template<typename S>
+    BddLookahead<S> bddLookahead(S const &spec)
+    {
+        return BddLookahead<S>(spec);
+    }
 
-/**
- * Optimizes a ZDD specification in terms of the ZDD node deletion rule.
- * @param spec original ZDD specification.
- * @return optimized ZDD specification.
- */
-template<typename S>
-ZddLookahead<S> zddLookahead(S const& spec) {
-    return ZddLookahead<S>(spec);
-}
+    /**
+     * Optimizes a ZDD specification in terms of the ZDD node deletion rule.
+     * @param spec original ZDD specification.
+     * @return optimized ZDD specification.
+     */
+    template<typename S>
+    ZddLookahead<S> zddLookahead(S const &spec)
+    {
+        return ZddLookahead<S>(spec);
+    }
 
-/**
- * Creates a QDD specification from a BDD specification by complementing
- * skipped nodes in terms of the BDD node deletion rule.
- * @param spec BDD specification.
- * @return QDD specification.
- */
-template<typename S>
-BddUnreduction<S> bddUnreduction(S const& spec, int numVars) {
-    return BddUnreduction<S>(spec, numVars);
-}
+    /**
+     * Creates a QDD specification from a BDD specification by complementing
+     * skipped nodes in terms of the BDD node deletion rule.
+     * @param spec BDD specification.
+     * @return QDD specification.
+     */
+    template<typename S>
+    BddUnreduction<S> bddUnreduction(S const &spec, int numVars)
+    {
+        return BddUnreduction<S>(spec, numVars);
+    }
 
-/**
- * Creates a QDD specification from a ZDD specification by complementing
- * skipped nodes in terms of the ZDD node deletion rule.
- * @param spec ZDD specification.
- * @return QDD specification.
- */
-template<typename S>
-ZddUnreduction<S> zddUnreduction(S const& spec, int numVars) {
-    return ZddUnreduction<S>(spec, numVars);
-}
+    /**
+     * Creates a QDD specification from a ZDD specification by complementing
+     * skipped nodes in terms of the ZDD node deletion rule.
+     * @param spec ZDD specification.
+     * @return QDD specification.
+     */
+    template<typename S>
+    ZddUnreduction<S> zddUnreduction(S const &spec, int numVars)
+    {
+        return ZddUnreduction<S>(spec, numVars);
+    }
 
 } // namespace tdzdd

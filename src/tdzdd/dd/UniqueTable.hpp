@@ -29,88 +29,104 @@
 #include "../util/MyHashTable.hpp"
 #include "../util/MyVector.hpp"
 
-namespace tdzdd {
+namespace tdzdd
+{
 
-template<int ARITY>
-class UniqueTable {
-    class Hash {
-        MyVector<Node<ARITY> > const& nodes;
+    template<int ARITY>
+    class UniqueTable
+    {
+            class Hash
+            {
+                    MyVector<Node<ARITY> > const &nodes;
 
-    public:
-        Hash()
-                : nodes(MyVector<Node<ARITY> >()) {
-        }
+                public:
+                    Hash()
+                        : nodes(MyVector<Node<ARITY> >())
+                    {
+                    }
 
-        Hash(MyVector<Node<ARITY> > const& nodes)
-                : nodes(nodes) {
-        }
+                    Hash(MyVector<Node<ARITY> > const &nodes)
+                        : nodes(nodes)
+                    {
+                    }
 
-        size_t operator()(size_t j) const {
-            return nodes[j - 1].hash(); // offset = 1
-        }
+                    size_t operator()(size_t j) const
+                    {
+                        return nodes[j - 1].hash(); // offset = 1
+                    }
 
-        bool operator()(size_t j1, size_t j2) const {
-            return nodes[j1 - 1] == nodes[j2 - 1]; // offset = 1
-        }
-    };
+                    bool operator()(size_t j1, size_t j2) const
+                    {
+                        return nodes[j1 - 1] == nodes[j2 - 1]; // offset = 1
+                    }
+            };
 
-    typedef MyHashTable<size_t,Hash,Hash> HashTable;
+            typedef MyHashTable<size_t, Hash, Hash> HashTable;
 
-    NodeTableEntity<ARITY>* nodeTable;
-    MyVector<HashTable> uniqTable;
+            NodeTableEntity<ARITY> *nodeTable;
+            MyVector<HashTable> uniqTable;
 
-public:
-    UniqueTable()
-            : nodeTable(0) {
-    }
-
-    UniqueTable(NodeTableEntity<ARITY>& nodeTable)
-            : nodeTable(&nodeTable) {
-        init();
-    }
-
-    /**
-     * Replaces the node table and rebuilds the unique table.
-     * @param newNodeTable new node table.
-     */
-    void init(NodeTableEntity<ARITY>& newNodeTable) {
-        nodeTable = &newNodeTable;
-        init();
-    }
-
-    /**
-     * Rebuilds the unique table.
-     */
-    void init() {
-        uniqTable.reserve(nodeTable->numRows());
-        uniqTable.resize(1);
-
-        for (int i = 1; i < nodeTable->numRows(); ++i) {
-            typeof((*nodeTable)[i])& nodes = (*nodeTable)[i];
-            size_t m = nodes.size();
-            uniqTable.push_back(HashTable(m * 2, Hash(nodes), Hash(nodes)));
-            HashTable& uniq = uniqTable.back();
-
-            for (size_t j = 0; j < m; ++j) {
-                uniq.add(j + 1); // offset = 1
+        public:
+            UniqueTable()
+                : nodeTable(0)
+            {
             }
-        }
-    }
 
-    /**
-     * Gets a canonical node.
-     * @param i level of the node.
-     * @param node node to be copied.
-     * @return node ID.
-     */
-    NodeId getNode(int i, Node<ARITY> const& node) {
-        typeof((*nodeTable)[i])& nodes = (*nodeTable)[i];
-        nodes.push_back(node);
-        size_t j = nodes.size() - 1;
-        size_t jj = uniqTable[i].add(j + 1) - 1; // offset = 1
-        if (jj != j) nodes.pop_back();
-        return NodeId(i, jj);
-    }
-};
+            UniqueTable(NodeTableEntity<ARITY> &nodeTable)
+                : nodeTable(&nodeTable)
+            {
+                init();
+            }
+
+            /**
+             * Replaces the node table and rebuilds the unique table.
+             * @param newNodeTable new node table.
+             */
+            void init(NodeTableEntity<ARITY> &newNodeTable)
+            {
+                nodeTable = &newNodeTable;
+                init();
+            };
+
+            /**
+             * Rebuilds the unique table.
+             */
+            void init()
+            {
+                uniqTable.reserve(nodeTable->numRows());
+                uniqTable.resize(1);
+
+                for (int i = 1; i < nodeTable->numRows(); ++i) {
+                    typeof((*nodeTable)[i])& nodes = (*nodeTable)[i];
+                    size_t m = nodes.size();
+                    uniqTable.push_back(HashTable(m * 2, Hash(nodes), Hash(nodes)));
+                    HashTable &uniq = uniqTable.back();
+
+                    for (size_t j = 0; j < m; ++j) {
+                        uniq.add(j + 1); // offset = 1
+                    }
+                }
+            }
+
+            /**
+             * Gets a canonical node.
+             * @param i level of the node.
+             * @param node node to be copied.
+             * @return node ID.
+             */
+            NodeId getNode(int i, Node<ARITY> const &node)
+            {
+                typeof((*nodeTable)[i])& nodes = (*nodeTable)[i];
+                nodes.push_back(node);
+                size_t j = nodes.size() - 1;
+                size_t jj = uniqTable[i].add(j + 1) - 1; // offset = 1
+
+                if (jj != j) {
+                    nodes.pop_back();
+                }
+
+                return NodeId(i, jj);
+            }
+    };
 
 } // namespace tdzdd

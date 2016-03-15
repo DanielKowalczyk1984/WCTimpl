@@ -1,5 +1,5 @@
 #ifndef WCT_PRIVATE_H
-#define WCT_PRIVATE_H 
+#define WCT_PRIVATE_H
 
 #include "util.h"
 #include "datastructsol.h"
@@ -15,7 +15,7 @@ extern "C" {
  * scatter search data types
  */
 
-typedef struct _REFSET{ 
+typedef struct _REFSET {
     int newsol;
     GPtrArray *list1;
     int nb1;
@@ -23,36 +23,36 @@ typedef struct _REFSET{
     int nb2;
 } REFSET;
 
-typedef struct _P{
+typedef struct _P {
     int PSize;
     GList *list;
     int lenght;
 } P;
 
 typedef enum {
-        init   = 0,
-        add    = 1,
-        update = 3,
-        opt    = 4
-    }  scatter_status;
+    init   = 0,
+    add    = 1,
+    update = 3,
+    opt    = 4
+}  scatter_status;
 
-typedef struct _SS{
+typedef struct _SS {
     REFSET *rs;
     P *p;
     int b1;
     int b2;
-    
+
     Job **jobarray;
     int njobs;
     int nmachines;
-    int lowerbound; 
+    int lowerbound;
     int upperbound;
 
     double timelimit;
     GRand *random;
     int iter;
     int combine_method;
-    
+
     scatter_status status;
 } SS;
 
@@ -60,7 +60,7 @@ typedef struct _SS{
 typedef struct heur_diving {
     int backtrack;
     int usefarkasonly;
-    
+
     int maxdiscdepth;
     int maxdiscrepancy;
 
@@ -75,13 +75,13 @@ typedef struct heur_diving {
 /**
  * wct data types nodes of branch and bound tree
  */
-typedef enum{
-        initialized             = 0,
-        infeasible              = 1,
-        LP_bound_estimated      = 2,
-        LP_bound_computed       = 3,
-        submitted_for_branching = 4,
-        finished                = 5,
+typedef enum {
+    initialized             = 0,
+    infeasible              = 1,
+    LP_bound_estimated      = 2,
+    LP_bound_computed       = 3,
+    submitted_for_branching = 4,
+    finished                = 5,
 } data_status;
 
 typedef struct wctdata wctdata;
@@ -89,9 +89,9 @@ struct wctdata {
     // The id and depth of the node in the B&B tree
     int id;
     int depth;
-    
+
     data_status status;
-    
+
     // The job information
     int njobs;
     int nmachines;
@@ -101,10 +101,10 @@ struct wctdata {
     int *weights;
     int *orig_node_ids;
     //data for meta heuristic
-    Job* jobarray;
+    Job *jobarray;
     int H_max;
     int H_min;
-    
+
     //The column generation lp information
     wctlp *LP;
     double *x;
@@ -114,12 +114,12 @@ struct wctdata {
     PricerSolver *solver;
     //Colorset(Assignments)
     int ccount;
-    Scheduleset*cclasses;
+    Scheduleset *cclasses;
     int dzcount;
     int gallocated;
-    Scheduleset*newsets;
+    Scheduleset *newsets;
     int nnewsets;
-    
+
     int kpc_pi_scalef;
     int kpc_pi_scalef_heur;
     int *kpc_pi;
@@ -145,35 +145,35 @@ struct wctdata {
     double eta_out;
     double eta_sep;
     double alpha;
-    
-    
+
+
     // Best Solution
-    Scheduleset*bestcolors;
+    Scheduleset *bestcolors;
     int besttotwct;
     int nbbest;
-    
-    const Scheduleset*debugcolors;
+
+    const Scheduleset *debugcolors;
     int ndebugcolors;
     int opt_track;
-    
-    
+
+
     //maxiterations and retireage
     int maxiterations;
     int retirementage;
-    
+
     //Branches
     int branch_job;
     int completiontime;
-    
-    wctdata* parent;
-    wctdata* duetime_child;
+
+    wctdata *parent;
+    wctdata *duetime_child;
     int nsame;
-    wctdata* releasetime_child;
+    wctdata *releasetime_child;
     int ndiff;
 
     //heur_diving
     heur_diving heur_data;
-    
+
     char pname[MAX_PNAME_LEN];
 };
 
@@ -183,18 +183,18 @@ struct wctdata {
 
 
 typedef enum  {
-        no_sol = 0,     
-        feasible   = 1,
-        meta_heur  = 2,
-        optimal    = 3
-    } problem_status;
+    no_sol = 0,
+    feasible   = 1,
+    meta_heur  = 2,
+    optimal    = 3
+} problem_status;
 
 typedef struct wctproblem wctproblem;
 
-struct wctproblem{
+struct wctproblem {
     wctparms parms;
     wctdata root_pd;
-    
+
     int nwctdata;
     int global_upper_bound;
     int first_upper_bound;
@@ -207,20 +207,20 @@ struct wctproblem{
     problem_status status;
     /* Scatter search*/
     SS scatter_search;
-    
+
     /* All stable sets*/
-    Scheduleset*initsets;
+    Scheduleset *initsets;
     int nbinitsets;
     int gallocated;
     /* Best Solution*/
-    Scheduleset*bestschedule;
+    Scheduleset *bestschedule;
     int nbestschedule;
     /*heap variables*/
     pmcheap *br_heap;
     int mult_key;
     int found;
     /*Cpu time measurement*/
-    CCutil_timer tot_build_dd;  
+    CCutil_timer tot_build_dd;
 
     CCutil_timer tot_cputime;
     CCutil_timer tot_branch_and_bound;
@@ -230,14 +230,14 @@ struct wctproblem{
     CCutil_timer tot_lb_lp;
     CCutil_timer tot_lb_heur;
     CCutil_timer tot_pricing;
-    
+
     CCutil_timer tot_scatter_search;
     double real_time;
 };
 
 /*Initialize pmc data*/
-void wctdata_init(wctdata* pd);
-int set_id_and_name(wctdata* pd, int id, const char* fname);
+void wctdata_init(wctdata *pd);
+int set_id_and_name(wctdata *pd, int id, const char *fname);
 int wctdata_init_unique(wctdata *pd, int id, const char *name);
 int lp_build(wctdata *pd);
 
