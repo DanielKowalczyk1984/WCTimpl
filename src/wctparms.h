@@ -61,6 +61,13 @@ enum pricing_solver
     DP_solver = 2,
 };
 
+enum construct_solutions
+{
+    min_construct_solutions = 1,
+    yes_construct = min_construct_solutions,
+    no_construct = 0,
+};
+
 
 typedef struct wctparms{
     /**
@@ -85,6 +92,7 @@ typedef struct wctparms{
     int dual_var_type;
     int stab_technique;
     int solver;
+    int construct;
     
     int delete_elists;
     int delete_cclasses;
@@ -119,6 +127,7 @@ int wctparms_set_branchandbound(wctparms *parms,int bound);
 int wctparms_set_dual_var_type(wctparms *parms,int);
 int wctparms_set_stab_technique(wctparms *parms, int stab_technique);
 int wctparms_set_solver(wctparms *parms, int solver);
+int wctparms_set_construct(wctparms *parms, int construct);
 
 /**
  * scatter search

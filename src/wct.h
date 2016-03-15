@@ -229,7 +229,7 @@ int compute_lower_bound(wctproblem *problem,wctdata *pd);
 int sequential_branching(wctproblem *problem);
 int create_branches(wctdata* pd,wctproblem* problem);
 int check_integrality(wctdata *pd,int nmachine,int *result);
-int build_lp(wctdata* pd);
+int build_lp(wctdata* pd, int construct);
 void make_pi_feasible(wctdata *pd);
 int heur_colors_with_stable_sets( wctdata *pd );
 int compute_objective( wctdata *pd );
@@ -297,6 +297,8 @@ int solvedblbdd(wctdata *pd);
 int solve_dynamic_programming_ahv(wctdata *pd);
 int solve_weight_dbl_bdd(wctdata *pd);
 int solve_weight_dbl_zdd(wctdata *pd);
+int solve_pricing(wctdata *pd, wctparms *parms);
+int solve_farkas_dbl(wctdata *pd);
 
 #ifdef __cplusplus
 }

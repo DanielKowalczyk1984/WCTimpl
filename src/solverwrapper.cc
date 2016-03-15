@@ -84,13 +84,28 @@ extern "C" {
         return val;
     }
 
-    void solvefarkasdbl(PricerSolver *solver, double *pi, int **sol,int *nsol, int* cost, int *newsol){
-        
+    int solve_farkas_dbl(wctdata *pd){
+        int val = 0;
+        Optimal_Solution<double> s = pd->solver->solve_farkas_double(pd->pi);
+        std::cout << s;
+
+
+
+        if(s.obj > 0.000001) {
+            val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
+            CCcheck_val_2(val, "Failed in constructing jobs");
+        } else {
+            pd->nnewsets = 0;
+        }
+
+        CLEAN:
+        return val;
     }
 
     int solve_weight_dbl_bdd(wctdata *pd){
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_bdd_double(pd->pi);
+        std::cout << s;
 
         if(s.obj > 0.0001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
@@ -106,7 +121,7 @@ extern "C" {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_zdd_double(pd->pi);
 
-        if(s.obj > 0.0001) {
+        if(s.obj > 0.00001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
             CCcheck_val_2(val, "Failed in construction")
         } else {
@@ -159,6 +174,28 @@ extern "C" {
         }
 
         *eta_sep = alpha * (*eta_in) + beta * (*eta_out);
+    }
+
+    int solve_pricing(wctdata *pd, wctparms *parms){
+        int val = 0;
+
+        switch(parms->solver){
+        case bdd_solver:
+            val = solve_weight_dbl_bdd(pd);
+            CCcheck_val_2(val, "Failed solve_weight_dbl_bdd");
+            break;
+        case zdd_solver:
+            val =solve_weight_dbl_zdd(pd);
+            CCcheck_val_2(val, "Failed solve_weight_dbl_zdd")
+            break;
+        case DP_solver:
+            val = solve_dynamic_programming_ahv(pd);
+            CCcheck_val_2(val, "Failed in solve_dynamic_programming_ahv")
+            break;
+        }
+
+        CLEAN:
+        return val;
     }
 
     double compute_lagrange(Optimal_Solution<double> &sol, double *pi, int nbjobs, int nbmachines){
@@ -265,19 +302,8 @@ extern "C" {
                         pd->eta_in = result;
                         memcpy(pd->pi_in, pd->pi_sep, sizeof(double)*pd->njobs + 1);
                     }
-                } else {
-                    pd->eta_in = result;
-                    memcpy(pd->pi_in, pd->pi_sep, sizeof(double)*pd->njobs + 1);
-                    /*result = compute_lagrange(sol, pd->pi_out, pd->njobs, pd->nmachines);
-
-                    if(result < pd->eta_out) {
-                        val = construct_sol_stab(pd, parms, sol);
-                        CCcheck_val_2(val, "Failed in construct_sol_stab");
-                        compute_subgradient(sol, pd->subgradient, pd->njobs, pd->nmachines);
-                        adjust_alpha(pd->pi_out, pd->pi_in, pd->subgradient, pd->njobs, alpha); 
-                    }*/
-
                 }
+                printf("alpha = %f\n", alpha);
             } while(pd->nnewsets == 0 && alpha > 0.0);/** mispricing check */
         }
 

@@ -19,6 +19,7 @@ public:
     int H_max;
     tdzdd::DataTable<PricerWeightZDD<double>> zdd_table;
     tdzdd::DataTable<PricerWeightBDD<double>> dd_table;
+    tdzdd::DataTable<PricerFarkasZDD<double>> farkas_table;
 
     PricerSolver( int *_p, int *_w,  int *_r, int *_d, int njobs, int Hmin, int Hmax, bool print = false, bool reduce = false): p(_p), w(_w), r(_r), d(_d), nbjobs(njobs),H_min(Hmin),H_max(Hmax) {
         delta = new int [nbjobs];
@@ -48,6 +49,7 @@ public:
             zdd = dd;
             zdd.zddReduce();
             init_table_zdd();
+            init_table_farkas();
             std::cout << "Reducing the size of DD structure:" <<  std::endl;
             std::cout << "DD = " << dd.size() << " " << "ZDD = " << zdd.size() << std::endl;
             if (print) {
@@ -109,6 +111,28 @@ public:
                 dd_table[i][j].init_node(node[j].weight);
             }
         }
+    }
+
+    void init_table_farkas(){
+        tdzdd::NodeTableHandler<2>& node_handler_farkas = zdd.getDiagram();
+        farkas_table.init(nbjobs + 1);
+
+        size_t const m = node_handler_farkas.privateEntity()[0].size();
+        farkas_table[0].resize(m);
+        for(size_t i = 0; i < m; ++i) {
+            farkas_table[0][i].init_terminal_node(i);
+        }
+
+        for (int i = 1; i <= nbjobs; ++i) {
+            tdzdd::MyVector<tdzdd::Node<2> > const& node = node_handler_farkas.privateEntity()[i];
+            size_t const mm = node.size();
+            farkas_table[i].resize(mm);
+
+            for (size_t j = 0; j < mm; ++j) {
+                farkas_table[i][j].init_node();
+            }
+        }
+
     }
 
     class Optimal_Solution<double> dynamic_programming_ahv(double *pi){
@@ -205,6 +229,10 @@ public:
 
     class Optimal_Solution<double> solve_weight_zdd_double(double *pi){
         return zdd.evaluate_weight(WeightZDDdouble(pi,p,w,r,d,nbjobs,H_min,H_max), zdd_table);
+    }
+
+    class Optimal_Solution<double> solve_farkas_double(double *pi){
+        return zdd.evaluate_weight(FarkasZDDdouble(pi,p,w,r,d,nbjobs,H_min,H_max), farkas_table);
     }
 
     void addRestriction(){

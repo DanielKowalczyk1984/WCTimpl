@@ -8,8 +8,6 @@
 //                                                            //
 ////////////////////////////////////////////////////////////////
 
-#include "wctparms.h"
-#include "wctprivate.h"
 #include "wct.h"
 #include "defs.h"
 
@@ -30,6 +28,7 @@ static void usage(char* f) {
     fprintf(stderr, "   -B int  Branch and Bound use: 0 = no branch and bound(default), 1 = use branch and bound\n");
     fprintf(stderr, "   -S int  Stabilization technique: 0 = no stabilization(default), 1 = stabilization wentgnes\n");
     fprintf(stderr, "   -z int  Pricing solver technique: 0 = BDD(default), 1 = ZDD, 2 = DP\n");
+    fprintf(stderr, "   -c int  Construct heuristically solutions: 0 = yes(default), 1 = no\n");
 }
 
 
@@ -38,7 +37,7 @@ static int parseargs(int ac, char **av, wctparms* parms) {
     int val = 0;
     int debug = dbg_lvl();
 
-    while((c = getopt(ac,av,"dr:f:s:l:L:C:B:z:S:")) != EOF) {
+    while((c = getopt(ac,av,"dr:f:s:l:L:C:B:z:S:c:")) != EOF) {
         switch(c) {
         case 'd':
             ++(debug);
@@ -51,10 +50,6 @@ static int parseargs(int ac, char **av, wctparms* parms) {
         case 'f':
             val = wctparms_set_nb_feas_sol(parms, atoi(optarg));
             CCcheck_val(val, "Failed number feasible solutions");
-            break;
-        case 'c':
-            val = wctparms_set_color_infile(parms,optarg);
-            CCcheck_val(val,"Failed set_color_infile");
             break;
         case 's':
             val = wctparms_set_branching_strategy(parms,atoi(optarg));
@@ -83,6 +78,10 @@ static int parseargs(int ac, char **av, wctparms* parms) {
         case 'z':
             val = wctparms_set_solver(parms, atoi(optarg));
             CCcheck_val(val, "Failed in wctparms_set_solver");
+            break;
+        case 'c':
+            val = wctparms_set_construct(parms, atoi(optarg));
+            CCcheck_val(val, "Failed in construct sol");
             break;
         default:
             usage(av[0]);
@@ -267,13 +266,21 @@ int main(int ac, char **av) {
     printf("Reading and preprocessing of the data took %f\n", CCutil_zeit()-start_time );
 
     /** Computing initial lowerbound */
+    CCutil_start_timer(&(problem.tot_lb));
     problem.global_lower_bound = lowerbound_eei(pd->jobarray, pd->njobs, pd->nmachines);
     problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cp(pd->jobarray, pd->njobs, pd->nmachines));
     problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cw(pd->jobarray, pd->njobs, pd->nmachines));
-    printf("Computing lowerbound took %f\n", problem.tot_lb.cum_zeit);
+    CCutil_stop_timer(&(problem.tot_lb), 0);
+    printf("Computing lowerbound EEI, CP and CW took %f\n", problem.tot_lb.cum_zeit);
 
     /** Construct Feasible solutions */
-    construct_feasible_solutions(&problem);
+    switch(parms->construct){
+        case yes_construct:
+            construct_feasible_solutions(&problem);
+            break;
+        case no_construct:
+            break;
+    }
 
     /** Compute Schedule with Branch and Price */
     compute_schedule(&problem);

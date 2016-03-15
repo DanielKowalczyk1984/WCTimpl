@@ -575,6 +575,7 @@ int heur_compute_lower_bound( wctproblem *problem, wctdata *pd )
     pd->retirementage = ( int )sqrt( ( double )pd->njobs) + 30;
     /** Initialize pricing problem */
 
+    CCutil_start_resume_time(&(problem->tot_lb_heur));
     do {
         iterations++;
         cur_cputime = CCutil_zeit();
@@ -653,6 +654,7 @@ int heur_compute_lower_bound( wctproblem *problem, wctdata *pd )
     }
 
     fflush( stdout );
+    CCutil_suspend_timer(&(problem->tot_lb_heur));
 CLEAN:
 
     return val;

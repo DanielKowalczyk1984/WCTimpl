@@ -43,6 +43,9 @@ int wctlp_init(wctlp **lp, const char *name){
     val = GRBsetintparam((*lp)->env,GRB_INT_PAR_METHOD,GRB_METHOD_PRIMAL);
     CHECK_VAL_GRB(val,"GRBsetintparam LPMETHOD failed",(*lp)->env);
 
+    val = GRBsetintparam((*lp)->env, GRB_INT_PAR_INFUNBDINFO, 1);
+    CHECK_VAL_GRB(val, "GRBsetintparam INFUNBDINFO", (*lp)->env);
+
     val = GRBnewmodel((*lp)->env,&((*lp)->model),name,0,(double*)NULL,
                       (double *)NULL,(double *)NULL,(char *)NULL,NULL);
     CHECK_VAL_GRB(val,"GRBnewmodel failed",(*lp)->env);
@@ -78,6 +81,7 @@ int wctlp_optimize(wctlp *lp, int* status){
                 val = 1;
                 break;
             case GRB_INFEASIBLE:
+                printf("GRB_INFEASIBLE\n");
                 break;
             case GRB_UNBOUNDED:
                 printf("GRB_UNBOUNDED");
@@ -221,11 +225,11 @@ int wctlp_pi(wctlp *lp, double *pi){
     val = GRBgetintattr(lp->model, GRB_INT_ATTR_STATUS,&solstat);
     CHECK_VAL_GRB(val,"failed to get attribute status gurobi",lp->env);
 
-    if(solstat == GRB_INFEASIBLE){
-        fprintf(stderr, "Problem is infeasible\n");
-        val = 1;
-        return val;
-    }
+    // if(solstat == GRB_INFEASIBLE){
+    //     fprintf(stderr, "Problem is infeasible\n");
+    //     val = 1;
+    //     return val;
+    // }
 
     val = GRBgetintattr(lp->model,GRB_INT_ATTR_NUMCONSTRS,&nrows);
     CHECK_VAL_GRB(val,"Failed to get nrows", lp->env);
@@ -236,8 +240,13 @@ int wctlp_pi(wctlp *lp, double *pi){
         return val;
     }
 
-    val = GRBgetdblattrarray(lp->model, GRB_DBL_ATTR_PI,0,nrows,pi);
-    CHECK_VAL_GRB(val, "Failed to get the dual prices",lp->env);
+    //if(solstat == GRB_OPTIMAL) {
+        val = GRBgetdblattrarray(lp->model, GRB_DBL_ATTR_PI,0,nrows,pi);
+        CHECK_VAL_GRB(val, "Failed to get the dual prices",lp->env);
+    // } else if( solstat == GRB_INFEASIBLE){
+    //     val = GRBgetdblattrarray(lp->model, GRB_DBL_ATTR_FARKASDUAL, 0, nrows, pi);
+    //     CHECK_VAL_GRB(val, "Failed to get the farkas dual prices", lp->env);
+    // }
 
     return val;
 

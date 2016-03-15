@@ -201,7 +201,7 @@ static int add_feasible_solution( wctproblem *problem, solution *new_sol)
     if(root_pd->ccount == 0) {
         update_Schedulesets(&root_pd->cclasses, &root_pd->ccount, problem->bestschedule, problem->nbestschedule);
         root_pd->gallocated = root_pd->ccount;
-    } else { 
+    } else {
       partlist_to_Scheduleset(new_sol->part, new_sol->nmachines, new_sol->njobs, &(root_pd->newsets), &(root_pd->nnewsets));
       add_newsets(root_pd);
     }
@@ -244,7 +244,7 @@ int construct_feasible_solutions(wctproblem *problem) {
 
   CCutil_start_timer(timer);
 
-  
+
   val = SSproblem_definition(scatter_search, 10, 8, parms->scatter_search_cpu_limit, parms->combine_method,
                              pd->njobs, pd->nmachines, pd->jobarray, problem->global_lower_bound);
   CCcheck_val_2(val, "Failed in SSproblem_definition");
@@ -289,7 +289,7 @@ int construct_feasible_solutions(wctproblem *problem) {
       add_newsets(pd);
     }
   }
-  
+
 
 CLEAN:
   g_rand_free(rand1);
@@ -298,4 +298,3 @@ CLEAN:
   printf("Construction of feasible solutions took %19.16f seconds\n", problem->tot_scatter_search.cum_zeit);
   return val;
 }
-

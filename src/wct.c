@@ -216,6 +216,7 @@ void wctproblem_init( wctproblem *problem )
     CCutil_init_timer( &( problem->tot_lb_lp ), "tot_lb_lp" );
     CCutil_init_timer( &( problem->tot_lb ), "tot_lb" );
     CCutil_init_timer( &( problem->tot_pricing ), "tot_pricing" );
+    CCutil_init_timer( &( problem->tot_lb_heur), "tot_lb_heur" );
 
     /* Scatter sear init*/
     SS_init( &problem->scatter_search, 15, 10, 0.1 );
@@ -591,7 +592,7 @@ int compute_objective( wctdata *pd )
     }
 
 
-    if ( dbg_lvl() > 0 )
+    //if ( dbg_lvl() > 0 )
     {
         printf( "Current primal LP objective: %19.16f  (LP_dual-bound %19.16f, lowerbound = %d).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual, pd->lower_bound );
     }
@@ -1301,7 +1302,7 @@ int create_branches( wctdata *pd, wctproblem *problem )
 
     if ( !pd->LP )
     {
-        val = build_lp( pd );
+        val = build_lp( pd, 1 );
         CCcheck_val_2( val, "Failed at build_lp" );
     }
 
@@ -1681,7 +1682,7 @@ CLEAN:
     return val;
 }
 
-int build_lp( wctdata *pd )
+int build_lp( wctdata *pd, int construct )
 {
     int val = 0;
     int i, j;
@@ -1695,33 +1696,34 @@ int build_lp( wctdata *pd )
 
     for ( i = 0; i < pd->njobs; i++ )
     {
-        val = wctlp_addrow( pd->LP, 0, ( int *)NULL, ( double *)NULL, wctlp_GREATER_EQUAL, 1.0,
+        val = wctlp_addrow( pd->LP, 0, ( int *)NULL, ( double *)NULL, wctlp_EQUAL, 1.0,
                             ( char *)NULL );
         CCcheck_val_2( val, "Failed wctlp_addrow" );
     }
-    wctlp_addrow(pd->LP, 0  , (int *)NULL, (double *) NULL, wctlp_LESS_EQUAL,(double)pd->nmachines , NULL);
+    wctlp_addrow(pd->LP, 0  , (int *)NULL, (double *) NULL, wctlp_EQUAL,(double)pd->nmachines , NULL);
 
     pd->coef = ( double *)CCutil_reallocrus( pd->coef, (pd->njobs + 1) * sizeof( double ) );
     CCcheck_NULL_2( pd->coef, "out of memory for coef" );
     fill_dbl( pd->coef, pd->njobs + 1, 1.0 );
     /** add constraint about number of machines */
+    if(construct) {
+        for ( i = 0; i < pd->ccount; i++ ) {
+            val = wctlp_addcol( pd->LP, pd->cclasses[i].count + 1,
+                                pd->cclasses[i].members,
+                                pd->coef, pd->cclasses[i].totwct, 0.0, 1.0, wctlp_CONT, NULL );
 
-    for ( i = 0; i < pd->ccount; i++ ) {
-        val = wctlp_addcol( pd->LP, pd->cclasses[i].count + 1,
-                            pd->cclasses[i].members,
-                            pd->coef, pd->cclasses[i].totwct, .0, 1.0, wctlp_CONT, NULL );
+            if ( val ) {
+                wctlp_printerrorcode( val );
+            }
+            CCcheck_val_2( val, "pmclp_addcol failed" );
 
-        if ( val ) {
-            wctlp_printerrorcode( val );
-        }
-        CCcheck_val_2( val, "pmclp_addcol failed" );
-
-        for ( j = 0; j < pd->cclasses[i].count && counter < pd->njobs; j++ )
-        {
-            if ( !covered[pd->cclasses[i].members[j]] )
+            for ( j = 0; j < pd->cclasses[i].count && counter < pd->njobs; j++ )
             {
-                covered[pd->cclasses[i].members[j]] = 1;
-                counter++;
+                if ( !covered[pd->cclasses[i].members[j]] )
+                {
+                    covered[pd->cclasses[i].members[j]] = 1;
+                    counter++;
+                }
             }
         }
     }
@@ -1747,6 +1749,13 @@ int build_lp( wctdata *pd )
                                     wctlp_CONT, NULL );
 
                 CCcheck_val_2( val, "Failed in pmclp_addcol" );
+                if(pd->gallocated == 0 && pd->ccount == 0 ) {
+                    pd->cclasses = CC_SAFE_MALLOC(pd->njobs, Scheduleset);
+                    for( j = 0; j < pd->njobs; ++j) {
+                        Scheduleset_init(pd->cclasses + i);
+                    }
+                    pd->gallocated = pd->njobs;
+                }
                 add_newsets( pd );
             }
         }
@@ -1790,19 +1799,18 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
     CCutil_start_resume_time( &( problem->tot_lb_lp ) );
 
     /** Construct solutions if list of columns is empty */
-    if ( !pd->ccount ) {
+    if ( !pd->ccount && parms->construct ) {
         solution *new_sol;
         new_sol = new_sol_init(pd->nmachines, pd->njobs);
         construct_wspt(pd->jobarray, pd->njobs, pd->nmachines, new_sol);
         partlist_to_Scheduleset(new_sol->part, pd->nmachines, pd->njobs, &(pd->cclasses), &(pd->ccount));
         solution_free(new_sol);
+        assert( pd->gallocated >= pd->ccount );
     }
-
-    assert( pd->gallocated >= pd->ccount );
 
     if ( !pd->LP )
     {
-        val = build_lp( pd );
+        val = build_lp( pd, parms->construct );
         CCcheck_val( val, "build_lp failed" );
     }
 
@@ -1825,9 +1833,9 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
         iterations++;
 
         /** delete old columns */
-        if(pd->dzcount > pd->njobs*min_ndelrow_ratio) {
+        /*if(pd->dzcount > pd->njobs*min_ndelrow_ratio) {
             val = delete_old_cclasses(pd);
-        }
+        }*/
         
         /** Compute LP relaxation */
         cur_cputime = CCutil_zeit();
@@ -1841,8 +1849,8 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
             fflush( stdout );
         }
 
-        val = grow_ages(pd);
-        CCcheck_val_2(val, "Failed in grow_ages");
+        // val = grow_ages(pd);
+        // CCcheck_val_2(val, "Failed in grow_ages");
 
         if ( dbg_lvl() > 1 )
         {
@@ -1854,15 +1862,14 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
         CCcheck_val_2( val, "pmclp_pi failed" );
         make_pi_feasible(pd);
 
-        /** Compute the objective function */
-        val = compute_objective(pd);
-        CCcheck_val_2(val, "Failed in compute_objective");
-        memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
-        pd->eta_out = pd->LP_lower_bound;
-
         CCutil_start_resume_time( &problem->tot_pricing );
         switch(status) {
         case GRB_OPTIMAL:
+            /** Compute the objective function */
+            val = compute_objective(pd);
+            CCcheck_val_2(val, "Failed in compute_objective");
+            memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
+            pd->eta_out = pd->LP_lower_bound;
             if ( iterations < pd->maxiterations ){
                 /** nnonimprovements? */
                 last_lower_bound = pd->dbl_safe_lower_bound;
@@ -1873,26 +1880,17 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
                     CCcheck_val_2(val, "Failed in solve_stab");
                     break;
                 case no_stab:
-                    switch(parms->solver){
-                    case bdd_solver:
-                        val = solve_weight_dbl_bdd(pd);
-                        CCcheck_val_2(val, "Failed solve_weight_dbl_bdd");
-                        break;
-                    case zdd_solver:
-                        val =solve_weight_dbl_zdd(pd);
-                        CCcheck_val_2(val, "Failed solve_weight_dbl_zdd")
-                        break;
-                    case DP_solver:
-                        val = solve_dynamic_programming_ahv(pd);
-                        CCcheck_val_2(val, "Failed in solve_dynamic_programming_ahv")
-                        break;
-                    }
+                    val = solve_pricing(pd,parms);
+                    CCcheck_val_2(val, "Failed in solving pricing");
+                    break;
                 }
             }
             break;
         case GRB_INFEASIBLE:
             if(iterations < pd->maxiterations) {
-                
+                val = solve_farkas_dbl(pd);
+                CCcheck_val_2(val, "Failed in solving farkas");
+                wctlp_write(pd->LP, "farkas.lp");
             }
             break;
         }
@@ -1903,32 +1901,40 @@ int compute_lower_bound( wctproblem *problem, wctdata *pd ) {
             val = wctlp_addcol(pd->LP, pd->newsets[j].count + 1, pd->newsets[j].members, pd->coef, pd->newsets[j].totwct, 0.0, 1.0, wctlp_CONT, NULL);
             CCcheck_val_2( val, "pmclp_addcol failed" );
         }
+
         switch(status){
             case GRB_OPTIMAL:
                 switch(parms->stab_technique){
                     case stab_wentgnes:
-                        break_while_loop = ( CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001 || pd->nnonimprovements > 5); 
+                        break_while_loop = ( CC_OURABS(pd->eta_out - pd->eta_in) < 0.001 || pd->nnonimprovements > 5); 
                         break;
                     case no_stab:
                         break_while_loop = ( pd->nnewsets == 0 || nnonimprovements > 5 );
                         break;
                 }
             case GRB_INFEASIBLE:
+                break_while_loop = (pd->nnewsets == 0);
                 break;
         }
         add_newsets( pd );
 
         CCutil_suspend_timer( &( problem->tot_cputime ) );
         CCutil_resume_timer( &( problem->tot_cputime ) );
+        printf("new sol\n");
+        getchar();
     }
 
     while ( ( iterations < pd->maxiterations ) && !break_while_loop
             && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit );
 
+    print_schedule(pd->cclasses, pd->ccount);
+    getchar();
+
     if ( iterations < pd->maxiterations && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit  )
     {
         val = wctlp_optimize( pd->LP, &status );
         CCcheck_val_2( val, "pmclp_optimize failed" );
+        printf("status = %d\n", status);
         switch(status) {
         case GRB_OPTIMAL:
             val = wctlp_pi( pd->LP, pd->pi );

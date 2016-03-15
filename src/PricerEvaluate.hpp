@@ -168,6 +168,28 @@ public:
 };
 
 template<typename T>
+class PricerFarkasZDD {
+public:
+    T obj;
+    bool take;
+
+    PricerFarkasZDD():obj(0), take(0){
+    };
+
+    ~PricerFarkasZDD(){
+    };
+
+    void init_terminal_node(int one){
+        obj = one ? 0.0:-1871286761.0;
+    }
+
+    void init_node(){
+        take = false;
+    }
+};
+
+
+template<typename T>
 class Optimal_Solution{
     public:
         T obj;
@@ -203,6 +225,17 @@ class Optimal_Solution{
             jobs = other.jobs;
             return *this;
         }
+
+        friend std::ostream& operator<<(std::ostream& os, Optimal_Solution<T> const& o) {
+        os << "max = " << o.obj << "," << std::endl << "cost = " << o.cost << std::endl;
+        std::vector<int>::const_iterator it = o.jobs.begin();
+        for (; it != o.jobs.end(); ++it)
+        {
+            std::cout << *it << " ";
+        }
+        std::cout << std::endl;
+        return os;
+    }
 };
 
 template<typename E, typename T>
@@ -494,21 +527,16 @@ public:
         PricerInfoBDD<T> *n0 = values.get_ptr(0);
         PricerInfoBDD<T> *n1 = values.get_ptr(1);
 
-        if (n0->obj < n.obj) {
+        if (n0->obj <= n.obj) {
             n0->obj = n.obj;
             n0->cost = n.cost;
             n0->sum_p = n.sum_p;
-            n0->jobs.clear();
-            n0->jobs = n.jobs;
         }
 
-        if (n1->obj < n.obj - w[j] * (n.sum_p + p[j]) + pi[j]) {
+        if (n1->obj < n.obj + pi[j]) {
             n1->obj = n.obj + pi[j];
             n1->cost = n.cost + w[j] * (n.sum_p + p[j]);
             n1->sum_p = n.sum_p + p[j];
-            n1->jobs.clear();
-            n1->jobs = n.jobs;
-            n1->jobs.push_back(j);
         }
     }
 
@@ -520,6 +548,68 @@ public:
         n.obj = pi[nbjobs];
     }
 
+};
+
+template<typename E, typename T>
+class FarkasZDD: public tdzdd::DdEval<E, PricerFarkasZDD<T>, Optimal_Solution<T> > {
+    T *pi;
+    int *p;
+    int *w;
+    int *r;
+    int *d;
+    int nbjobs;
+    int H_min;
+    int H_max;
+
+public:
+    FarkasZDD(T *_pi, int *_p, int *_w, int *_r, int *_d, int _nbjobs, int Hmin,int Hmax)
+        : pi(_pi), p(_p), w(_w),r(_r),d(_d), nbjobs(_nbjobs),H_min(Hmin), H_max(Hmax) {
+    };
+
+    void evalTerminal( PricerFarkasZDD<T> &n) {
+        n.obj = pi[nbjobs];
+    }
+
+    void evalNode( PricerFarkasZDD<T> *n, int i, tdzdd::DdValues<PricerFarkasZDD<T>, 2>  &  values) const {
+        int j = nbjobs - i;
+        assert(j >= 0 && j <= nbjobs - 1);
+        PricerFarkasZDD<T> *n0 = values.get_ptr(0);
+        PricerFarkasZDD<T> *n1 = values.get_ptr(1);
+
+        if(n0->obj >= n1->obj + pi[j] ) {
+            n->obj = n0->obj;
+            n->take = false;
+        } else {
+            n->obj = n1->obj + pi[j];
+            n->take = true;
+        }
+    }
+
+    void initializenode(PricerFarkasZDD<T> &n){
+        n.take = false;
+    }
+
+    Optimal_Solution<T> get_objective( tdzdd::NodeTableHandler<2> diagram, tdzdd::DataTable<PricerFarkasZDD<T>> *data_table, const tdzdd::NodeId *f){
+        Optimal_Solution<T> sol;
+        sol.obj = (*data_table)[f->row()][f->col()].obj;
+        sol.cost = 0;
+        int C =0;
+        tdzdd::NodeId cur_node = *f;
+        int j = nbjobs - cur_node.row();
+        while(cur_node.row() != 0 ) {
+            if((*data_table)[cur_node.row()][cur_node.col()].take &&  r[j] <= C && C + p[j] <= d[j] ) {
+                sol.jobs.push_back(j);
+                cur_node = diagram.privateEntity().child(cur_node, 1);
+                C += p[j];
+                sol.cost += w[j]*C;
+                j = nbjobs - cur_node.row();
+            } else {
+                cur_node = diagram.privateEntity().child(cur_node, 0);
+                j = nbjobs - cur_node.row();
+            }
+        }
+        return sol;
+    }
 };
 
 struct DurationZDDdouble: DurationZDD<DurationZDDdouble, double> {
@@ -542,7 +632,7 @@ struct WeightZDDdouble: WeightZDD<WeightZDDdouble, double> {
     };
 };
 
-struct FarkasBDDdouble: Farkas<FarkasBDDdouble, double> {
-    FarkasBDDdouble(double *_pi, int *_p, int *_w, int _nbjobs): Farkas<FarkasBDDdouble, double>(_pi, _p, _w, _nbjobs) {
+struct FarkasZDDdouble: FarkasZDD<FarkasZDDdouble, double> {
+    FarkasZDDdouble(double *_pi, int *_p, int *_w, int *r, int *d, int _nbjobs,int Hmin,int Hmax): FarkasZDD<FarkasZDDdouble, double>(_pi, _p, _w, r,d, _nbjobs,Hmin,Hmax) {
     };
 };

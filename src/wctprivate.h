@@ -228,6 +228,7 @@ struct wctproblem{
 
     CCutil_timer tot_lb_lp_root;
     CCutil_timer tot_lb_lp;
+    CCutil_timer tot_lb_heur;
     CCutil_timer tot_pricing;
     
     CCutil_timer tot_scatter_search;
