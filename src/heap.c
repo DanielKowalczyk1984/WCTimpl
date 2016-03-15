@@ -15,30 +15,30 @@
 /* #define HEAP_INTEGRITY_CHECKS 1 */
 
 
-static int pmcheap_empty( pmcheap *heap )
+static int pmcheap_empty(pmcheap *heap)
 {
-    assert( heap->end >= 0 );
-    return !( heap->end );
+    assert(heap->end >= 0);
+    return !(heap->end);
 }
 
 MAYBE_UNUSED
-static int pmcheap_integrity( pmcheap *heap )
+static int pmcheap_integrity(pmcheap *heap)
 {
     int val = 0;
     int i;
     int *perm = heap->perm;
     int *iperm = heap->iperm;
 
-    for ( i = 0 ; i < heap->end; ++i ) {
-        val = ! ( iperm[perm[i]] == i );
-        CCcheck_val( val, "Failed: iperm[perm[i]] == i" );
-        val = ! ( perm[iperm[i]] == i );
-        CCcheck_val( val, "Failed: perm[iperm[i]] == i" );
+    for (i = 0 ; i < heap->end; ++i) {
+        val = !(iperm[perm[i]] == i);
+        CCcheck_val(val, "Failed: iperm[perm[i]] == i");
+        val = !(perm[iperm[i]] == i);
+        CCcheck_val(val, "Failed: perm[iperm[i]] == i");
 
-        if ( i > 0 ) {
+        if (i > 0) {
             int parent = i >> 1;
-            val = ( heap->elms[perm[parent]].key < heap->elms[perm[i]].key );
-            CCcheck_val( val, "Failed: heap order" );
+            val = (heap->elms[perm[parent]].key < heap->elms[perm[i]].key);
+            CCcheck_val(val, "Failed: heap order");
         }
     }
 
@@ -55,97 +55,97 @@ static int pmcheap_integrity( pmcheap *heap )
 #endif
 
 
-int pmcheap_init( pmcheap **heap, int size )
+int pmcheap_init(pmcheap **heap, int size)
 {
     int val = 0;
 
-    if ( size == 0 ) {
+    if (size == 0) {
         val = 1;
         goto CLEAN;
     }
 
-    *heap = ( pmcheap * ) CC_SAFE_MALLOC ( 1, pmcheap );
-    CCcheck_NULL_2( *heap, "Failed to allocate heap" );
-    ( *heap )->perm  = ( int * ) NULL;
-    ( *heap )->iperm = ( int * ) NULL;
-    ( *heap )->elms  = ( heapelm * ) NULL;
-    ( *heap )->end = 0;
+    *heap = (pmcheap *) CC_SAFE_MALLOC(1, pmcheap);
+    CCcheck_NULL_2(*heap, "Failed to allocate heap");
+    (*heap)->perm  = (int *) NULL;
+    (*heap)->iperm = (int *) NULL;
+    (*heap)->elms  = (heapelm *) NULL;
+    (*heap)->end = 0;
     size += 2;
-    ( *heap )->size = size;
-    ( *heap )->perm = ( int * ) CC_SAFE_MALLOC( size, int );
-    CCcheck_NULL_2( ( *heap )->perm, "Failed to allocate (*heap)->perm" );
-    ( *heap )->iperm = ( int * ) CC_SAFE_MALLOC( size, int );
-    CCcheck_NULL_2( ( *heap )->iperm, "Failed to allocate (*heap)->iperm" );
-    ( *heap )->elms = ( heapelm * ) CC_SAFE_MALLOC( size, heapelm );
-    CCcheck_NULL_2( ( *heap )->elms, "Failed to allocate (*heap)->elms" );
+    (*heap)->size = size;
+    (*heap)->perm = (int *) CC_SAFE_MALLOC(size, int);
+    CCcheck_NULL_2((*heap)->perm, "Failed to allocate (*heap)->perm");
+    (*heap)->iperm = (int *) CC_SAFE_MALLOC(size, int);
+    CCcheck_NULL_2((*heap)->iperm, "Failed to allocate (*heap)->iperm");
+    (*heap)->elms = (heapelm *) CC_SAFE_MALLOC(size, heapelm);
+    CCcheck_NULL_2((*heap)->elms, "Failed to allocate (*heap)->elms");
     /* Use sentenials at beginning and end.*/
-    ( *heap )->elms[0].key       =   -CCutil_MAXINT;
-    ( *heap )->perm[0] = ( *heap )->iperm[0] = 0;
-    ( *heap )->elms[size - 1].key  =  CCutil_MAXINT;
-    ( *heap )->perm[size - 1] = ( *heap )->iperm[size - 1] = size - 1;
-    pmcheap_reset( *heap );
-    HEAP_INTEGRITY( val, *heap,
-                    "pmcheap_integrity failed in pmcheap_relabel." );
+    (*heap)->elms[0].key       =   -CCutil_MAXINT;
+    (*heap)->perm[0] = (*heap)->iperm[0] = 0;
+    (*heap)->elms[size - 1].key  =  CCutil_MAXINT;
+    (*heap)->perm[size - 1] = (*heap)->iperm[size - 1] = size - 1;
+    pmcheap_reset(*heap);
+    HEAP_INTEGRITY(val, *heap,
+                   "pmcheap_integrity failed in pmcheap_relabel.");
 CLEAN:
 
-    if ( val ) {
-        pmcheap_free( *heap );
-        *heap = ( pmcheap * ) NULL;
+    if (val) {
+        pmcheap_free(*heap);
+        *heap = (pmcheap *) NULL;
     }
 
     return val;
 }
 
-int pmcheap_free( pmcheap  *heap )
+int pmcheap_free(pmcheap  *heap)
 {
-    if ( heap ) {
-        if ( heap->perm ) {
-            free( heap->perm );
+    if (heap) {
+        if (heap->perm) {
+            free(heap->perm);
         }
 
-        if ( heap->iperm ) {
-            free( heap->iperm );
+        if (heap->iperm) {
+            free(heap->iperm);
         }
 
-        if ( heap->elms ) {
-            free( heap->elms );
+        if (heap->elms) {
+            free(heap->elms);
         }
 
-        free ( heap );
+        free(heap);
     }
 
     return 0;
 }
 
-int pmcheap_free_all( pmcheap *heap )
+int pmcheap_free_all(pmcheap *heap)
 {
-    if ( heap ) {
-        for ( int i = 1; i <= heap->end; ++i ) {
-            if ( heap->elms[heap->perm[i]].obj ) {
-                free( heap->elms[heap->perm[i]].obj );
+    if (heap) {
+        for (int i = 1; i <= heap->end; ++i) {
+            if (heap->elms[heap->perm[i]].obj) {
+                free(heap->elms[heap->perm[i]].obj);
             }
         }
 
-        CC_IFFREE( heap->elms, heapelm )
-        CC_IFFREE( heap->perm, int )
-        CC_IFFREE( heap->iperm, int )
-        free( heap );
+        CC_IFFREE(heap->elms, heapelm)
+        CC_IFFREE(heap->perm, int)
+        CC_IFFREE(heap->iperm, int)
+        free(heap);
     }
 
     return 0;
 }
 
-void pmcheap_reset_free( pmcheap *heap )
+void pmcheap_reset_free(pmcheap *heap)
 {
     int i;
 
-    for ( i = 1; i  <= heap->size; ++i ) {
-        if ( heap->elms[heap->perm[i]].obj ) {
-            free( heap->elms[heap->perm[i]].obj );
+    for (i = 1; i  <= heap->size; ++i) {
+        if (heap->elms[heap->perm[i]].obj) {
+            free(heap->elms[heap->perm[i]].obj);
         }
     }
 
-    for ( i = 1; i <= heap->size; i++ ) {
+    for (i = 1; i <= heap->size; i++) {
         heap->elms[i].obj = NULL;
         heap->elms[i].key = CCutil_MAXINT;
         heap->perm[i] = heap->iperm[i] = i;
@@ -154,24 +154,24 @@ void pmcheap_reset_free( pmcheap *heap )
     heap->end = 0;
 }
 
-void pmcheap_reset( pmcheap *heap )
+void pmcheap_reset(pmcheap *heap)
 {
     int i;
     heap->end = 0;
 
-    for ( i = 1; i + 1 < heap->size; ++i ) {
+    for (i = 1; i + 1 < heap->size; ++i) {
         heap->elms[i].obj = NULL;
         heap->elms[i].key = CCutil_MAXINT;
         heap->perm[i] = heap->iperm[i] = i;
     }
 
 #ifdef HEAP_INTEGRITY_CHECKS
-    assert( !pmcheap_integrity( heap ) );
+    assert(!pmcheap_integrity(heap));
 #endif
 }
 
-static int pmcheap_liftup( pmcheap *heap,
-                           int           pos )
+static int pmcheap_liftup(pmcheap *heap,
+                          int           pos)
 {
     int swaps   = 0;
     int href     = heap->perm[pos];
@@ -181,7 +181,7 @@ static int pmcheap_liftup( pmcheap *heap,
     int key = heap->elms[href].key;
 
     /* The sentinel at index 0 will stop the loop.*/
-    while ( heap->elms[perm[parent]].key > key ) {
+    while (heap->elms[perm[parent]].key > key) {
         /* Move the parent down .*/
         perm[pos] = perm[parent];
         iperm[perm[pos]] = pos;
@@ -191,7 +191,7 @@ static int pmcheap_liftup( pmcheap *heap,
     }
 
     /* If elm at href was lifted up (to pos), update perm arrays.*/
-    if ( href != heap->perm[pos] ) {
+    if (href != heap->perm[pos]) {
         perm[pos]         = href;
         iperm[href]        = pos;
     }
@@ -199,7 +199,7 @@ static int pmcheap_liftup( pmcheap *heap,
     return swaps;
 }
 
-static int pmcheap_siftdown( pmcheap *heap, int pos )
+static int pmcheap_siftdown(pmcheap *heap, int pos)
 {
     int swaps    = 0;
     int end_half = heap->end / 2;
@@ -210,16 +210,16 @@ static int pmcheap_siftdown( pmcheap *heap, int pos )
     int  ref = perm[pos];
     int  key = heap->elms[ref].key;
 
-    while ( pos <= end_half ) {
+    while (pos <= end_half) {
         minc  = pos << 1;  /* j = k*2 */
         rightc = minc + 1;
 
         /* set minc to minimum of left and right child */
-        if ( elms[perm[minc]].key  >  elms[perm[rightc]].key  ) {
+        if (elms[perm[minc]].key  >  elms[perm[rightc]].key) {
             minc = rightc;
         }
 
-        if ( key <= elms[perm[minc]].key ) {
+        if (key <= elms[perm[minc]].key) {
             break;
         }
 
@@ -236,52 +236,53 @@ static int pmcheap_siftdown( pmcheap *heap, int pos )
 }
 
 
-int pmcheap_insert ( pmcheap *heap, int key, void *obj )
+int pmcheap_insert(pmcheap *heap, int key, void *obj)
 {
     int val = 0;
-    ( heap->end )++;
+    (heap->end)++;
 
-    if ( heap->end  >= heap->size ) {
+    if (heap->end  >= heap->size) {
         int i;
         heap->size = heap->size * 2 + 2;
         /* realloc memory */
-        heap->perm = ( int * ) CCutil_reallocrus( heap->perm,
-                     heap->size * sizeof( int ) );
-        CCcheck_NULL_2( heap->perm, "Failed to reallocate heap->perm" );
-        heap->iperm = ( int * ) CCutil_reallocrus( heap->iperm,
-                      heap->size * sizeof( int ) );
-        CCcheck_NULL_2( heap->iperm, "Failed to reallocate heap->iperm" );
-        heap->elms = ( heapelm * ) CCutil_reallocrus( heap->elms,
-                     heap->size * sizeof( heapelm ) );
-        CCcheck_NULL_2( heap->elms, "Failed to reallocate heap->elms" );
+        heap->perm = (int *) CCutil_reallocrus(heap->perm,
+                                               heap->size * sizeof(int));
+        CCcheck_NULL_2(heap->perm, "Failed to reallocate heap->perm");
+        heap->iperm = (int *) CCutil_reallocrus(heap->iperm,
+                                                heap->size * sizeof(int));
+        CCcheck_NULL_2(heap->iperm, "Failed to reallocate heap->iperm");
+        heap->elms = (heapelm *) CCutil_reallocrus(heap->elms,
+                     heap->size * sizeof(heapelm));
+        CCcheck_NULL_2(heap->elms, "Failed to reallocate heap->elms");
 
-        for ( i = heap->end; i < heap->size; ++i ) {
+        for (i = heap->end; i < heap->size; ++i) {
             heap->elms[i].obj = NULL;
             heap->elms[i].key = CCutil_MAXINT;
             heap->perm[i] = heap->iperm[i] = i;
         }
 
 #ifdef HEAP_INTEGRITY_CHECKS
-        assert( !pmcheap_integrity( heap ) );
+        assert(!pmcheap_integrity(heap));
 #endif
     }
 
     heap->elms[heap->perm[heap->end]].obj  = obj;
     heap->elms[heap->perm[heap->end]].key  = key;
-    pmcheap_liftup( heap, heap->end );
-    HEAP_INTEGRITY( rval, heap, "pmcheap_integrity failed in pmcheap_insert." );
+    pmcheap_liftup(heap, heap->end);
+    HEAP_INTEGRITY(rval, heap, "pmcheap_integrity failed in pmcheap_insert.");
 CLEAN:
     return val;
 }
 
-int pmcheap_remove ( pmcheap *heap, int href )
+int pmcheap_remove(pmcheap *heap, int href)
 {
     int rval = 0;
     int heap_pos = heap->iperm[href];
 
-    if ( heap_pos > heap->end ) {
-        fprintf( stderr, "pmcheap_remove error: href does not exist!\n" );
-        rval = 1; goto CLEANUP;
+    if (heap_pos > heap->end) {
+        fprintf(stderr, "pmcheap_remove error: href does not exist!\n");
+        rval = 1;
+        goto CLEANUP;
     }
 
     heap->elms[href].key = CCutil_MAXINT;
@@ -290,7 +291,7 @@ int pmcheap_remove ( pmcheap *heap, int href )
      the time beeing I'm too lazy to implement this.  Instead I lift
      the last element to the hole and sift it down.
      */
-    if ( heap_pos < heap->end ) {
+    if (heap_pos < heap->end) {
         /* swap last elm to heap_pos  */
         heap->perm[heap_pos] = heap->perm[heap->end];
         heap->perm[heap->end] = href;
@@ -301,26 +302,26 @@ int pmcheap_remove ( pmcheap *heap, int href )
          It cannot travel to heap->end, as that element has
          key of CCutil_MAXINT now.
          */
-        rval = pmcheap_relabel( heap, heap->perm[heap_pos],
-                                heap->elms[heap->perm[heap_pos]].key );
+        rval = pmcheap_relabel(heap, heap->perm[heap_pos],
+                               heap->elms[heap->perm[heap_pos]].key);
     }
 
-    ( heap->end )--;
-    HEAP_INTEGRITY( rval, heap, "pmcheap_integrity failed in pmcheap_remove." );
+    (heap->end)--;
+    HEAP_INTEGRITY(rval, heap, "pmcheap_integrity failed in pmcheap_remove.");
 CLEANUP:
     return rval;
 }
 
-void *pmcheap_min( pmcheap *heap )
+void *pmcheap_min(pmcheap *heap)
 {
     int href;
     void *obj;
 #ifdef HEAP_INTEGRITY_CHECKS
-    assert( !pmcheap_integrity( heap ) );
+    assert(!pmcheap_integrity(heap));
 #endif
 
-    if ( pmcheap_empty( heap ) ) {
-        return ( void * ) NULL;
+    if (pmcheap_empty(heap)) {
+        return (void *) NULL;
     }
 
     href = heap->perm[1];
@@ -333,65 +334,66 @@ void *pmcheap_min( pmcheap *heap )
     heap->iperm[heap->perm[heap->end]] = heap->end;
     heap->elms[heap->perm[heap->end]].key = CCutil_MAXINT;
     heap->elms[heap->perm[heap->end]].obj = NULL;
-    ( heap->end )--;
+    (heap->end)--;
     /* Move down elm at index 1. */
-    pmcheap_siftdown( heap, 1 );
+    pmcheap_siftdown(heap, 1);
 #ifdef HEAP_INTEGRITY_CHECKS
-    assert( !pmcheap_integrity( heap ) );
+    assert(!pmcheap_integrity(heap));
 #endif
     return obj;
 }
 
-int pmcheap_get_key ( const pmcheap *heap, int href )
+int pmcheap_get_key(const pmcheap *heap, int href)
 {
-    assert( href < heap->size );
+    assert(href < heap->size);
     return heap->elms[href].key;
 }
 
-int pmcheap_size ( const pmcheap *heap )
+int pmcheap_size(const pmcheap *heap)
 {
     return heap->end;
 }
 
-void *pmcheap_get_obj( const pmcheap *heap, int href )
+void *pmcheap_get_obj(const pmcheap *heap, int href)
 {
-    assert( href < heap->size );
+    assert(href < heap->size);
     return heap->elms[href].obj;
 }
 
 
 
 
-int pmcheap_decrease_key ( pmcheap *heap, int href, int new_key )
+int pmcheap_decrease_key(pmcheap *heap, int href, int new_key)
 {
     int rval = 0;
     int heap_pos = heap->iperm[href];
 
-    if ( heap->elms[href].key < new_key ) {
-        fprintf( stderr,
-                 "pmcheap_decrease_key error: new_key is greater than old key!\n" );
-        rval = 1; goto CLEANUP;
+    if (heap->elms[href].key < new_key) {
+        fprintf(stderr,
+                "pmcheap_decrease_key error: new_key is greater than old key!\n");
+        rval = 1;
+        goto CLEANUP;
     }
 
     heap->elms[href].key = new_key;
-    pmcheap_liftup( heap, heap_pos );
-    HEAP_INTEGRITY( rval, heap,
-                    "pmcheap_integrity failed in pmcheap_decrease_key.\n" );
+    pmcheap_liftup(heap, heap_pos);
+    HEAP_INTEGRITY(rval, heap,
+                   "pmcheap_integrity failed in pmcheap_decrease_key.\n");
 CLEANUP:
     return rval;
 }
 
-int pmcheap_relabel ( pmcheap *heap, int href, int new_key )
+int pmcheap_relabel(pmcheap *heap, int href, int new_key)
 {
     int rval = 0;
     int heap_pos = heap->iperm[href];
     heap->elms[href].key = new_key;
 
-    if ( !pmcheap_liftup( heap, heap_pos ) ) {
-        pmcheap_siftdown( heap, heap_pos );
+    if (!pmcheap_liftup(heap, heap_pos)) {
+        pmcheap_siftdown(heap, heap_pos);
     }
 
-    HEAP_INTEGRITY( rval, heap, "pmcheap_integrity failed in pmcheap_relabel." );
+    HEAP_INTEGRITY(rval, heap, "pmcheap_integrity failed in pmcheap_relabel.");
 #ifdef HEAP_INTEGRITY_CHECKS
 CLEANUP:
 #endif

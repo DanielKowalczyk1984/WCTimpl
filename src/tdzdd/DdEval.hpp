@@ -28,127 +28,148 @@
 #include <iostream>
 #include <vector>
 
-namespace tdzdd {
+namespace tdzdd
+{
 
-/**
- * Collection of child node values/levels for
- * DdEval::evalNode function interface.
- * @tparam T data type of work area for each node.
- * @tparam ARITY the number of children for each node.
- */
-template<typename T, int ARITY>
-class DdValues {
-    T * value[ARITY];
-    int level[ARITY];
-
-public:
     /**
-     * Returns the value of the b-th child.
-     * @param b branch index.
-     * @return value of the b-th child.
+     * Collection of child node values/levels for
+     * DdEval::evalNode function interface.
+     * @tparam T data type of work area for each node.
+     * @tparam ARITY the number of children for each node.
      */
-    T const& get(int b) const {
-        assert(0 <= b && b < ARITY);
-        return *value[b];
+    template<typename T, int ARITY>
+    class DdValues
+    {
+            T *value[ARITY];
+            int level[ARITY];
+
+        public:
+            /**
+             * Returns the value of the b-th child.
+             * @param b branch index.
+             * @return value of the b-th child.
+             */
+            T const &get(int b) const
+            {
+                assert(0 <= b && b < ARITY);
+                return *value[b];
+            };
+
+            T *get_ptr(int b)
+            {
+                return value[b];
+            }
+
+            /**
+             * Returns the level of the b-th child.
+             * @param b branch index.
+             * @return level of the b-th child.
+             */
+            int getLevel(int b) const
+            {
+                assert(0 <= b && b < ARITY);
+                return level[b];
+            }
+
+            void setReference(int b, T &v)
+            {
+                assert(0 <= b && b < ARITY);
+                value[b] = &v;
+            }
+
+            void setReference(int b, T *v)
+            {
+                assert(0 <= b && b < ARITY);
+                value[b] =  v;
+            }
+
+            void setLevel(int b, int i)
+            {
+                assert(0 <= b && b < ARITY);
+                level[b] = i;
+            }
+
+            friend std::ostream &operator<<(std::ostream &os, DdValues const &o)
+            {
+                os << "(";
+
+                for (int b = 0; b < ARITY; ++b) {
+                    if (b != 0) {
+                        os << ",";
+                    }
+
+                    os << o.value(b) << "@" << o.level(b);
+                }
+
+                return os << ")";
+            }
     };
 
-    T* get_ptr(int b) {
-        return value[b];
-    }
-
     /**
-     * Returns the level of the b-th child.
-     * @param b branch index.
-     * @return level of the b-th child.
+     * Base class of DD evaluators.
+     *
+     * Every implementation must define the following functions:
+     * - void evalTerminal(T& v, int id)
+     * - void evalNode(T& v, int level, DdValues<T,ARITY> const& values)
+     *
+     * Optionally, the following functions can be overloaded:
+     * - bool showMessages()
+     * - void initialize(int level)
+     * - R getValue(T const& work)
+     * - void destructLevel(int i)
+     *
+     * @tparam E the class implementing this class.
+     * @tparam T data type of work area for each node.
+     * @tparam R data type of return value.
      */
-    int getLevel(int b) const {
-        assert(0 <= b && b < ARITY);
-        return level[b];
-    }
+    template<typename E, typename T, typename R = T>
+    class DdEval
+    {
+        public:
+            E &entity()
+            {
+                return *static_cast<E *>(this);
+            }
 
-    void setReference(int b, T & v){
-        assert(0 <= b && b < ARITY);
-        value[b] = &v;
-    }
+            E const &entity() const
+            {
+                return *static_cast<E const *>(this);
+            }
 
-    void setReference(int b, T * v) {
-        assert(0 <= b && b < ARITY);
-        value[b] =  v;
-    }
+            /**
+             * Returns preference to show messages.
+             * @return true if messages are preferred.
+             */
+            bool showMessages() const
+            {
+                return false;
+            }
 
-    void setLevel(int b, int i) {
-        assert(0 <= b && b < ARITY);
-        level[b] = i;
-    }
+            /**
+             * Initialization.
+             * @param level the maximum level of the DD.
+             */
+            void initialize(int level)
+            {
+            }
 
-    friend std::ostream& operator<<(std::ostream& os, DdValues const& o) {
-        os << "(";
-        for (int b = 0; b < ARITY; ++b) {
-            if (b != 0) os << ",";
-            os << o.value(b) << "@" << o.level(b);
-        }
-        return os << ")";
-    }
-};
+            /**
+             * Makes a result value.
+             * @param v work area value for the root node.
+             * @return final value of the evaluation.
+             */
+            R getValue(T const &v)
+            {
+                return R(v);
+            }
 
-/**
- * Base class of DD evaluators.
- *
- * Every implementation must define the following functions:
- * - void evalTerminal(T& v, int id)
- * - void evalNode(T& v, int level, DdValues<T,ARITY> const& values)
- *
- * Optionally, the following functions can be overloaded:
- * - bool showMessages()
- * - void initialize(int level)
- * - R getValue(T const& work)
- * - void destructLevel(int i)
- *
- * @tparam E the class implementing this class.
- * @tparam T data type of work area for each node.
- * @tparam R data type of return value.
- */
-template<typename E, typename T, typename R = T>
-class DdEval {
-public:
-    E& entity() {
-        return *static_cast<E*>(this);
-    }
-
-    E const& entity() const {
-        return *static_cast<E const*>(this);
-    }
-
-    /**
-     * Returns preference to show messages.
-     * @return true if messages are preferred.
-     */
-    bool showMessages() const {
-        return false;
-    }
-
-    /**
-     * Initialization.
-     * @param level the maximum level of the DD.
-     */
-    void initialize(int level) {
-    }
-
-    /**
-     * Makes a result value.
-     * @param v work area value for the root node.
-     * @return final value of the evaluation.
-     */
-    R getValue(T const& v) {
-        return R(v);
-    }
-
-    /**
-     * Destructs i-th level of data storage.
-     * @param i the level to be destructerd.
-     */
-    void destructLevel(int i) {
-    }
-};
+            /**
+             * Destructs i-th level of data storage.
+             * @param i the level to be destructerd.
+             */
+            void destructLevel(int i)
+            {
+            }
+    };
 
 } // namespace tdzdd

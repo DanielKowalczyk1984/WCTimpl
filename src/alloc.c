@@ -10,70 +10,70 @@
 
 #include "util.h"
 
-void *CCutil_allocrus ( size_t size )
+void *CCutil_allocrus(size_t size)
 {
-    void *mem = ( void * ) NULL;
+    void *mem = (void *) NULL;
 
-    if ( size == 0 ) {
-        fprintf ( stderr, "Warning: 0 bytes allocated\n" );
+    if (size == 0) {
+        fprintf(stderr, "Warning: 0 bytes allocated\n");
         return mem;
     }
 
-    mem = ( void * ) malloc ( size );
+    mem = (void *) malloc(size);
 
-    if ( mem == ( void * ) NULL ) {
-        fprintf ( stderr, "Out of memory. Asked for %d bytes\n at %d in file %s",
-                  ( int ) size, __LINE__, __FILE__ );
+    if (mem == (void *) NULL) {
+        fprintf(stderr, "Out of memory. Asked for %d bytes\n at %d in file %s",
+                (int) size, __LINE__, __FILE__);
     }
 
     return mem;
 }
 
-void CCutil_freerus ( void *p )
+void CCutil_freerus(void *p)
 {
-    if ( !p ) {
-        fprintf ( stderr, "Warning: null pointer freed\n" );
+    if (!p) {
+        fprintf(stderr, "Warning: null pointer freed\n");
         return;
     }
 
-    free ( p );
+    free(p);
 }
 
-void *CCutil_reallocrus ( void *ptr, size_t size )
+void *CCutil_reallocrus(void *ptr, size_t size)
 {
     void *newptr;
 
-    if ( !ptr ) {
-        return CCutil_allocrus ( size );
+    if (!ptr) {
+        return CCutil_allocrus(size);
     } else {
-        newptr = ( void * ) realloc ( ptr, size );
+        newptr = (void *) realloc(ptr, size);
 
-        if ( !newptr ) {
-            fprintf ( stderr, "Out of memory.  Tried to grow to %d bytes\n",
-                      ( int ) size );
+        if (!newptr) {
+            fprintf(stderr, "Out of memory.  Tried to grow to %d bytes\n",
+                    (int) size);
         }
 
         return newptr;
     }
 }
 
-int CCutil_reallocrus_scale ( void **pptr, int *pnnum, int count, double scale,
-                              size_t size )
+int CCutil_reallocrus_scale(void **pptr, int *pnnum, int count, double scale,
+                            size_t size)
 {
-    int newsize = ( int ) ( ( ( double ) * pnnum ) * scale );
+    int newsize = (int)(((double) * pnnum) * scale);
     void *p;
 
-    if ( newsize < *pnnum + 1000 ) {
+    if (newsize < *pnnum + 1000) {
         newsize = *pnnum + 1000;
     }
 
-    if ( newsize < count ) {
+    if (newsize < count) {
         newsize = count;
     }
 
-    p = CCutil_reallocrus ( *pptr, newsize * size );
+    p = CCutil_reallocrus(*pptr, newsize * size);
 
-    if ( !p ) {
+    if (!p) {
         return 1;
     } else {
         *pptr = p;
@@ -82,11 +82,11 @@ int CCutil_reallocrus_scale ( void **pptr, int *pnnum, int count, double scale,
     }
 }
 
-int CCutil_reallocrus_count ( void **pptr, int count, size_t size )
+int CCutil_reallocrus_count(void **pptr, int count, size_t size)
 {
-    void *p = CCutil_reallocrus ( *pptr, count * size );
+    void *p = CCutil_reallocrus(*pptr, count * size);
 
-    if ( !p ) {
+    if (!p) {
         return 1;
     } else {
         *pptr = p;
