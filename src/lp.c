@@ -70,18 +70,15 @@ int wctlp_optimize(wctlp *lp, int *status)
     CHECK_VAL_GRB(val, "GRBoptimize failed", lp->env);
     val = GRBgetintattr(lp->model, GRB_INT_ATTR_STATUS, status);
     CHECK_VAL_GRB(val, "GRBgetinattr failed", lp->env);
+    printf("status = %d\n", *status);
 
-    if (*status != GRB_OPTIMAL) {
+    if (*status != GRB_OPTIMAL && *status != GRB_INFEASIBLE) {
         printf("Failed to solve the model to optimality. status= ");
 
         switch (*status) {
             case GRB_LOADED:
                 printf("GRB_LOADED");
                 val = 1;
-                break;
-
-            case GRB_INFEASIBLE:
-                printf("GRB_INFEASIBLE\n");
                 break;
 
             case GRB_UNBOUNDED:
@@ -228,11 +225,6 @@ int wctlp_pi(wctlp *lp, double *pi)
     int solstat;
     val = GRBgetintattr(lp->model, GRB_INT_ATTR_STATUS, &solstat);
     CHECK_VAL_GRB(val, "failed to get attribute status gurobi", lp->env);
-    // if(solstat == GRB_INFEASIBLE){
-    //     fprintf(stderr, "Problem is infeasible\n");
-    //     val = 1;
-    //     return val;
-    // }
     val = GRBgetintattr(lp->model, GRB_INT_ATTR_NUMCONSTRS, &nrows);
     CHECK_VAL_GRB(val, "Failed to get nrows", lp->env);
 
@@ -242,13 +234,8 @@ int wctlp_pi(wctlp *lp, double *pi)
         return val;
     }
 
-    //if(solstat == GRB_OPTIMAL) {
     val = GRBgetdblattrarray(lp->model, GRB_DBL_ATTR_PI, 0, nrows, pi);
     CHECK_VAL_GRB(val, "Failed to get the dual prices", lp->env);
-    // } else if( solstat == GRB_INFEASIBLE){
-    //     val = GRBgetdblattrarray(lp->model, GRB_DBL_ATTR_FARKASDUAL, 0, nrows, pi);
-    //     CHECK_VAL_GRB(val, "Failed to get the farkas dual prices", lp->env);
-    // }
     return val;
 }
 

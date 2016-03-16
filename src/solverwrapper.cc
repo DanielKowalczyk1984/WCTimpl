@@ -23,6 +23,7 @@ int construct_sol(Scheduleset **set, int *nnewsets, Optimal_Solution<T> &sol, in
     }
 
     newset->totwct = sol.cost;
+    newset->totweight = sol.C_max;
     newset->count = sol.jobs.size();
     newset->members[sol.jobs.size()] = nbjobs;
     *set = newset;
@@ -78,6 +79,7 @@ CLEAN:
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->dynamic_programming_ahv(pd->pi);
+        printf("solve_dynamic_programming_ahv\n");
 
         if (s.obj < -0.000001) {
             val = construct_sol<double, true>(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
@@ -94,7 +96,7 @@ CLEAN:
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_farkas_double(pd->pi);
-        std::cout << s;
+        printf("solve_farkas_dbl\n");
 
         if (s.obj > 0.000001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
@@ -111,9 +113,9 @@ CLEAN:
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_bdd_double(pd->pi);
-        std::cout << s;
+        printf("solve_weight_dbl_bdd\n");
 
-        if (s.obj > 0.0001) {
+        if (s.obj > 0.00001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
             CCcheck_val_2(val, "Failed in construction")
         } else {
@@ -128,6 +130,7 @@ CLEAN:
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_zdd_double(pd->pi);
+        printf("solve_weight_dbl_zdd\n" );
 
         if (s.obj > 0.00001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
@@ -323,9 +326,10 @@ CLEAN:
                         pd->eta_in = result;
                         memcpy(pd->pi_in, pd->pi_sep, sizeof(double)*pd->njobs + 1);
                     }
+                } else {
+                    pd->eta_in = result;
+                    memcpy(pd->pi_in, pd->pi_sep, sizeof(double)*pd->njobs + 1);
                 }
-
-                printf("alpha = %f\n", alpha);
             } while (pd->nnewsets == 0 && alpha > 0.0); /** mispricing check */
         }
 
@@ -336,3 +340,5 @@ CLEAN:
         return val;
     }
 }
+
+

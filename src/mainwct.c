@@ -219,6 +219,7 @@ static int print_to_screen(wctproblem *problem)
             break;
 
         case feasible:
+        case lp_feasible:
         case meta_heur:
             printf("The suboptimal schedule with relative error %f is given by:\n", (double)(problem->global_upper_bound - problem->global_lower_bound) / (problem->global_lower_bound));
             //print_schedule(problem->bestschedule, problem->nbestschedule);

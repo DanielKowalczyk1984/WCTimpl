@@ -153,7 +153,6 @@ class PricerSolver
                 double **F;
                 bool **A;
                 int t_min = H_min;
-                double min;
                 F = new double* [nbjobs + 1];
                 A = new bool* [nbjobs + 1];
 
@@ -199,16 +198,16 @@ class PricerSolver
                 }
 
                 /** Find optimal solution */
-                min = F[nbjobs][0];
-                opt_sol.obj = min;
+                opt_sol.obj = F[nbjobs][0];
 
                 for (int i =  H_min; i < H_max + 1; i++) {
-                    if (F[nbjobs][i] < min) {
-                        min = F[nbjobs][i];
-                        t_min = i;
-                        opt_sol.obj = min;
+                    if (F[nbjobs][i] < opt_sol.obj) {
+                        opt_sol.C_max = i;
+                        opt_sol.obj = F[nbjobs][i];
                     }
                 }
+
+                t_min = opt_sol.C_max;
 
                 /** Construct the solution */
                 for (int i = nbjobs; i >= 1; --i) {

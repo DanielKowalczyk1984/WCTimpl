@@ -1688,7 +1688,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     int iterations = 0;
     int break_while_loop = 1;
     int    nnonimprovements     = 0;
-    int status;
+    int status = GRB_LOADED;
     double cur_cputime;
     double last_lower_bound = DBL_MAX;
     wctparms *parms = &(problem->parms);
@@ -1723,21 +1723,23 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     CCcheck_NULL_2(pd->pi_in, "Failed to allocate memory");
     fill_dbl(pd->pi_in, pd->njobs, 0.0);
     pd->eta_in = 0.0;
-    pd->subgradient_in = CC_SAFE_MALLOC(pd->njobs + 1, double);
-    CCcheck_NULL_2(pd->subgradient_in, "Failed to allocate memory");
     pd->pi_out = CC_SAFE_MALLOC(pd->njobs + 1, double);
     CCcheck_NULL_2(pd->pi_out, "Failed to allocate memory");
     pd->pi_sep = CC_SAFE_MALLOC(pd->njobs + 1, double);
     CCcheck_NULL_2(pd->pi_sep, "Failed to allocate memory");
+    pd->subgradient_in = CC_SAFE_MALLOC(pd->njobs + 1, double);
+    CCcheck_NULL_2(pd->subgradient_in, "Failed to allocate memory");
     pd->subgradient = CC_SAFE_MALLOC(pd->njobs + 1, double);
     CCcheck_NULL_2(pd->subgradient, "Failed to allocate memory");
 
     do {
         iterations++;
+
         /** delete old columns */
-        /*if(pd->dzcount > pd->njobs*min_ndelrow_ratio) {
+        if (pd->dzcount > pd->njobs * min_ndelrow_ratio && status == GRB_OPTIMAL) {
             val = delete_old_cclasses(pd);
-        }*/
+        }
+
         /** Compute LP relaxation */
         cur_cputime = CCutil_zeit();
         val = wctlp_optimize(pd->LP, &status);
@@ -1756,14 +1758,14 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
             print_ages(pd);
         }
 
-        /** get the dual variables and make them feasible */
-        val = wctlp_pi(pd->LP, pd->pi);
-        CCcheck_val_2(val, "pmclp_pi failed");
-        make_pi_feasible(pd);
         CCutil_start_resume_time(&problem->tot_pricing);
 
         switch (status) {
             case GRB_OPTIMAL:
+                /** get the dual variables and make them feasible */
+                val = wctlp_pi(pd->LP, pd->pi);
+                CCcheck_val_2(val, "pmclp_pi failed");
+                make_pi_feasible(pd);
                 /** Compute the objective function */
                 val = compute_objective(pd);
                 CCcheck_val_2(val, "Failed in compute_objective");
@@ -1791,10 +1793,13 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 break;
 
             case GRB_INFEASIBLE:
+                /** get the dual variables and make them feasible */
+                val = wctlp_pi(pd->LP, pd->pi);
+                CCcheck_val_2(val, "pmclp_pi failed");
+
                 if (iterations < pd->maxiterations) {
                     val = solve_farkas_dbl(pd);
                     CCcheck_val_2(val, "Failed in solving farkas");
-                    wctlp_write(pd->LP, "farkas.lp");
                 }
 
                 break;
@@ -1811,7 +1816,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
             case GRB_OPTIMAL:
                 switch (parms->stab_technique) {
                     case stab_wentgnes:
-                        break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.001 || pd->nnonimprovements > 5);
+                        break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001 || pd->nnonimprovements > 5);
                         break;
 
                     case no_stab:
@@ -1827,40 +1832,33 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         add_newsets(pd);
         CCutil_suspend_timer(&(problem->tot_cputime));
         CCutil_resume_timer(&(problem->tot_cputime));
-        printf("new sol\n");
-        getchar();
-    } while ((iterations < pd->maxiterations) && !break_while_loop
+    } while ((iterations < pd->maxiterations)
+             && !break_while_loop
              && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit);
 
     print_schedule(pd->cclasses, pd->ccount);
     getchar();
 
     if (iterations < pd->maxiterations && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit) {
-        val = wctlp_optimize(pd->LP, &status);
-        CCcheck_val_2(val, "pmclp_optimize failed");
-        printf("status = %d\n", status);
-
         switch (status) {
             case GRB_OPTIMAL:
+
+                /** change status of problem */
+                if (problem->status == no_sol) {
+                    problem->status = lp_feasible;
+                }
+
+                val = wctlp_optimize(pd->LP, &status);
+                CCcheck_val_2(val, "pmclp_optimize failed");
                 val = wctlp_pi(pd->LP, pd->pi);
                 CCcheck_val_2(val, "pmclp_pi failed");
                 make_pi_feasible(pd);
-
-                switch (parms->dual_var_type) {
-                    case Dbl:
-                        break;
-
-                    case Int:
-                        double2int(pd->kpc_pi, &(pd->kpc_pi_scalef), pd->pi, pd->njobs);
-                        val = compute_objective(pd);
-                        break;
-                }
-
+                val = compute_objective(pd);
                 CCcheck_val_2(val, "compute_objective failed");
 
                 if (dbg_lvl() > 1) {
                     printf("Found lb = %d (%f) upper_bound = %d (id= %d, iterations = %d,opt_track = %d).\n",
-                           pd->lower_bound, pd->dbl_safe_lower_bound, pd->upper_bound,
+                           pd->lower_bound, pd->LP_lower_bound, pd->upper_bound,
                            pd->id, iterations, pd->opt_track);
                 }
 

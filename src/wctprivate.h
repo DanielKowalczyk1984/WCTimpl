@@ -184,9 +184,10 @@ struct wctdata {
 
 typedef enum  {
     no_sol = 0,
-    feasible   = 1,
-    meta_heur  = 2,
-    optimal    = 3
+    lp_feasible = 1,
+    feasible   = 2,
+    meta_heur  = 3,
+    optimal    = 4
 } problem_status;
 
 typedef struct wctproblem wctproblem;

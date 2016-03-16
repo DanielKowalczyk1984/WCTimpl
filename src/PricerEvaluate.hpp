@@ -223,8 +223,9 @@ class Optimal_Solution
 {
     public:
         T obj;
-        std::vector<int> jobs;
         int cost;
+        int C_max;
+        std::vector<int> jobs;
         Optimal_Solution(PricerInfoZDD<T> *node, const int L)
         {
             int it_max = node->get_max(L);
@@ -258,12 +259,13 @@ class Optimal_Solution
             obj = other.obj;
             cost = other.cost;
             jobs = other.jobs;
+            C_max = other.C_max;
             return *this;
         }
 
         friend std::ostream &operator<<(std::ostream &os, Optimal_Solution<T> const &o)
         {
-            os << "max = " << o.obj << "," << std::endl << "cost = " << o.cost << std::endl;
+            os << "obj = " << o.obj << "," << std::endl << "cost = " << o.cost << " C_max = " << o.C_max << std::endl;
             std::vector<int>::const_iterator it = o.jobs.begin();
 
             for (; it != o.jobs.end(); ++it) {
@@ -471,15 +473,15 @@ class WeightBDD: public tdzdd::DdEval<E, PricerWeightBDD<T>, Optimal_Solution<T>
             sol.obj = (*data_table)[f->row()][f->col()].obj;
             tdzdd::NodeId cur_node = *f;
             sol.cost = 0;
-            int C = 0;
+            sol.C_max = 0;
             int j = nbjobs - cur_node.row();
 
             while (cur_node.row() != 0 || cur_node.col() != 0) {
-                if ((*data_table)[cur_node.row()][cur_node.col()].take &&  r[j] <= C && C + p[j] <= d[j]) {
+                if ((*data_table)[cur_node.row()][cur_node.col()].take &&  r[j] <= sol.C_max && sol.C_max + p[j] <= d[j]) {
                     sol.jobs.push_back(j);
                     cur_node = diagram.privateEntity().child(cur_node, 1);
-                    C += p[j];
-                    sol.cost += w[j] * C;
+                    sol.C_max += p[j];
+                    sol.cost += w[j] * sol.C_max;
                     j = nbjobs - cur_node.row();
                 } else {
                     cur_node = diagram.privateEntity().child(cur_node, 0);
@@ -544,18 +546,18 @@ class WeightZDD: public tdzdd::DdEval<E, PricerWeightZDD<T>, Optimal_Solution<T>
         Optimal_Solution<T> get_objective(tdzdd::NodeTableHandler<2> diagram, tdzdd::DataTable<PricerWeightZDD<T>> *data_table, const tdzdd::NodeId *f)
         {
             Optimal_Solution<T> sol;
-            int C = 0;
-            sol.obj = (*data_table)[f->row()][f->col()].obj[C];
+            sol.C_max = 0;
+            sol.obj = (*data_table)[f->row()][f->col()].obj[sol.C_max];
             sol.cost = 0;
             tdzdd::NodeId cur_node = *f;
             int j = nbjobs - cur_node.row();
 
             while (cur_node.row() != 0) {
-                if ((*data_table)[cur_node.row()][cur_node.col()].take[C] &&  r[j] <= C && C + p[j] <= d[j]) {
+                if ((*data_table)[cur_node.row()][cur_node.col()].take[sol.C_max] &&  r[j] <= sol.C_max && sol.C_max + p[j] <= d[j]) {
                     sol.jobs.push_back(j);
                     cur_node = diagram.privateEntity().child(cur_node, 1);
-                    C += p[j];
-                    sol.cost += w[j] * C;
+                    sol.C_max += p[j];
+                    sol.cost += w[j] * sol.C_max;
                     j = nbjobs - cur_node.row();
                 } else {
                     cur_node = diagram.privateEntity().child(cur_node, 0);
