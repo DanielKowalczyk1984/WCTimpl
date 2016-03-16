@@ -236,12 +236,16 @@ int Scheduleset_more(Scheduleset *c1, Scheduleset *c2)
 
 int Scheduleset_less_totweight(Scheduleset *c1, Scheduleset *c2)
 {
+    int i;
+
     if (c1->totweight != c2->totweight) {
         return c1->totweight < c2->totweight;
     }
 
-    if (c1->count != c2->count) {
-        return c1->count < c2->count;
+    for (i = 0; i < c1->count; ++i) {
+        if (c1->members[i] != c2->members[i]) {
+            return c1->members[i] < c2->members[i];
+        }
     }
 
     return 0;
@@ -249,12 +253,16 @@ int Scheduleset_less_totweight(Scheduleset *c1, Scheduleset *c2)
 
 int Scheduleset_more_totweight(Scheduleset *c1, Scheduleset *c2)
 {
+    int i;
+
     if (c1->totweight != c2->totweight) {
         return c1->totweight > c2->totweight;
     }
 
-    if (c1->count != c2->count) {
-        return c1->count > c2->count;
+    for (i = 0; i < c1->count; ++i) {
+        if (c1->members[i] != c2->members[i]) {
+            return c1->members[i] < c2->members[i];
+        }
     }
 
     return 0;

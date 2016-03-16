@@ -79,7 +79,6 @@ CLEAN:
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->dynamic_programming_ahv(pd->pi);
-        printf("solve_dynamic_programming_ahv\n");
 
         if (s.obj < -0.000001) {
             val = construct_sol<double, true>(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
@@ -96,7 +95,6 @@ CLEAN:
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_farkas_double(pd->pi);
-        printf("solve_farkas_dbl\n");
 
         if (s.obj > 0.000001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
@@ -113,7 +111,6 @@ CLEAN:
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_bdd_double(pd->pi);
-        printf("solve_weight_dbl_bdd\n");
 
         if (s.obj > 0.00001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
@@ -130,7 +127,7 @@ CLEAN:
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_zdd_double(pd->pi);
-        printf("solve_weight_dbl_zdd\n" );
+        printf("solve_weight_dbl_zdd\n");
 
         if (s.obj > 0.00001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
@@ -309,11 +306,11 @@ CLEAN:
         } else {
             double k = 0.0;
             double alpha;
+            double  result;
 
             do {
                 k += 1.0;
                 alpha = CC_MAX(0, 1.0 - k * (1.0 - pd->alpha));
-                double  result;
                 compute_pi_eta_sep(pd->njobs, pd->pi_sep, &(pd->eta_sep), alpha, pd->pi_in, &(pd->eta_in), pd->pi_out, &(pd->eta_out));
                 compute_sol_stab(solver, parms, pd->pi_sep, &sol);
                 result = compute_lagrange(sol, pd->pi_sep, pd->njobs, pd->nmachines);
@@ -326,11 +323,13 @@ CLEAN:
                         pd->eta_in = result;
                         memcpy(pd->pi_in, pd->pi_sep, sizeof(double)*pd->njobs + 1);
                     }
-                } else {
-                    pd->eta_in = result;
-                    memcpy(pd->pi_in, pd->pi_sep, sizeof(double)*pd->njobs + 1);
                 }
             } while (pd->nnewsets == 0 && alpha > 0.0); /** mispricing check */
+
+            if (result > pd->eta_in) {
+                pd->eta_in = result;
+                memcpy(pd->pi_in, pd->pi_sep, sizeof(double)*pd->njobs + 1);
+            }
         }
 
         //if(dbg_lvl() > 1) {

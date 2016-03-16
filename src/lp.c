@@ -70,7 +70,6 @@ int wctlp_optimize(wctlp *lp, int *status)
     CHECK_VAL_GRB(val, "GRBoptimize failed", lp->env);
     val = GRBgetintattr(lp->model, GRB_INT_ATTR_STATUS, status);
     CHECK_VAL_GRB(val, "GRBgetinattr failed", lp->env);
-    printf("status = %d\n", *status);
 
     if (*status != GRB_OPTIMAL && *status != GRB_INFEASIBLE) {
         printf("Failed to solve the model to optimality. status= ");

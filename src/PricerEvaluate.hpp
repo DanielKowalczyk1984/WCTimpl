@@ -675,16 +675,16 @@ class FarkasZDD: public tdzdd::DdEval<E, PricerFarkasZDD<T>, Optimal_Solution<T>
             Optimal_Solution<T> sol;
             sol.obj = (*data_table)[f->row()][f->col()].obj;
             sol.cost = 0;
-            int C = 0;
+            sol.C_max = 0;
             tdzdd::NodeId cur_node = *f;
             int j = nbjobs - cur_node.row();
 
             while (cur_node.row() != 0) {
-                if ((*data_table)[cur_node.row()][cur_node.col()].take &&  r[j] <= C && C + p[j] <= d[j]) {
+                if ((*data_table)[cur_node.row()][cur_node.col()].take &&  r[j] <= sol.C_max && sol.C_max + p[j] <= d[j]) {
                     sol.jobs.push_back(j);
                     cur_node = diagram.privateEntity().child(cur_node, 1);
-                    C += p[j];
-                    sol.cost += w[j] * C;
+                    sol.C_max += p[j];
+                    sol.cost += w[j] * sol.C_max;
                     j = nbjobs - cur_node.row();
                 } else {
                     cur_node = diagram.privateEntity().child(cur_node, 0);

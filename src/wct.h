@@ -3,6 +3,7 @@
 
 
 #include "wctprivate.h"
+#include "defs.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -229,6 +230,7 @@ int create_branches(wctdata *pd, wctproblem *problem);
 int check_integrality(wctdata *pd, int nmachine, int *result);
 int build_lp(wctdata *pd, int construct);
 void make_pi_feasible(wctdata *pd);
+void make_pi_feasible_farkas_pricing(wctdata *pd);
 int heur_colors_with_stable_sets(wctdata *pd);
 int compute_objective(wctdata *pd);
 

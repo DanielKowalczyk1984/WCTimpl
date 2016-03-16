@@ -581,7 +581,7 @@ int compute_objective(wctdata *pd)
         pd->lower_bound = (int) ceil(pd->LP_lower_bound);
     }
 
-    //if ( dbg_lvl() > 0 )
+    if ( dbg_lvl() > 0 )
     {
         printf("Current primal LP objective: %19.16f  (LP_dual-bound %19.16f, lowerbound = %d).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual, pd->lower_bound);
     }
@@ -589,7 +589,7 @@ CLEAN:
     return val;
 }
 
-
+MAYBE_UNUSED
 void make_pi_feasible(wctdata *pd)
 {
     int c;
@@ -608,7 +608,11 @@ void make_pi_feasible(wctdata *pd)
             colsum = nextafter(colsum, DBL_MAX);
         }
 
-        colsum += pd->nmachines * pd->pi[pd->cclasses[c].members[i]];
+        if (!signbit(pd->pi[pd->cclasses[i].members[i]])) {
+            pd->pi[pd->cclasses[c].members[i]] = 0;
+        }
+
+        colsum +=  pd->pi[pd->cclasses[c].members[i]];
 
         if (colsum > pd->cclasses[c].totwct) {
             for (i = 0; i < pd->cclasses[c].count; ++i) {
@@ -629,6 +633,7 @@ void make_pi_feasible(wctdata *pd)
     }
 }
 
+MAYBE_UNUSED
 void make_pi_feasible_farkas_pricing(wctdata *pd)
 {
     int c;
@@ -718,6 +723,7 @@ CLEAN:
     return val;
 }
 
+MAYBE_UNUSED
 int double2int(int *kpc_pi, int *scalef, const double *pi, int vcount)
 {
     int    i;
@@ -1431,7 +1437,7 @@ int sequential_branching(wctproblem *problem)
         int i;
         pd->upper_bound = problem->global_upper_bound;
 
-        if (pd->lower_bound >= pd->upper_bound) {
+        if (pd->lower_bound >= pd->upper_bound || pd->status == infeasible) {
             skip_wctdata(pd, problem);
             remove_finished_subtree(pd);
         } else {
@@ -1575,11 +1581,11 @@ static int delete_old_cclasses(wctdata *pd)
         pd->cclasses = new_cclasses;
         pd->ccount   = new_ccount;
 
-        if (dbg_lvl() > 0) {
+        //if (dbg_lvl() > 0) {
             printf("Deleted %d out of %d columns with age > %d.\n",
                    pd->dzcount, pd->dzcount + pd->ccount, pd->retirementage);
-        }
-
+        //}
+            getchar();
         pd->dzcount = 0;
     }
 
@@ -1751,9 +1757,6 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
             fflush(stdout);
         }
 
-        // val = grow_ages(pd);
-        // CCcheck_val_2(val, "Failed in grow_ages");
-
         if (dbg_lvl() > 1) {
             print_ages(pd);
         }
@@ -1762,15 +1765,15 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
 
         switch (status) {
             case GRB_OPTIMAL:
+                /** grow ages of the different columns */
+                val = grow_ages(pd);
+                CCcheck_val_2(val, "Failed in grow_ages");
                 /** get the dual variables and make them feasible */
                 val = wctlp_pi(pd->LP, pd->pi);
                 CCcheck_val_2(val, "pmclp_pi failed");
-                make_pi_feasible(pd);
                 /** Compute the objective function */
                 val = compute_objective(pd);
                 CCcheck_val_2(val, "Failed in compute_objective");
-                memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
-                pd->eta_out = pd->LP_lower_bound;
 
                 if (iterations < pd->maxiterations) {
                     /** nnonimprovements? */
@@ -1779,6 +1782,8 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                     /** Solve the pricing problem */
                     switch (parms->stab_technique) {
                         case stab_wentgnes:
+                            memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
+                            pd->eta_out = pd->LP_lower_bound;
                             val = solve_stab(pd, parms);
                             CCcheck_val_2(val, "Failed in solve_stab");
                             break;
@@ -1816,14 +1821,14 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
             case GRB_OPTIMAL:
                 switch (parms->stab_technique) {
                     case stab_wentgnes:
-                        break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001 || pd->nnonimprovements > 5);
+                        break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001);
                         break;
 
                     case no_stab:
                         break_while_loop = (pd->nnewsets == 0 || nnonimprovements > 5);
                         break;
                 }
-
+            break;
             case GRB_INFEASIBLE:
                 break_while_loop = (pd->nnewsets == 0);
                 break;
@@ -1835,9 +1840,6 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     } while ((iterations < pd->maxiterations)
              && !break_while_loop
              && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit);
-
-    print_schedule(pd->cclasses, pd->ccount);
-    getchar();
 
     if (iterations < pd->maxiterations && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit) {
         switch (status) {
@@ -1852,7 +1854,6 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 CCcheck_val_2(val, "pmclp_optimize failed");
                 val = wctlp_pi(pd->LP, pd->pi);
                 CCcheck_val_2(val, "pmclp_pi failed");
-                make_pi_feasible(pd);
                 val = compute_objective(pd);
                 CCcheck_val_2(val, "compute_objective failed");
 
@@ -1866,6 +1867,10 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 CCcheck_NULL_2(pd->x, "Failed to allocate memory to pd->x");
                 val = wctlp_x(pd->LP, pd->x, 0);
                 CCcheck_val_2(val, "Failed in pmclp_x");
+                for(unsigned i = 0; i < pd->ccount; ++i) {
+                    printf("%f \n", pd->x[i]);
+                }
+                printf("\n");
                 pd->status = LP_bound_computed;
                 break;
 
