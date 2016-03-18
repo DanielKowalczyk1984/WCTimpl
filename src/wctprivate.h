@@ -5,7 +5,6 @@
 #include "datastructsol.h"
 #include "wctparms.h"
 #include "lp.h"
-#include "solverwrapper.h"
 
 #ifdef __cplusplus
 extern "C" {
