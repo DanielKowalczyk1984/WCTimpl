@@ -211,6 +211,8 @@ void wctproblem_init(wctproblem *problem)
     CCutil_init_timer(&(problem->tot_lb_heur), "tot_lb_heur");
     /* Scatter sear init*/
     SS_init(&problem->scatter_search, 15, 10, 0.1);
+    /** Solver */
+    problem->solver = (PricerSolver *) NULL;
 }
 
 void wctproblem_free(wctproblem *problem)
@@ -1738,6 +1740,20 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     pd->subgradient = CC_SAFE_MALLOC(pd->njobs + 1, double);
     CCcheck_NULL_2(pd->subgradient, "Failed to allocate memory");
 
+    /** Init alpha */
+    switch (parms->stab_technique) {
+        case stab_wentgnes:
+            pd->alpha = 0.8;
+            break;
+
+        case stab_dynamic:
+            pd->alpha = 0.0;
+            break;
+
+        case no_stab:
+            break;
+    }
+
     do {
         iterations++;
 
@@ -1788,6 +1804,13 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                             CCcheck_val_2(val, "Failed in solve_stab");
                             break;
 
+                        case stab_dynamic:
+                            memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
+                            pd->eta_out = pd->LP_lower_bound;
+                            val = solve_stab_dynamic(pd, parms);
+                            CCcheck_val_2(val, "Failed in solve_stab");
+                            break;
+
                         case no_stab:
                             val = solve_pricing(pd, parms);
                             CCcheck_val_2(val, "Failed in solving pricing");
@@ -1821,6 +1844,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
             case GRB_OPTIMAL:
                 switch (parms->stab_technique) {
                     case stab_wentgnes:
+                    case stab_dynamic:
                         break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001);
                         break;
 

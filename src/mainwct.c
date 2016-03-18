@@ -27,7 +27,7 @@ static void usage(char *f)
     fprintf(stderr, "   -C int  Combine method scatter search: 0 = Pathrelinking, 1 = PM\n");
     fprintf(stderr, "   -r int  Scatter search use: 0 = no scatter search(default), 1 = scatter search\n");
     fprintf(stderr, "   -B int  Branch and Bound use: 0 = no branch and bound(default), 1 = use branch and bound\n");
-    fprintf(stderr, "   -S int  Stabilization technique: 0 = no stabilization(default), 1 = stabilization wentgnes\n");
+    fprintf(stderr, "   -S int  Stabilization technique: 0 = no stabilization(default), 1 = stabilization wentgnes, 2 = stabilization dynamic\n");
     fprintf(stderr, "   -z int  Pricing solver technique: 0 = BDD(default), 1 = ZDD, 2 = DP\n");
     fprintf(stderr, "   -c int  Construct heuristically solutions: 0 = yes(default), 1 = no\n");
 }

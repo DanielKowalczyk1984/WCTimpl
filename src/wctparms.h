@@ -51,6 +51,7 @@ enum dualvariablesType {
 enum stab_techniques {
     no_stab = 0,
     stab_wentgnes = 1,
+    stab_dynamic = 2,
 };
 
 enum pricing_solver {

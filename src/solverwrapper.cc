@@ -338,6 +338,47 @@ CLEAN:
 CLEAN:
         return val;
     }
+
+    int solve_stab_dynamic(wctdata *pd, wctparms *parms)
+    {
+        int val = 0;
+        PricerSolver *solver = pd->solver;
+        Optimal_Solution<double> sol;
+        double k = 0.0;
+        double alpha;
+        double result;
+
+        do {
+            k += 1.0;
+            alpha = CC_MAX(0.0, 1.0 - k * (1 - pd->alpha));
+            compute_pi_eta_sep(pd->njobs, pd->pi_sep, &(pd->eta_sep), alpha, pd->pi_in, &(pd->eta_in), pd->pi_out, &(pd->eta_out));
+            compute_sol_stab(solver, parms, pd->pi_sep, &(sol));
+            result = compute_lagrange(sol, pd->pi_sep, pd->njobs, pd->nmachines);
+
+            if (result < pd->eta_sep) {
+                val = construct_sol_stab(pd, parms, sol);
+                CCcheck_val_2(val, "Failed in construct_sol_stab");
+                compute_subgradient(sol, pd->subgradient, pd->njobs, pd->nmachines);
+                adjust_alpha(pd->pi_out, pd->pi_in, pd->subgradient, pd->njobs, alpha);
+
+                if (result > pd->eta_in) {
+                    pd->eta_in = result;
+                    memcpy(pd->pi_in, pd->pi_sep, sizeof(double) * (pd->njobs + 1));
+                }
+            }
+        } while (pd->nnewsets == 0 && alpha > 0.0);
+
+        if (result > pd->eta_in) {
+            pd->eta_in = result;
+            memcpy(pd->pi_in, pd->pi_sep, sizeof(double) * (pd->njobs + 1));
+        }
+
+        //if(dbg_lvl() > 1) {
+        printf(" alpha = %f, result of primal bound and Lagragian bound: out =%f, in = %f\n",  pd->alpha, pd->eta_out, pd->eta_in);
+        //}
+CLEAN:
+        return val;
+    }
 }
 
 
