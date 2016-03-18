@@ -222,27 +222,25 @@ static int print_to_screen(wctproblem *problem)
         case lp_feasible:
         case meta_heur:
             printf("The suboptimal schedule with relative error %f is given by:\n", (double)(problem->global_upper_bound - problem->global_lower_bound) / (problem->global_lower_bound));
-            //print_schedule(problem->bestschedule, problem->nbestschedule);
-            printf("Compute_schedule took %f seconds(tot_scatter_search %f, tot_branch_and_bound %f, tot_lb_cpu_time %f) and %f seconds in real time\n",
-                   problem->tot_cputime.cum_zeit,
-                   problem->tot_scatter_search.cum_zeit,
-                   problem->tot_branch_and_bound.cum_zeit,
-                   problem->tot_lb_lp.cum_zeit,
-                   problem->real_time);
+            print_schedule(problem->bestschedule, problem->nbestschedule);
             break;
 
         case optimal:
             printf("The optimal schedule is given by:\n");
             print_schedule(problem->bestschedule, problem->nbestschedule);
-            printf("Compute_schedule took %f seconds(tot_scatter_search %f, tot_branch_and_bound %f, tot_lb_cpu_time %f) and %f seconds in real time\n",
-                   problem->tot_cputime.cum_zeit,
-                   problem->tot_scatter_search.cum_zeit,
-                   problem->tot_branch_and_bound.cum_zeit,
-                   problem->tot_lb_lp.cum_zeit,
-                   problem->real_time);
             break;
     }
 
+    printf("Compute_schedule took %f seconds(tot_scatter_search %f, tot_branch_and_bound %f, tot_lb_lp_root %f, tot_lb_lp %f, tot_lb %f, tot_pricing %f, tot_build_dd %f) and %f seconds in real time\n",
+           problem->tot_cputime.cum_zeit,
+           problem->tot_scatter_search.cum_zeit,
+           problem->tot_branch_and_bound.cum_zeit,
+           problem->tot_lb_lp_root.cum_zeit,
+           problem->tot_lb_lp.cum_zeit,
+           problem->tot_lb.cum_zeit,
+           problem->tot_pricing.cum_zeit,
+           problem->tot_build_dd.cum_zeit,
+           problem->real_time);
     return val;
 }
 
@@ -295,6 +293,10 @@ int main(int ac, char **av)
     problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cw(pd->jobarray, pd->njobs, pd->nmachines));
     CCutil_stop_timer(&(problem.tot_lb), 0);
     printf("Computing lowerbound EEI, CP and CW took %f\n", problem.tot_lb.cum_zeit);
+    /** Construction Pricersolver */
+    CCutil_start_resume_time(&(problem.tot_build_dd));
+    problem.solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+    CCutil_suspend_timer(&(problem.tot_build_dd));
 
     /** Construct Feasible solutions */
     switch (parms->construct) {

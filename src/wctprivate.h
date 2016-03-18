@@ -12,6 +12,14 @@ extern "C" {
 #endif
 
 /**
+ * Solver data types
+ */
+
+typedef struct PricerSolver PricerSolver;
+PricerSolver *newSolver(int *p, int *w, int *r, int *d, int nbjobs, int Hmin, int Hmax);
+void deletePricerSolver(PricerSolver *solver);
+
+/**
  * scatter search data types
  */
 
@@ -222,18 +230,17 @@ struct wctproblem {
     int found;
     /*Cpu time measurement*/
     CCutil_timer tot_build_dd;
-
     CCutil_timer tot_cputime;
     CCutil_timer tot_branch_and_bound;
     CCutil_timer tot_lb;
-
     CCutil_timer tot_lb_lp_root;
     CCutil_timer tot_lb_lp;
     CCutil_timer tot_lb_heur;
     CCutil_timer tot_pricing;
-
     CCutil_timer tot_scatter_search;
     double real_time;
+    /** Pricer Solver */
+    PricerSolver *solver;
 };
 
 /*Initialize pmc data*/

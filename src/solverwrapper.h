@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-typedef struct PricerSolver PricerSolver;
+/*typedef struct PricerSolver PricerSolver;
 
 PricerSolver *newSolver(int *p, int *w, int *r, int *d, int nbjobs, int Hmin, int Hmax);
 
@@ -21,7 +21,7 @@ void addRestriction(PricerSolver *solver, int *jobs);
 
 void deletePricerSolver(PricerSolver *solver);
 
-void calc(PricerSolver *solver, double *pi);
+void calc(PricerSolver *solver, double *pi);*/
 
 
 #ifdef __cplusplus

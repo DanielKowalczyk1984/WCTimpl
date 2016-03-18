@@ -226,6 +226,7 @@ void wctproblem_free(wctproblem *problem)
     Schedulesets_free(&(problem->initsets), &(problem->gallocated));
     Schedulesets_free(&(problem->bestschedule), &(problem->nbestschedule));
     SS_free(&problem->scatter_search);
+    deletePricerSolver(problem->solver);
 }
 
 /*Functions for initialization and free the data*/
@@ -581,10 +582,10 @@ int compute_objective(wctdata *pd)
         pd->lower_bound = (int) ceil(pd->LP_lower_bound);
     }
 
-    if ( dbg_lvl() > 0 )
-    {
+    if (dbg_lvl() > 0) {
         printf("Current primal LP objective: %19.16f  (LP_dual-bound %19.16f, lowerbound = %d).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual, pd->lower_bound);
     }
+
 CLEAN:
     return val;
 }
@@ -1580,12 +1581,11 @@ static int delete_old_cclasses(wctdata *pd)
         CC_IFFREE(pd->cclasses, Scheduleset);
         pd->cclasses = new_cclasses;
         pd->ccount   = new_ccount;
-
         //if (dbg_lvl() > 0) {
-            printf("Deleted %d out of %d columns with age > %d.\n",
-                   pd->dzcount, pd->dzcount + pd->ccount, pd->retirementage);
+        printf("Deleted %d out of %d columns with age > %d.\n",
+               pd->dzcount, pd->dzcount + pd->ccount, pd->retirementage);
         //}
-            getchar();
+        getchar();
         pd->dzcount = 0;
     }
 
@@ -1700,7 +1700,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     wctparms *parms = &(problem->parms);
     /* Construction of solver*/
     CCutil_start_resume_time(&(problem->tot_build_dd));
-    pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+    pd->solver = problem->solver;
     CCutil_suspend_timer(&(problem->tot_build_dd));
 
     if (dbg_lvl()) {
@@ -1828,7 +1828,9 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                         break_while_loop = (pd->nnewsets == 0 || nnonimprovements > 5);
                         break;
                 }
-            break;
+
+                break;
+
             case GRB_INFEASIBLE:
                 break_while_loop = (pd->nnewsets == 0);
                 break;
@@ -1867,10 +1869,6 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 CCcheck_NULL_2(pd->x, "Failed to allocate memory to pd->x");
                 val = wctlp_x(pd->LP, pd->x, 0);
                 CCcheck_val_2(val, "Failed in pmclp_x");
-                for(unsigned i = 0; i < pd->ccount; ++i) {
-                    printf("%f \n", pd->x[i]);
-                }
-                printf("\n");
                 pd->status = LP_bound_computed;
                 break;
 
@@ -1885,7 +1883,6 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     fflush(stdout);
     CCutil_suspend_timer(&(problem->tot_lb_lp));
 CLEAN:
-    deletePricerSolver(pd->solver);
     pd->solver = (PricerSolver *) NULL;
     return val;
 }
