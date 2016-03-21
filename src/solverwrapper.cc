@@ -149,6 +149,13 @@ CLEAN:
         }
     }
 
+    int calculate_table(PricerSolver *solver){
+        int val = 0;
+        solver->init_bdd_table();
+
+        return val = 0;
+    }
+
     void compute_subgradient(Optimal_Solution<double> &sol, double *sub_gradient, int nbjobs, int nbmachines)
     {
         fill_dbl(sub_gradient, nbjobs, 1.0);
@@ -249,6 +256,7 @@ CLEAN:
             case DP_solver:
                 *sol = solver->dynamic_programming_ahv(pi);
                 break;
+            std::cout << *sol;
         }
     }
 
@@ -295,6 +303,7 @@ CLEAN:
             double result;
             compute_sol_stab(solver, parms, pd->pi, &sol);
             result = compute_lagrange(sol, pd->pi, pd->njobs, pd->nmachines);
+            std::cout << sol;
 
             if (result > pd->eta_in) {
                 pd->eta_in = result;
@@ -313,6 +322,7 @@ CLEAN:
                 alpha = CC_MAX(0, 1.0 - k * (1.0 - pd->alpha));
                 compute_pi_eta_sep(pd->njobs, pd->pi_sep, &(pd->eta_sep), alpha, pd->pi_in, &(pd->eta_in), pd->pi_out, &(pd->eta_out));
                 compute_sol_stab(solver, parms, pd->pi_sep, &sol);
+                std::cout << sol;
                 result = compute_lagrange(sol, pd->pi_sep, pd->njobs, pd->nmachines);
 
                 if (result < pd->eta_sep) {

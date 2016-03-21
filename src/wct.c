@@ -584,9 +584,9 @@ int compute_objective(wctdata *pd)
         pd->lower_bound = (int) ceil(pd->LP_lower_bound);
     }
 
-    if (dbg_lvl() > 0) {
+    //if (dbg_lvl() > 0) {
         printf("Current primal LP objective: %19.16f  (LP_dual-bound %19.16f, lowerbound = %d).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual, pd->lower_bound);
-    }
+    //}
 
 CLEAN:
     return val;
@@ -1704,6 +1704,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     CCutil_start_resume_time(&(problem->tot_build_dd));
     pd->solver = problem->solver;
     CCutil_suspend_timer(&(problem->tot_build_dd));
+    /** Init table */
 
     if (dbg_lvl()) {
         printf("Starting compute_lower_bound with lb %d and ub %d at depth %d(id = %d, opt_track = %d)\n",
@@ -1859,7 +1860,8 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 break_while_loop = (pd->nnewsets == 0);
                 break;
         }
-
+        printf("new col\n");
+        getchar();
         add_newsets(pd);
         CCutil_suspend_timer(&(problem->tot_cputime));
         CCutil_resume_timer(&(problem->tot_cputime));

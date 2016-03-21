@@ -159,12 +159,8 @@ namespace tdzdd
     template<int ARITY, typename T = int>
     struct Node {
         NodeId branch[ARITY];
-        T weight;
-        int indegree;
-        int var;
-        std::vector<T> vec_weight;
 
-        Node(): indegree(0), var(0)
+        Node()
         {
         }
 

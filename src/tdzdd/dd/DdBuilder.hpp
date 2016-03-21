@@ -31,7 +31,7 @@
 #include <map>
 
 #ifdef _OPENMP
-#include <omp.h>
+    #include <omp.h>
 #endif
 
 #include "DdSweeper.hpp"
@@ -347,9 +347,6 @@ namespace tdzdd
                     }
 
                     bool allZero = true;
-                    q->weight = spec.getState(state(p));
-                    q->var = i;
-                    q->indegree = indegree[p];
 
                     for (int b = 0; b < AR; ++b) {
                         spec.get_copy(state(pp), state(p));

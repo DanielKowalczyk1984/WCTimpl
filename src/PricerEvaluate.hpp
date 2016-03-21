@@ -5,6 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <array>
+#include <unordered_map>
 #include <boost/dynamic_bitset.hpp>
 #include <boost/unordered_map.hpp>
 
@@ -145,28 +146,19 @@ template<typename T>
 class PricerWeightZDD
 {
     public:
-        T *obj;
-        bool *take;
-        const std::vector<int> *weight;
+        std::unordered_map<int, T> obj;
+        std::unordered_map<int, bool> take;
+        std::vector<int> weight;
 
-        PricerWeightZDD(): obj(0), take(0), weight(0)
+        PricerWeightZDD()
         {
         };
 
         ~PricerWeightZDD()
         {
-            if (obj != 0) {
-                delete[] obj;
-                obj = 0;
-            }
-
-            if (take != 0) {
-                delete [] take;
-                take = 0;
-            }
         }
 
-        void alloc_node(const std::vector<int> *v)
+        /*void alloc_node(const std::vector<int> *v)
         {
             int max = *std::max_element(v->begin(), v->end());
             obj = new T[max + 1];
@@ -176,9 +168,9 @@ class PricerWeightZDD
             for (auto &i : *v) {
                 take[i] = false;
             }
-        }
+        }*/
 
-        void alloc_terminal_node(int H_min, int H_max, int H, int one)
+        /*void alloc_terminal_node(int H_min, int H_max, int H, int one)
         {
             int end = one ? H_max + 1 : H;
             obj = new T[end];
@@ -186,6 +178,14 @@ class PricerWeightZDD
 
             for (int i = one ? H_min : 0; i < H_max + 1 ; i++) {
                 obj[i] = one ? 0 : -1871286761.0;
+            }
+        }*/
+
+        void add_weight(int _weight){
+            if(obj.find(_weight) == obj.end()) {
+                weight.push_back(_weight);
+                obj[_weight] = 0.0;
+                take[_weight] = false;
             }
         }
 
@@ -488,7 +488,6 @@ class WeightBDD: public tdzdd::DdEval<E, PricerWeightBDD<T>, Optimal_Solution<T>
                     j = nbjobs - cur_node.row();
                 }
             }
-
             return sol;
         }
 };
@@ -525,7 +524,7 @@ class WeightZDD: public tdzdd::DdEval<E, PricerWeightZDD<T>, Optimal_Solution<T>
             PricerWeightZDD<T> *n0 = values.get_ptr(0);
             PricerWeightZDD<T> *n1 = values.get_ptr(1);
 
-            for (auto &it : * (n->weight)) {
+            for (auto &it : (n->weight)) {
                 if (n0->obj[it] >= n1->obj[it + p[j]] - (T) w[j] * (it + p[j]) + pi[j]) {
                     n->obj[it] = n0->obj[it];
                     n->take[it] = false;
@@ -538,8 +537,9 @@ class WeightZDD: public tdzdd::DdEval<E, PricerWeightZDD<T>, Optimal_Solution<T>
 
         void initializenode(PricerWeightZDD<T> &n)
         {
-            for (auto &i : * (n.weight)) {
+            for (auto &i : (n.weight)) {
                 n.take[i] = false;
+                n.obj[i] = 0.0;
             }
         }
 

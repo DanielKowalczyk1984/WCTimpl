@@ -16,6 +16,7 @@ extern "C" {
 
 typedef struct PricerSolver PricerSolver;
 PricerSolver *newSolver(int *p, int *w, int *r, int *d, int nbjobs, int Hmin, int Hmax);
+int calculate_table(PricerSolver *solver);
 void deletePricerSolver(PricerSolver *solver);
 
 /**

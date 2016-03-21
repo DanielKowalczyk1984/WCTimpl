@@ -21,6 +21,7 @@ class PricerSolver
         tdzdd::DataTable<PricerWeightZDD<double>> zdd_table;
         tdzdd::DataTable<PricerWeightBDD<double>> dd_table;
         tdzdd::DataTable<PricerFarkasZDD<double>> farkas_table;
+        tdzdd::DataTable<PricerWeightBDD<double>> bdd_calc_table;
 
         PricerSolver(int *_p, int *_w,  int *_r, int *_d, int njobs, int Hmin, int Hmax, bool print = false, bool reduce = false): p(_p), w(_w), r(_r), d(_d), nbjobs(njobs), H_min(Hmin), H_max(Hmax)
         {
@@ -50,12 +51,12 @@ class PricerSolver
             }
 
             dd = tdzdd::DdStructure<2>(ps);
-            init_table_bdd();
+            init_bdd_table();
 
             if (reduce) {
                 zdd = dd;
                 zdd.zddReduce();
-                init_table_zdd();
+                init_zdd_table();
                 init_table_farkas();
                 std::cout << "Reducing the size of DD structure:" <<  std::endl;
                 std::cout << "DD = " << dd.size() << " " << "ZDD = " << zdd.size() << std::endl;
@@ -78,52 +79,6 @@ class PricerSolver
             file.close();
         }
 
-        void init_table_zdd()
-        {
-            tdzdd::NodeTableHandler<2> &node_handler_zdd = zdd.getDiagram();
-            zdd_table.init(nbjobs + 1);
-            size_t const m = node_handler_zdd.privateEntity()[0].size();
-            /** Allocate memory to terminal nodes */
-            zdd_table[0].resize(m);
-
-            for (size_t j = 0; j < m; ++j) {
-                zdd_table[0][j].alloc_terminal_node(H_min, H_max, 2000, j);
-            }
-
-            /** Allocate memory to the other nodes */
-            for (size_t i = 1; i <= nbjobs; ++i) {
-                tdzdd::MyVector<tdzdd::Node<2> > const &node = node_handler_zdd.privateEntity()[i];
-                size_t const mm = node.size();
-                zdd_table[i].resize(mm);
-
-                for (size_t j = 0; j < mm; ++j) {
-                    zdd_table[i][j].alloc_node(&(node[j].vec_weight));
-                }
-            }
-        }
-
-        void init_table_bdd()
-        {
-            tdzdd::NodeTableHandler<2> &node_handler_bdd = dd.getDiagram();
-            dd_table.init(nbjobs + 1);
-            size_t const m = node_handler_bdd.privateEntity()[0].size();
-            dd_table[0].resize(m);
-
-            for (size_t i = 0; i < m; ++i) {
-                dd_table[0][i].init_terminal_node(i);
-            }
-
-            for (int i = 1; i <= nbjobs; ++i) {
-                tdzdd::MyVector<tdzdd::Node<2> > const &node = node_handler_bdd.privateEntity()[i];
-                size_t const mm = node.size();
-                dd_table[i].resize(mm);
-
-                for (size_t j = 0; j < mm; ++j) {
-                    dd_table[i][j].init_node(node[j].weight);
-                }
-            }
-        }
-
         void init_table_farkas()
         {
             tdzdd::NodeTableHandler<2> &node_handler_farkas = zdd.getDiagram();
@@ -142,6 +97,89 @@ class PricerSolver
 
                 for (size_t j = 0; j < mm; ++j) {
                     farkas_table[i][j].init_node();
+                }
+            }
+        }
+
+        void init_bdd_table()
+        {
+            tdzdd::NodeTableHandler<2> &handler = dd.getDiagram();
+            tdzdd::NodeId &root = dd.root();
+            dd_table.init(root.row() + 1);
+
+            /** init table */
+            for (int i = root.row(); i >= 0 ; i--) {
+                tdzdd::MyVector<tdzdd::Node<2>> const &node = handler.privateEntity()[i];
+                size_t const m = node.size();
+                dd_table[i].resize(m);
+            }
+
+            /** init root */
+            dd_table[root.row()][root.col()].init_node(0);
+
+            for (size_t i = nbjobs; i > 1 ; i--) {
+                size_t const m = dd_table[i].size();
+                int cur_job = nbjobs - i;
+
+                for (size_t j = 0; j < m; j++) {
+                    int sum_p = dd_table[i][j].sum_p;
+                    tdzdd::NodeId cur_node = handler.privateEntity().child(i, j, 0);
+
+                    if (cur_node.row() != 0) {
+                        dd_table[cur_node.row()][cur_node.col()].init_node(sum_p);
+                    }
+
+                    cur_node = handler.privateEntity().child(i, j, 1);
+
+                    if (cur_node.row() != 0) {
+                        dd_table[cur_node.row()][cur_node.col()].init_node(sum_p + p[cur_job]);
+                    }
+                }
+            }
+
+            /** init terminal nodes */
+            size_t const mm = handler.privateEntity()[0].size();
+
+            for (size_t j  = 0; j < mm; j++) {
+                dd_table[0][j].init_terminal_node(j);
+            }
+        }
+
+        void init_zdd_table()
+        {
+            tdzdd::NodeTableHandler<2> &handler = zdd.getDiagram();
+            tdzdd::NodeId &root = zdd.root();
+            zdd_table.init(root.row() + 1);
+
+            /** init table */
+            for (int i = root.row(); i >= 0 ; i--) {
+                tdzdd::MyVector<tdzdd::Node<2>> const &node = handler.privateEntity()[i];
+                size_t const m = node.size();
+                zdd_table[i].resize(m);
+            }
+
+            /** init root */
+            zdd_table[root.row()][root.col()].add_weight(0);
+
+            for (size_t i = nbjobs; i > 1 ; i--) {
+                size_t const m = zdd_table[i].size();
+                int cur_job = nbjobs - i;
+
+                for (size_t j = 0; j < m; j++) {
+                    std::vector<int>::iterator it =  zdd_table[i][j].weight.begin();
+                    tdzdd::NodeId cur_node_0 = handler.privateEntity().child(i, j, 0);
+                    tdzdd::NodeId cur_node_1 = handler.privateEntity().child(i, j, 1);
+
+                    for (; it != zdd_table[i][j].weight.end(); it++) {
+                        zdd_table[cur_node_0.row()][cur_node_0.col()].add_weight(*it);
+                        zdd_table[cur_node_1.row()][cur_node_1.col()].add_weight(*it + p[cur_job]);
+                    }
+                    printf("new row %lu\n",  zdd_table[cur_node_0.row()][cur_node_0.col()].weight.size());
+                    for(it = zdd_table[cur_node_0.row()][cur_node_0.col()].weight.begin(); it != zdd_table[cur_node_0.row()][cur_node_0.col()].weight.end();it++){
+                        std::cout << *it << " ";
+                    }
+                    std::cout << std::endl;
+                    std::cout << "-----------------------------------------------------------" << std::endl;
                 }
             }
         }
