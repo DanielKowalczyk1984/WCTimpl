@@ -1705,6 +1705,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     pd->solver = problem->solver;
     CCutil_suspend_timer(&(problem->tot_build_dd));
     /** Init table */
+    calculate_table(pd->solver, parms);
 
     if (dbg_lvl()) {
         printf("Starting compute_lower_bound with lb %d and ub %d at depth %d(id = %d, opt_track = %d)\n",
@@ -1860,8 +1861,6 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 break_while_loop = (pd->nnewsets == 0);
                 break;
         }
-        printf("new col\n");
-        getchar();
         add_newsets(pd);
         CCutil_suspend_timer(&(problem->tot_cputime));
         CCutil_resume_timer(&(problem->tot_cputime));

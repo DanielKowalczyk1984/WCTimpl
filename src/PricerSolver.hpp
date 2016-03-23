@@ -14,33 +14,15 @@ class PricerSolver
         int *w;
         int *r;
         int *d;
-        int *delta;
         const int nbjobs;
         int H_min;
         int H_max;
         tdzdd::DataTable<PricerWeightZDD<double>> zdd_table;
         tdzdd::DataTable<PricerWeightBDD<double>> dd_table;
         tdzdd::DataTable<PricerFarkasZDD<double>> farkas_table;
-        tdzdd::DataTable<PricerWeightBDD<double>> bdd_calc_table;
 
         PricerSolver(int *_p, int *_w,  int *_r, int *_d, int njobs, int Hmin, int Hmax, bool print = false, bool reduce = false): p(_p), w(_w), r(_r), d(_d), nbjobs(njobs), H_min(Hmin), H_max(Hmax)
         {
-            delta = new int [nbjobs];
-            int *sum_p = new int [nbjobs];
-            sum_p[0] = p[0];
-            int max_d = d[0];
-            delta[0] = std::min(sum_p[0], max_d);
-
-            for (int i = 1; i < nbjobs; i++) {
-                sum_p[i] = sum_p[i - 1] + p[i];
-
-                if (max_d < d[i]) {
-                    max_d = d[i];
-                }
-
-                delta[i] = std::min(sum_p[i], max_d);
-            }
-
             PricerSpec ps(p, r, d, nbjobs, Hmin, Hmax);
 
             if (print) {
@@ -51,13 +33,10 @@ class PricerSolver
             }
 
             dd = tdzdd::DdStructure<2>(ps);
-            init_bdd_table();
 
             if (reduce) {
                 zdd = dd;
                 zdd.zddReduce();
-                init_zdd_table();
-                init_table_farkas();
                 std::cout << "Reducing the size of DD structure:" <<  std::endl;
                 std::cout << "DD = " << dd.size() << " " << "ZDD = " << zdd.size() << std::endl;
 
@@ -66,7 +45,6 @@ class PricerSolver
                 }
             }
 
-            delete [] sum_p;
             delete [] ps.sum_p;
             delete [] ps.min_p;
         };
@@ -174,12 +152,6 @@ class PricerSolver
                         zdd_table[cur_node_0.row()][cur_node_0.col()].add_weight(*it);
                         zdd_table[cur_node_1.row()][cur_node_1.col()].add_weight(*it + p[cur_job]);
                     }
-                    printf("new row %lu\n",  zdd_table[cur_node_0.row()][cur_node_0.col()].weight.size());
-                    for(it = zdd_table[cur_node_0.row()][cur_node_0.col()].weight.begin(); it != zdd_table[cur_node_0.row()][cur_node_0.col()].weight.end();it++){
-                        std::cout << *it << " ";
-                    }
-                    std::cout << std::endl;
-                    std::cout << "-----------------------------------------------------------" << std::endl;
                 }
             }
         }
@@ -308,7 +280,6 @@ class PricerSolver
 
         ~PricerSolver()
         {
-            delete [] delta;
         };
 
 
