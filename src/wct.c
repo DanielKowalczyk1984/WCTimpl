@@ -5,6 +5,10 @@
 #include "wctparms.h"
 #include "heurdiving.h"
 
+static int collect_same_child(wctdata *cd);
+static int collect_diff_child(wctdata *cd);
+static int remove_finished_subtree_conflict(wctdata *child, wctproblem *problem);
+
 int debug = 0;
 
 static const double min_ndelrow_ratio = 0.5;
@@ -1011,7 +1015,7 @@ static int remove_finished_subtree_conflict(wctdata *child, wctproblem *problem)
         }
 
         if (cd->nsame && all_same_finished) {
-            val = collect_same_children(cd);
+            val = collect_same_child(cd);
             CCcheck_val_2(val, "Failed in collect_same_children");
 
             for (i = 0;  i < cd->nsame; ++i) {
@@ -1031,7 +1035,7 @@ static int remove_finished_subtree_conflict(wctdata *child, wctproblem *problem)
         }
 
         if (cd->ndiff && all_diff_finished) {
-            val = collect_diff_children(cd);
+            val = collect_diff_child(cd);
             CCcheck_val_2(val, "Failed in collect_diff_children");
 
             for (i = 0;  i < cd->ndiff; ++i) {
@@ -1045,7 +1049,6 @@ static int remove_finished_subtree_conflict(wctdata *child, wctproblem *problem)
 
         if (!cd->same_children && !cd->diff_children) {
             cd->status = finished;
-            val = backup_wctdata(cd, problem);
             CCcheck_val_2(val, "Failed to write_wctdata");
             cd = cd->parent;
         } else {
@@ -1293,6 +1296,10 @@ static int create_differ(wctdata *parent_pd,
     pd->upper_bound = parent_pd->upper_bound;
     pd->lower_bound = parent_pd->lower_bound;
     pd->dbl_safe_lower_bound = parent_pd->dbl_safe_lower_bound;
+    pd->lower_bound = parent_pd->lower_bound;
+    pd->duration = parent_pd->duration;
+    pd->releasetime = parent_pd->releasetime;
+    pd->duetime = parent_pd->duetime;
     /* Create  graph with extra edge (v1,v2) */
     pd->njobs = parent_pd->njobs;
     pd->ecount_differ = parent_pd->ecount_differ + 1;
@@ -1553,9 +1560,13 @@ static int create_same(wctdata *parent_pd, int v1, int v2)
     pd->upper_bound = parent_pd->upper_bound;
     pd->lower_bound = parent_pd->lower_bound;
     pd->dbl_safe_lower_bound = parent_pd->dbl_safe_lower_bound;
+    pd->lower_bound = parent_pd->lower_bound;
     pd->parent = parent_pd;
     pd->debugcolors = parent_pd->debugcolors;
     pd->ndebugcolors = parent_pd->ndebugcolors;
+    pd->duration = parent_pd->duration;
+    pd->releasetime = parent_pd->releasetime;
+    pd->duetime = parent_pd->duetime;
     val = mark_neighborhood(v2_neighbor_marker,
                             parent_pd->njobs, parent_pd->ecount_differ, parent_pd->elist_differ,
                             v2);
@@ -2554,8 +2565,8 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     CCutil_start_resume_time(&(problem->tot_build_dd));
     pd->solver = problem->solver;
     CCutil_suspend_timer(&(problem->tot_build_dd));
-    /** Init table */
-    calculate_table(pd->solver, parms);
+    /** Init table and construct zdd with conflicts */
+    add_conflict_constraints(pd->solver, parms, pd->elist_same, pd->ecount_same, pd->elist_differ, pd->ecount_differ);
 
     if (dbg_lvl() > 1) {
         printf("Starting compute_lower_bound with lb %d and ub %d at depth %d(id = %d, opt_track = %d)\n",
@@ -2758,6 +2769,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     fflush(stdout);
     CCutil_suspend_timer(&(problem->tot_lb_lp));
 CLEAN:
+    free_conflict_constraints(pd->solver, parms, pd->ecount_same, pd->ecount_differ);
     pd->solver = (PricerSolver *) NULL;
     return val;
 }
@@ -2839,12 +2851,12 @@ int compute_schedule(wctproblem *problem)
         val = compute_lower_bound(problem, root_pd);
         CCcheck_val_2(val, "Failed in compute_lower_bound");
         CCutil_stop_timer(&(problem->tot_lb_lp_root), 0);
-        //val = insert_into_branching_heap( root_pd, problem );
+        val = insert_into_branching_heap( root_pd, problem );
         CCcheck_val_2(val, "insert_into_branching_heap failed");
     }
 
     CCutil_start_resume_time(&(problem->tot_branch_and_bound));
-    //val = sequential_branching( problem );
+    //val = sequential_branching_conflict( problem );
     CCcheck_val(val, "Failed in sequential_branching");
     CCutil_suspend_timer(&(problem->tot_branch_and_bound));
 CLEAN:

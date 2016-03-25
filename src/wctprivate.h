@@ -18,6 +18,8 @@ typedef struct PricerSolver PricerSolver;
 PricerSolver *newSolver(int *p, int *w, int *r, int *d, int nbjobs, int Hmin, int Hmax);
 int calculate_table(PricerSolver *solver, wctparms *parms);
 void deletePricerSolver(PricerSolver *solver);
+int add_conflict_constraints(PricerSolver *solver, wctparms *parms, int *elist_same, int ecount_same, int *elist_differ, int  ecount_differ);
+int free_conflict_constraints(PricerSolver *solver, wctparms *parms, int ecount_same, int ecount_differ);
 
 /**
  * scatter search data types

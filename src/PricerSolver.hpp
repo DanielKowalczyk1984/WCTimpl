@@ -7,9 +7,10 @@
 class PricerSolver
 {
     public:
-        tdzdd::DdStructure<2> dd;
-        tdzdd::DdStructure<2> zdd;
-        tdzdd::DdStructure<2> tmp;
+        tdzdd::DdStructure<2> *dd;
+        tdzdd::DdStructure<2> *zdd;
+        tdzdd::DdStructure<2> root_dd;
+        tdzdd::DdStructure<2> root_zdd;
         int *p;
         int *w;
         int *r;
@@ -32,15 +33,13 @@ class PricerSolver
                 file.close();
             }
 
-            dd = tdzdd::DdStructure<2>(ps);
+            root_dd = tdzdd::DdStructure<2>(ps);
+            root_zdd = root_dd;
+            root_zdd.zddReduce();
+            std::cout << "Reducing the size of DD structure:" <<  std::endl;
+            std::cout << "DD = " << root_dd.size() << " " << "ZDD = " << root_zdd.size() << std::endl;
 
-            if (reduce) {
-                zdd = dd;
-                zdd.zddReduce();
-                std::cout << "Reducing the size of DD structure:" <<  std::endl;
-                std::cout << "DD = " << dd.size() << " " << "ZDD = " << zdd.size() << std::endl;
-                //if (print) {
-                //}
+            if (print) {
             }
 
             delete [] ps.sum_p;
@@ -51,13 +50,13 @@ class PricerSolver
         {
             std::ofstream file;
             file.open(name);
-            zdd.dumpDot(file);
+            zdd->dumpDot(file);
             file.close();
         }
 
         void init_table_farkas()
         {
-            tdzdd::NodeTableHandler<2> &node_handler_farkas = zdd.getDiagram();
+            tdzdd::NodeTableHandler<2> &node_handler_farkas = zdd->getDiagram();
             farkas_table.init(nbjobs + 1);
             size_t const m = node_handler_farkas.privateEntity()[0].size();
             farkas_table[0].resize(m);
@@ -79,8 +78,8 @@ class PricerSolver
 
         void init_bdd_table()
         {
-            tdzdd::NodeTableHandler<2> &handler = dd.getDiagram();
-            tdzdd::NodeId &root = dd.root();
+            tdzdd::NodeTableHandler<2> &handler = dd->getDiagram();
+            tdzdd::NodeId &root = dd->root();
             dd_table.init(root.row() + 1);
 
             /** init table */
@@ -123,8 +122,8 @@ class PricerSolver
 
         void init_zdd_table()
         {
-            tdzdd::NodeTableHandler<2> &handler = zdd.getDiagram();
-            tdzdd::NodeId &root = zdd.root();
+            tdzdd::NodeTableHandler<2> &handler = zdd->getDiagram();
+            tdzdd::NodeId &root = zdd->root();
             zdd_table.init(root.row() + 1);
 
             /** init table */
@@ -159,6 +158,62 @@ class PricerSolver
             for (size_t j = 0; j < mm ; j++) {
                 zdd_table[0][j].init_terminal_node(j, H_max);
             }
+        }
+
+        void init_bdd_conflict_solver(int *elist_same, int ecount_same, int *elist_differ, int ecount_differ)
+        {
+            if (ecount_differ + ecount_same > 0) {
+                dd = new tdzdd::DdStructure<2>;
+                *dd = root_dd;
+                ConflictConstraints conflict(nbjobs, elist_same, ecount_same, elist_differ, ecount_differ);
+                dd->zddSubset(conflict);
+                zdd = new tdzdd::DdStructure<2>;
+                *dd = *zdd;
+                zdd->zddReduce();
+            } else {
+                dd = &(root_dd);
+                zdd = &(root_zdd);
+            }
+
+            init_bdd_table();
+            init_table_farkas();
+        }
+
+        void init_zdd_conflict_solver(int *elist_same, int ecount_same, int *elist_differ, int ecount_differ)
+        {
+            if (ecount_same + ecount_differ > 0) {
+                zdd = new tdzdd::DdStructure<2>;
+                *zdd = root_dd;
+                ConflictConstraints conflict(nbjobs, elist_same, ecount_same, elist_differ, ecount_differ);
+                zdd->zddSubset(conflict);
+                zdd->zddReduce();
+            } else {
+                zdd = &(root_zdd);
+            }
+
+            init_zdd_table();
+            init_table_farkas();
+        }
+
+        void free_bdd_solver(int ecount_same, int ecount_differ)
+        {
+            if (ecount_differ + ecount_same > 0) {
+                delete dd;
+                delete zdd;
+            }
+
+            dd_table.init();
+            farkas_table.init();
+        }
+
+        void free_zdd_solver(int ecount_same, int ecount_differ)
+        {
+            if (ecount_differ + ecount_same > 0) {
+                delete zdd;
+            }
+
+            zdd_table.init();
+            farkas_table.init();
         }
 
         class Optimal_Solution<double> dynamic_programming_ahv(double *pi)
@@ -248,35 +303,29 @@ class PricerSolver
 
         class Optimal_Solution<double> solve_duration_bdd_double(double *pi)
         {
-                return dd.evaluate_reverse(DurationBDDdouble(pi, p, w, nbjobs));
+                return dd->evaluate_reverse(DurationBDDdouble(pi, p, w, nbjobs));
         }
 
         class Optimal_Solution<double> solve_duration_zdd_double(double *pi)
         {
-                return zdd.evaluate_forward_DP(DurationZDDdouble(pi, p, w, nbjobs, H_max));
+                return zdd->evaluate_forward_DP(DurationZDDdouble(pi, p, w, nbjobs, H_max));
         }
 
         class Optimal_Solution<double> solve_weight_bdd_double(double *pi)
         {
-                return dd.evaluate_weight(WeightBDDdouble(pi, p, w, r, d, nbjobs), dd_table);
+                return dd->evaluate_weight(WeightBDDdouble(pi, p, w, r, d, nbjobs), dd_table);
         }
 
         class Optimal_Solution<double> solve_weight_zdd_double(double *pi)
         {
-                return zdd.evaluate_weight(WeightZDDdouble(pi, p, w, r, d, nbjobs, H_min, H_max), zdd_table);
+                return zdd->evaluate_weight(WeightZDDdouble(pi, p, w, r, d, nbjobs, H_min, H_max), zdd_table);
         }
 
         class Optimal_Solution<double> solve_farkas_double(double *pi)
         {
-                return zdd.evaluate_weight(FarkasZDDdouble(pi, p, w, r, d, nbjobs, H_min, H_max), farkas_table);
+                return zdd->evaluate_weight(FarkasZDDdouble(pi, p, w, r, d, nbjobs, H_min, H_max), farkas_table);
         }
 
-        void addConflictConstraints(int *elist_same, int ecount_same, int *elist_differ, int ecount_differ)
-        {
-            tmp = zdd;
-            ConflictConstraints conflict(nbjobs, elist_same, ecount_same, elist_differ, ecount_differ);
-            tmp.zddSubset(conflict);
-        }
 
         void addDuetimeConstraint()
         {
@@ -288,9 +337,9 @@ class PricerSolver
 
         void iterate_zdd()
         {
-            tdzdd::DdStructure<2>::const_iterator it = zdd.begin();
+            tdzdd::DdStructure<2>::const_iterator it = zdd->begin();
 
-            for (; it != zdd.end(); ++it) {
+            for (; it != zdd->end(); ++it) {
                 std::vector<int>::const_iterator i = (*it).begin();
 
                 for (; i != (*it).end(); i++) {
@@ -302,10 +351,11 @@ class PricerSolver
         }
 
 
-        void iterate_dd(){
-            tdzdd::DdStructure<2>::const_iterator it = dd.begin();
+        void iterate_dd()
+        {
+            tdzdd::DdStructure<2>::const_iterator it = dd->begin();
 
-            for (; it != dd.end(); ++it) {
+            for (; it != dd->end(); ++it) {
                 std::vector<int>::const_iterator i = (*it).begin();
 
                 for (; i != (*it).end(); i++) {

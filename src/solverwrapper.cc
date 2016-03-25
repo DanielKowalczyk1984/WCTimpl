@@ -177,6 +177,46 @@ CLEAN:
         return val = 0;
     }
 
+    int add_conflict_constraints(PricerSolver *solver, wctparms *parms, int *elist_same, int ecount_same, int *elist_differ, int  ecount_differ)
+    {
+        int val = 0;
+
+        switch (parms->solver) {
+            case bdd_solver:
+                solver->init_bdd_conflict_solver(elist_same, ecount_same, elist_differ, ecount_differ);
+                break;
+
+            case zdd_solver:
+                solver->init_zdd_conflict_solver(elist_same, ecount_same, elist_differ, ecount_differ);
+                break;
+
+            case DP_solver:
+                break;
+        }
+
+        return val;
+    }
+
+    int free_conflict_constraints(PricerSolver *solver, wctparms *parms, int ecount_same, int ecount_differ)
+    {
+        int val = 0;
+
+        switch (parms->solver) {
+            case bdd_solver:
+                solver->free_bdd_solver(ecount_same, ecount_differ);
+                break;
+
+            case zdd_solver:
+                solver->free_zdd_solver(ecount_same, ecount_differ);
+                break;
+
+            case DP_solver:
+                break;
+        }
+
+        return val;
+    }
+
     void compute_subgradient(Optimal_Solution<double> &sol, double *sub_gradient, int nbjobs, int nbmachines)
     {
         fill_dbl(sub_gradient, nbjobs, 1.0);
@@ -323,7 +363,7 @@ CLEAN:
             double result;
             compute_sol_stab(solver, parms, pd->pi, &sol);
             result = compute_lagrange(sol, pd->pi, pd->njobs, pd->nmachines);
-            std::cout << sol;
+
             if (result > pd->eta_in) {
                 pd->eta_in = result;
                 memcpy(pd->pi_in, pd->pi, sizeof(double)*pd->njobs + 1);
