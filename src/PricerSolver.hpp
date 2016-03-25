@@ -39,10 +39,8 @@ class PricerSolver
                 zdd.zddReduce();
                 std::cout << "Reducing the size of DD structure:" <<  std::endl;
                 std::cout << "DD = " << dd.size() << " " << "ZDD = " << zdd.size() << std::endl;
-
-                if (print) {
-                    create_dot_zdd("DDStructure.txt");
-                }
+                //if (print) {
+                //}
             }
 
             delete [] ps.sum_p;
@@ -139,7 +137,7 @@ class PricerSolver
             /** init root */
             zdd_table[root.row()][root.col()].add_weight(0);
 
-            for (size_t i = nbjobs; i > 1 ; i--) {
+            for (size_t i = nbjobs; i >= 1 ; i--) {
                 size_t const m = zdd_table[i].size();
                 int cur_job = nbjobs - i;
 
@@ -153,6 +151,13 @@ class PricerSolver
                         zdd_table[cur_node_1.row()][cur_node_1.col()].add_weight(*it + p[cur_job]);
                     }
                 }
+            }
+
+            /** init terminal nodes */
+            size_t const mm = handler.privateEntity()[0].size();
+
+            for (size_t j = 0; j < mm ; j++) {
+                zdd_table[0][j].init_terminal_node(j, H_max);
             }
         }
 
@@ -266,8 +271,11 @@ class PricerSolver
                 return zdd.evaluate_weight(FarkasZDDdouble(pi, p, w, r, d, nbjobs, H_min, H_max), farkas_table);
         }
 
-        void addRestriction()
+        void addConflictConstraints(int *elist_same, int ecount_same, int *elist_differ, int ecount_differ)
         {
+            tmp = zdd;
+            ConflictConstraints conflict(nbjobs, elist_same, ecount_same, elist_differ, ecount_differ);
+            tmp.zddSubset(conflict);
         }
 
         void addDuetimeConstraint()
@@ -276,6 +284,36 @@ class PricerSolver
 
         void addReleasetimeConstraint()
         {
+        }
+
+        void iterate_zdd()
+        {
+            tdzdd::DdStructure<2>::const_iterator it = zdd.begin();
+
+            for (; it != zdd.end(); ++it) {
+                std::vector<int>::const_iterator i = (*it).begin();
+
+                for (; i != (*it).end(); i++) {
+                    std::cout << nbjobs - *i << " ";
+                }
+
+                std::cout << std::endl;
+            }
+        }
+
+
+        void iterate_dd(){
+            tdzdd::DdStructure<2>::const_iterator it = dd.begin();
+
+            for (; it != dd.end(); ++it) {
+                std::vector<int>::const_iterator i = (*it).begin();
+
+                for (; i != (*it).end(); i++) {
+                    std::cout << nbjobs - *i << " ";
+                }
+
+                std::cout << std::endl;
+            }
         }
 
         ~PricerSolver()

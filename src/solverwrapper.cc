@@ -127,7 +127,6 @@ CLEAN:
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_zdd_double(pd->pi);
-        printf("solve_weight_dbl_zdd\n");
 
         if (s.obj > 0.00001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
@@ -168,10 +167,10 @@ CLEAN:
 
         switch (parms->construct) {
             case yes_construct:
-                solver->init_table_farkas();
                 break;
 
             case no_construct:
+                solver->init_table_farkas();
                 break;
         }
 
@@ -210,7 +209,7 @@ CLEAN:
         int i;
         double beta = 1.0 - alpha;
 
-        for (i = 0; i < vcount; ++i) {
+        for (i = 0; i <= vcount; ++i) {
             pi_sep[i] = alpha * pi_in[i] + beta * pi_out[i];
         }
 
@@ -308,7 +307,6 @@ CLEAN:
                 break;
         }
 
-        std::cout << sol;
 CLEAN:
         return val;
     }
@@ -325,7 +323,7 @@ CLEAN:
             double result;
             compute_sol_stab(solver, parms, pd->pi, &sol);
             result = compute_lagrange(sol, pd->pi, pd->njobs, pd->nmachines);
-
+            std::cout << sol;
             if (result > pd->eta_in) {
                 pd->eta_in = result;
                 memcpy(pd->pi_in, pd->pi, sizeof(double)*pd->njobs + 1);
@@ -351,14 +349,14 @@ CLEAN:
 
                     if (result > pd->eta_in) {
                         pd->eta_in = result;
-                        memcpy(pd->pi_in, pd->pi_sep, sizeof(double)*pd->njobs + 1);
+                        memcpy(pd->pi_in, pd->pi_sep, sizeof(double) * (pd->njobs + 1));
                     }
                 }
             } while (pd->nnewsets == 0 && alpha > 0.0); /** mispricing check */
 
             if (result > pd->eta_in) {
                 pd->eta_in = result;
-                memcpy(pd->pi_in, pd->pi_sep, sizeof(double)*pd->njobs + 1);
+                memcpy(pd->pi_in, pd->pi_sep, sizeof(double) * (pd->njobs + 1));
             }
         }
 
@@ -389,7 +387,7 @@ CLEAN:
                 val = construct_sol_stab(pd, parms, sol);
                 CCcheck_val_2(val, "Failed in construct_sol_stab");
                 compute_subgradient(sol, pd->subgradient, pd->njobs, pd->nmachines);
-                adjust_alpha(pd->pi_out, pd->pi_in, pd->subgradient, pd->njobs, alpha);
+                adjust_alpha(pd->pi_out, pd->pi_in, pd->subgradient, pd->njobs, pd->alpha);
 
                 if (result > pd->eta_in) {
                     pd->eta_in = result;

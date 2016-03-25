@@ -172,12 +172,23 @@ struct wctdata {
     //Branches
     int branch_job;
     int completiontime;
+    //Conflict Branching
+    int *elist_same;
+    int ecount_same;
+    int *elist_differ;
+    int ecount_differ;
+    wctdata *same_children;
+    int nsame;
+    wctdata *diff_children;
+    int ndiff;
+    
 
     wctdata *parent;
     wctdata *duetime_child;
-    int nsame;
+    int nduetime;
     wctdata *releasetime_child;
-    int ndiff;
+    int nreleasetime;
+    int v1, v2;
 
     //heur_diving
     heur_diving heur_data;

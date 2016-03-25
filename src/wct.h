@@ -250,6 +250,7 @@ int add_newsets(wctdata *pd);
 int add_to_init(wctproblem *problem, Scheduleset *sets, int nbsets);
 int delete_to_bigcclasses(wctdata *pd, int capacity);
 int add_some_maximal_stable_sets(wctdata *pd, int number);
+int insert_into_branching_heap(wctdata *pd, wctproblem *problem);
 
 int remove_finished_subtreebis(wctdata *child);
 

@@ -47,6 +47,9 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
     CCcheck_val_2(val, "Failed in branchcandlp");
 
     if (branchcand.nlpcands == 0) {
+        int success;
+        val = constructsolution(pd, problem->parms.nmachines, &success);
+        CCcheck_val_2(val, "Failed at constructsolution");
         goto CLEAN;
     }
 
@@ -64,7 +67,7 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
 
     if (dbg_lvl() > 0) {
         printf("executing primal heuristic: depth=%d, %d fractionals, searchbound=%d",
-               depth, nlpcands, searchbound);
+               divedepth, nlpcands, searchbound);
     }
 
     while (!lperror && !cutoff && status == GRB_OPTIMAL && nlpcands > 0
@@ -129,13 +132,13 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
         do {
             cutoff = (((status > GRB_OPTIMAL)
                        || (objval > (double)pd->upper_bound + lp_int_tolerance())
-                       || (nlpcands == 0 && objval > (double)problem->parms.nmachines   + lp_int_tolerance())));
+                       || (nlpcands == 0 && objval > (double)pd->upper_bound + lp_int_tolerance())));
 
             if (!cutoff || backtracked || farkaspricing) {
-                val = heur_compute_lower_bound(problem, pd);
+                val = compute_lower_bound(problem, pd);
 
                 if (val) {
-                    printf("Failed at heur_compute_lower_bound_BPPC\n");
+                    printf("Failed at heur_compute_lower_bound\n");
                     lperror = 1;
                     break;
                 }

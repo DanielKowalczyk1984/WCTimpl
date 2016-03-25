@@ -9,7 +9,6 @@
 #include <boost/dynamic_bitset.hpp>
 #include <boost/unordered_map.hpp>
 
-
 /**
  * ZDD
  */
@@ -131,6 +130,7 @@ class PricerWeightBDD
         void init_terminal_node(int one)
         {
             obj = one ? 0.0 : -1871286761.0;
+            sum_p = 0;
         }
 
         void init_node(int weight)
@@ -186,6 +186,14 @@ class PricerWeightZDD
                 weight.push_back(_weight);
                 obj[_weight] = 0.0;
                 take[_weight] = false;
+            }
+        }
+
+        void init_terminal_node(int j, int H_max){
+            int end = j ? H_max + 1 : 2*H_max;
+            for(size_t i = 0; i < end;i++){
+                obj[i] = j ? 0.0 : -1871286761.0;
+                take[i] = false;
             }
         }
 
@@ -444,6 +452,7 @@ class WeightBDD: public tdzdd::DdEval<E, PricerWeightBDD<T>, Optimal_Solution<T>
             n.cost = 0.0;
             n.sum_w = 0.0;
             n.sum_p = 0.0;
+            n.take = false;
         }
 
         void evalNode(PricerWeightBDD<T> *n, int i, tdzdd::DdValues<PricerWeightBDD<T>, 2>    &values) const
@@ -512,7 +521,7 @@ class WeightZDD: public tdzdd::DdEval<E, PricerWeightZDD<T>, Optimal_Solution<T>
 
         void evalTerminal(PricerWeightZDD<T> &n)
         {
-            for (int i = H_min ; i < H_max  + 1; i++) {
+            for (int i = 0 ; i < 2000; i++) {
                 n.obj[i] = pi[nbjobs];
             }
         }
