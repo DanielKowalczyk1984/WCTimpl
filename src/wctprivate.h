@@ -20,7 +20,8 @@ int calculate_table(PricerSolver *solver, wctparms *parms);
 void deletePricerSolver(PricerSolver *solver);
 int add_conflict_constraints(PricerSolver *solver, wctparms *parms, int *elist_same, int ecount_same, int *elist_differ, int  ecount_differ);
 int free_conflict_constraints(PricerSolver *solver, wctparms *parms, int ecount_same, int ecount_differ);
-
+void iterate_dd(PricerSolver *solver);
+void iterate_zdd(PricerSolver *solver);
 /**
  * scatter search data types
  */
@@ -216,6 +217,12 @@ typedef struct wctproblem wctproblem;
 struct wctproblem {
     wctparms parms;
     wctdata root_pd;
+    /** Job data */
+    int *duration;
+    int *weight;
+    int *releasetime;
+    int *duetime;
+    Job *jobarray;
 
     int nwctdata;
     int global_upper_bound;

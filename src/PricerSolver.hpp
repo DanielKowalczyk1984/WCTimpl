@@ -92,7 +92,7 @@ class PricerSolver
             /** init root */
             dd_table[root.row()][root.col()].init_node(0);
 
-            for (size_t i = nbjobs; i > 1 ; i--) {
+            for (size_t i = nbjobs; i > 0 ; i--) {
                 size_t const m = dd_table[i].size();
                 int cur_job = nbjobs - i;
 
@@ -168,11 +168,15 @@ class PricerSolver
                 ConflictConstraints conflict(nbjobs, elist_same, ecount_same, elist_differ, ecount_differ);
                 dd->zddSubset(conflict);
                 zdd = new tdzdd::DdStructure<2>;
-                *dd = *zdd;
+                *zdd = *dd;
                 zdd->zddReduce();
             } else {
                 dd = &(root_dd);
                 zdd = &(root_zdd);
+            }
+
+            if (dd->size() == 0) {
+                return;
             }
 
             init_bdd_table();

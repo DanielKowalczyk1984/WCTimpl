@@ -167,6 +167,7 @@ static int print_to_csv(wctproblem *problem)
     problem->real_time = getRealTime() - problem->real_time;
     CCutil_stop_timer(&(problem->tot_cputime), 0);
     file = fopen(filenm, "a+");
+    int size = ftell(file);
 
     if (file == NULL) {
         printf("We couldn't open %s in %s at line %d\n", filenm, __FILE__, __LINE__);
@@ -175,7 +176,6 @@ static int print_to_csv(wctproblem *problem)
     }
 
     fseek(file, 0, SEEK_END);
-    int size = ftell(file);
 
     if (size == 0) {
         fprintf(file, "%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n", "NameInstance", "tot_Real_time", "tot_cputime",
@@ -274,7 +274,7 @@ int main(int ac, char **av)
 
     fflush(stdout);
     /** Reading and preprocessing the data */
-    val  = read_problem(parms->jobfile, &(pd->njobs), &(pd->duration), &(pd->weights));
+    val  = read_problem(parms->jobfile, &(pd->njobs), &(problem.duration), &(problem.weight));
     pd->nmachines = parms->nmachines;
     CCcheck_val(val, "read_adjlist failed");
     pd->orig_node_ids = (int *)CC_SAFE_MALLOC(pd->njobs, int);
@@ -284,7 +284,7 @@ int main(int ac, char **av)
         pd->orig_node_ids[i] = i;
     }
 
-    Preprocessdata(pd);
+    Preprocessdata(&problem, pd);
     printf("Reading and preprocessing of the data took %f\n", CCutil_zeit() - start_time);
     /** Computing initial lowerbound */
     CCutil_start_timer(&(problem.tot_lb));

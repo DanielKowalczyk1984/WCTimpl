@@ -54,7 +54,7 @@ void wctlp_free(wctlp **lp)
             GRBfreemodel((*lp)->model);
         }
 
-        if ((*lp)->model) {
+        if ((*lp)->env) {
             GRBfreeenv((*lp)->env);
         }
 
@@ -156,7 +156,7 @@ int wctlp_addrow(wctlp *lp, int nzcount, int *cind , double *cval,
             val = 1;
             return val;
     }
-
+    
     val = GRBaddconstr(lp->model, nzcount, cind, cval, isense, rhs, name);
     CHECK_VAL_GRB(val, "Failed GRBadd", lp->env);
     val = GRBupdatemodel(lp->model);

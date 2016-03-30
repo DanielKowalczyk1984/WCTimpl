@@ -95,6 +95,7 @@ CLEAN:
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_farkas_double(pd->pi);
+        std::cout << s ;
 
         if (s.obj > 0.000001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
@@ -195,6 +196,14 @@ CLEAN:
         }
 
         return val;
+    }
+
+    void iterate_dd(PricerSolver *solver){
+        solver->iterate_dd();
+    }
+
+    void iterate_zdd(PricerSolver *solver){
+        solver->iterate_zdd();
     }
 
     int free_conflict_constraints(PricerSolver *solver, wctparms *parms, int ecount_same, int ecount_differ)
@@ -400,9 +409,10 @@ CLEAN:
             }
         }
 
-        //if(dbg_lvl() > 1) {
-        printf("heading = %d, alpha = %f, result of primal bound and Lagragian bound: out =%f, in = %f\n", heading_in, pd->alpha, pd->eta_out, pd->eta_in);
-        //}
+        if (dbg_lvl() > 1) {
+            printf("heading = %d, alpha = %f, result of primal bound and Lagragian bound: out =%f, in = %f\n", heading_in, pd->alpha, pd->eta_out, pd->eta_in);
+        }
+
 CLEAN:
         return val;
     }

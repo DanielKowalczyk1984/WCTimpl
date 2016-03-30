@@ -633,6 +633,12 @@ namespace tdzdd
                     mh.setSteps(n);
                 }
 
+                if (this->size() == 0){
+                    printf("empty DDstructure\n");
+                    R retval;
+                    return retval;
+                }
+
                 eval.evalTerminal(work[0][1]);
 
                 for (int i = 1; i <= n; ++i) {

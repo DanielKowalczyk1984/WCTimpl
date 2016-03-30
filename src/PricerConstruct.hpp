@@ -162,11 +162,11 @@ class ConflictConstraints: public tdzdd::DdSpec<ConflictConstraints, conflict_st
 
     public:
         ConflictConstraints(int _nbjobs, int *elist_same, int ecount_same, int *elist_differ, int ecount_differ): nbjobs(_nbjobs)
-        {
+        {   
             differsets.resize(_nbjobs);
             samesets.resize(_nbjobs);
 
-            for (size_t i = 0; i < nbjobs; i++) {
+            for (size_t i = 0; i < _nbjobs; i++) {
                 differsets[i].resize(_nbjobs);
                 samesets[i].resize(_nbjobs);
             }

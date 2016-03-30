@@ -131,10 +131,12 @@ class PricerWeightBDD
         {
             obj = one ? 0.0 : -1871286761.0;
             sum_p = 0;
+            take = false;
         }
 
         void init_node(int weight)
         {
+            obj = 0.0;
             sum_p = weight;
             take = false;
         }
@@ -260,6 +262,9 @@ class Optimal_Solution
 
         Optimal_Solution()
         {
+            obj = 0;
+            cost = 0;
+            C_max = 0;
         }
 
         Optimal_Solution &operator=(const Optimal_Solution &other)
