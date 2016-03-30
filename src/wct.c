@@ -7,7 +7,7 @@
 
 static int collect_same_child(wctdata *cd);
 static int collect_diff_child(wctdata *cd);
-static int remove_finished_subtree_conflict(wctdata *child, wctproblem *problem);
+static int remove_finished_subtree_conflict(wctdata *child);
 int recover_elist(wctdata *pd);
 int create_branches_conflict(wctdata *pd, wctproblem *problem);
 int sequential_branching_conflict(wctproblem *problem);
@@ -192,7 +192,7 @@ void wctproblem_init(wctproblem *problem)
     problem->releasetime = (int *) NULL;
     problem->duetime = (int *) NULL;
     problem->jobarray = (Job *) NULL;
-    /*B&B info*/ 
+    /*B&B info*/
     problem->nwctdata = 0;
     problem-> global_upper_bound = INT_MAX;
     problem->first_lower_bound = 0;
@@ -318,6 +318,8 @@ void wctdata_init(wctdata *pd)
     pd->ecount_same = 0;
     pd->elist_differ = (int *) NULL;
     pd->ecount_differ = 0;
+    pd->v1 = -1;
+    pd->v2 = -1;
     heur_init(pd);
 }
 
@@ -397,13 +399,11 @@ void temporary_data_free(wctdata *pd)
 
 void wctdata_free(wctdata *pd)
 {
-    
     Schedulesets_free(&(pd->bestcolors), &(pd->nbbest));
     temporary_data_free(pd);
     CC_IFFREE(pd->elist_same, int);
     CC_IFFREE(pd->elist_differ, int);
     CC_IFFREE(pd->orig_node_ids, int);
-    
 }
 
 /** help functions for heap srong branching */
@@ -600,12 +600,12 @@ int Preprocessdata(wctproblem *problem, wctdata *pd)
         problem->releasetime[i] = jobarray[i].releasetime;
         problem->duetime[i] = jobarray[i].duetime;
     }
+
     pd->jobarray = jobarray;
     pd->releasetime = problem->releasetime;
     pd->duetime = problem->duetime;
     pd->duration = problem->duration;
     pd->weights = problem->weight;
-
 CLEAN:
 
     if (val) {
@@ -649,9 +649,9 @@ int compute_objective(wctdata *pd)
         pd->lower_bound = (int) ceil(pd->LP_lower_bound);
     }
 
-    //if (dbg_lvl() > 1) {
+    if (dbg_lvl() > 1) {
         printf("Current primal LP objective: %19.16f  (LP_dual-bound %19.16f, lowerbound = %d).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual, pd->lower_bound);
-    //}
+    }
 
 CLEAN:
     return val;
@@ -966,8 +966,8 @@ static int collect_duetime_child(wctdata *cd)
             }
 
             cd->upper_bound = cd->besttotwct = cd->duetime_child[c].besttotwct;
-            cd->nbbest = 
-            cd->duetime_child[c].nbbest = 0;
+            cd->nbbest =
+                cd->duetime_child[c].nbbest = 0;
             cd->bestcolors = cd->duetime_child[c].bestcolors;
             cd->duetime_child[c].bestcolors = (Scheduleset *) NULL;
             /** Check if the solution is feasible, i.e. every job is covered */
@@ -1023,7 +1023,7 @@ static int collect_diff_child(wctdata *cd)
     return rval;
 }
 
-static int remove_finished_subtree_conflict(wctdata *child, wctproblem *problem)
+static int remove_finished_subtree_conflict(wctdata *child)
 {
     int val = 0;
     int i;
@@ -1310,7 +1310,6 @@ static int create_differ(wctdata *parent_pd,
 {
     int val = 0;
     int i;
-    int           v2_covered = 0;
     wctdata    *pd =  CC_SAFE_MALLOC(1, wctdata);
     CCcheck_NULL_2(pd, "Failed to allocate pd");
     wctdata_init(pd);
@@ -1454,9 +1453,7 @@ CLEAN:
 }
 
 static int transfer_same_cclasses(wctdata *pd,
-                                  const int *v2_neighbor_marker,
                                   const Scheduleset *parent_cclasses,
-                                  const int *parent_weights,
                                   int   parent_ccount,
                                   int   v1,
                                   int   v2)
@@ -1553,7 +1550,7 @@ CLEAN:
     return val;
 }
 
-
+MAYBE_UNUSED
 static int mark_neighborhood(int *neighbor_marker,
                              int vcount, int ecount, int elist[],
                              int v)
@@ -1613,11 +1610,7 @@ static int create_same(wctdata *parent_pd, int v1, int v2)
     pd->dbl_safe_lower_bound = parent_pd->dbl_safe_lower_bound;
     pd->parent = parent_pd;
     pd->debugcolors = parent_pd->debugcolors;
-    pd->ndebugcolors = parent_pd->ndebugcolors;
-    val = mark_neighborhood(v2_neighbor_marker,
-                            parent_pd->njobs, parent_pd->ecount_differ, parent_pd->elist_differ,
-                            v2);
-    CCcheck_val_2(val, "Failed in mark_neighborhood");
+    pd->ndebugcolors = parent_pd->ndebugcolors;;
     /* Create  graph with extra edge (v1,v2) in same_elist*/
     pd->ecount_same = parent_pd->ecount_same + 1;
     pd->elist_same  = CC_SAFE_MALLOC(2 * pd->ecount_same, int);
@@ -1647,9 +1640,7 @@ static int create_same(wctdata *parent_pd, int v1, int v2)
     }
 
     val = transfer_same_cclasses(pd,
-                                 v2_neighbor_marker,
                                  parent_pd->cclasses,
-                                 parent_pd->weights,
                                  parent_pd->ccount,
                                  v1, v2);
     CCcheck_val_2(val, "Failed in transfer_same_cclasses");
@@ -1674,7 +1665,6 @@ int recover_elist(wctdata *pd)
     wctdata    **path  = (wctdata **) NULL;
     int            npath = 0;
     wctdata     *tmp_cd  = pd;
-    wctdata     *root_cd = pd;
     int           *elist_same   = (int *) NULL;
     int *elist_differ = (int *) NULL;
     int            ecount_differ = 0;
@@ -1696,7 +1686,6 @@ int recover_elist(wctdata *pd)
     while (tmp_cd) {
         i--;
         path[i] = tmp_cd;
-        root_cd = tmp_cd;
 
         if (is_diff_child(tmp_cd)) {
             ndiff++;
@@ -1805,7 +1794,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
         inodepair_ref_key(&v1, &v2, (int)(min_nodepair - nodepair_refs));
         assert(v1 < v2);
 
-        if (dbg_lvl() == 0) {
+        if (dbg_lvl() > 1) {
             printf("Creating branches for v1 = %d, v2 = %d (node-pair weight %f)\n", v1,
                    v2,
                    nodepair_weights[(int)(min_nodepair - nodepair_refs)]);
@@ -1816,8 +1805,8 @@ static int find_strongest_children_conflict(int *strongest_v1,
         CCcheck_val_2(val, "Failed in create_same");
         val = create_differ(pd, v1, v2);
         CCcheck_val_2(val, "Failed in create_differ");
-        pd->same_children->maxiterations = 100;
-        pd->diff_children->maxiterations = 100;
+        pd->same_children->maxiterations = 5;
+        pd->diff_children->maxiterations = 5;
         compute_lower_bound(problem, pd->same_children);
         compute_lower_bound(problem, pd->diff_children);
         dbl_child_lb = (pd->same_children->LP_lower_bound <
@@ -2086,7 +2075,6 @@ static int grab_int_sol(wctdata *pd, double *x, double tolerance)
     colored = CC_SAFE_MALLOC(pd->njobs, int);
     CCcheck_NULL_2(colored, "Failed to allocate colored");
     fill_int(colored, pd->njobs, 0);
-
     val = wctlp_objval(pd->LP, &incumbent);
     CCcheck_val_2(val, "wctlp_objval failed");
     Schedulesets_free(&(pd->bestcolors), &(pd->nbbest));
@@ -2157,7 +2145,6 @@ static int insert_frac_pairs_into_heap(wctdata *pd, const double x[],
     int val = 0;
     int i;
     int ref_key;
-    printf("enter insert frac pair\n");
 
     for (i = 0; i < pd->ccount; ++i) {
         int j;
@@ -2203,7 +2190,6 @@ static int insert_frac_pairs_into_heap(wctdata *pd, const double x[],
         }
     }
 
-    printf("leaved insertion frac heap\n");
 CLEAN:
     return val;
 }
@@ -2295,15 +2281,13 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem)
         printf("Collected %d branching candidates.\n", pmcheap_size(heap));
     }
 
-    val = find_strongest_children_conflict(&strongest_v1, &strongest_v2,
-                                           pd, problem, heap, nodepair_refs, nodepair_weights);
+    val = find_strongest_children_conflict(&strongest_v1, &strongest_v2, pd, problem, heap, nodepair_refs, nodepair_weights);
     CCcheck_val_2(val, "Failed in find_strongest_children");
     val = create_same(pd, strongest_v1, strongest_v2);
     CCcheck_val(val, "Failed in create_same");
     val = set_id_and_name(pd->same_children, problem->nwctdata++, pd->pname);
     CCcheck_val_2(val, "Failed in set_id_and_name");
     val = compute_lower_bound(problem, pd->same_children);
-    printf("created branches\n");
     CCcheck_val_2(val, "Failed in compute_lower_bound");
     val = create_differ(pd, strongest_v1, strongest_v2);
     CCcheck_val_2(val, "Failed in create_differ");
@@ -2353,32 +2337,34 @@ int insert_into_branching_heap(wctdata *pd, wctproblem *problem)
     switch (problem->parms.branching_strategy) {
         case dfs_strategy:
             if (pd->parent) {
-                heap_key = (int)(pd->dbl_est_lower_bound) - pd->depth * 1000000 ;
+                heap_key = (int)(pd->lower_bound) - pd->depth * 10000 - pd->id%2 ;
             }
 
             break;
 
         case min_lb_strategy:
         default:
-            heap_key = (int)(pd->dbl_est_lower_bound * problem->mult_key) - pd->depth -
+            heap_key = (int)(pd->LP_lower_bound * problem->mult_key) - pd->depth -
                        pd->id % 2;
     }
 
-    int lb = (int) ceil(pd->dbl_est_lower_bound);
+    int lb = (int) ceil(pd->LP_lower_bound_dual);
 
-    if (lb < problem->global_upper_bound) {
-        if (dbg_lvl()) {
-            printf("Inserting into branching heap with lb %d and ub %d at depth %d (id = %d) heap_key = %d\n",
-                   pd->lower_bound, pd->upper_bound, pd->depth, pd->id, heap_key);
-        }
+    if (dbg_lvl()) {
+        printf("Inserting into branching heap with lb %d and ub %d at depth %d (id = %d) heap_key = %d\n",
+               pd->lower_bound, pd->upper_bound, pd->depth, pd->id, heap_key);
+    }
 
+    free_elist(pd, &(problem->parms));
+
+    if (lb < pd->upper_bound) {
         val = pmcheap_insert(problem->br_heap, heap_key, (void *)pd);
         CCcheck_val(val, "Failed at pmcheap_insert");
     } else {
         skip_wctdata(pd, problem);
     }
 
-    trigger_lb_changes(pd);
+    val = trigger_lb_changes(pd);
     CCcheck_val_2(val, "Failed in trigger_lb_changes");
 CLEAN:
     return val;
@@ -2395,7 +2381,7 @@ int branching_msg(wctdata *pd, wctproblem *problem)
                pd->lower_bound, pd->dbl_safe_lower_bound, pd->LP_lower_bound,
                pd->depth,
                pd->id, problem->tot_cputime.cum_zeit, pmcheap_size(br_heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2
-               );
+              );
         CCutil_resume_timer(&problem->tot_cputime);
     }
 
@@ -2419,7 +2405,7 @@ int sequential_branching_conflict(wctproblem *problem)
 
         if (pd->lower_bound >= pd->upper_bound || pd->status == infeasible) {
             skip_wctdata(pd, problem);
-            remove_finished_subtree_conflict(pd, problem);
+            remove_finished_subtree_conflict(pd);
         } else {
             branching_msg(pd, problem);
             /** Construct PricerSolver */
@@ -2447,7 +2433,7 @@ int sequential_branching_conflict(wctproblem *problem)
             adapt_global_upper_bound(problem, pd->upper_bound);
 
             if (pd->upper_bound == pd->lower_bound) {
-                remove_finished_subtree_conflict(pd, problem);
+                remove_finished_subtree_conflict(pd);
             }
 
             /** Check for integer solutions */
@@ -2468,6 +2454,7 @@ CLEAN:
     return val;
 }
 
+MAYBE_UNUSED
 static int grow_ages(wctdata *pd)
 {
     int val = 0;
@@ -2674,14 +2661,13 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     int    nnonimprovements     = 0;
     int status = GRB_LOADED;
     double cur_cputime;
-    double last_lower_bound = DBL_MAX;
     wctparms *parms = &(problem->parms);
     /* Construction of solver*/
-    CCutil_start_resume_time(&(problem->tot_build_dd));
     pd->solver = problem->solver;
-    CCutil_suspend_timer(&(problem->tot_build_dd));
     /** Init table and construct zdd with conflicts */
+    CCutil_start_resume_time(&(problem->tot_build_dd));
     add_conflict_constraints(pd->solver, parms, pd->elist_same, pd->ecount_same, pd->elist_differ, pd->ecount_differ);
+    CCutil_suspend_timer(&(problem->tot_build_dd));
 
     if (dbg_lvl() > 1) {
         printf("Starting compute_lower_bound with lb %d and ub %d at depth %d(id = %d, opt_track = %d)\n",
@@ -2736,10 +2722,12 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
 
     do {
         iterations++;
+
         /** delete old columns */
-        // if (pd->dzcount > pd->njobs * min_ndelrow_ratio && status == GRB_OPTIMAL) {
-        //     val = delete_old_cclasses(pd);
-        // }
+        if (pd->dzcount > pd->njobs * min_ndelrow_ratio && status == GRB_OPTIMAL) {
+            val = delete_old_cclasses(pd);
+        }
+
         /** Compute LP relaxation */
         cur_cputime = CCutil_zeit();
         val = wctlp_optimize(pd->LP, &status);
@@ -2760,8 +2748,8 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         switch (status) {
             case GRB_OPTIMAL:
                 /** grow ages of the different columns */
-                // val = grow_ages(pd);
-                // CCcheck_val_2(val, "Failed in grow_ages");
+                val = grow_ages(pd);
+                CCcheck_val_2(val, "Failed in grow_ages");
                 /** get the dual variables and make them feasible */
                 val = wctlp_pi(pd->LP, pd->pi);
                 CCcheck_val_2(val, "wctlp_pi failed");
@@ -2771,7 +2759,6 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
 
                 if (iterations < pd->maxiterations) {
                     /** nnonimprovements? */
-                    last_lower_bound = pd->dbl_safe_lower_bound;
 
                     /** Solve the pricing problem */
                     switch (parms->stab_technique) {
@@ -2875,6 +2862,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 break;
 
             case GRB_INFEASIBLE:
+                printf("LP is infeasible\n");
                 pd->status = infeasible;
         }
     } else  {
@@ -2954,7 +2942,7 @@ int compute_schedule(wctproblem *problem)
 {
     int val = 0;
     wctdata *root_pd = &(problem->root_pd);
-    problem->mult_key = (double)(INT_MAX - 1) / root_pd->njobs;
+    problem->mult_key = 1.0;
     problem->first_upper_bound = problem->global_upper_bound;
     problem->first_lower_bound = problem->global_lower_bound;
     problem->first_rel_error = (double)(problem->global_upper_bound -
@@ -2968,10 +2956,8 @@ int compute_schedule(wctproblem *problem)
         CCcheck_val(val, "Failed in prefill_heap");
     } else {
         CCutil_start_timer(&(problem->tot_lb_lp_root));
-        printf("Computing lower bound at the root node %d %d\n", root_pd->ecount_differ, root_pd->ecount_same);
         val = compute_lower_bound(problem, root_pd);
         problem->parms.construct = 1;
-        printf("computed lower bound at the root node\n");
         CCcheck_val_2(val, "Failed in compute_lower_bound");
         CCutil_stop_timer(&(problem->tot_lb_lp_root), 0);
         val = insert_into_branching_heap(root_pd, problem);
@@ -2981,7 +2967,21 @@ int compute_schedule(wctproblem *problem)
     CCutil_start_resume_time(&(problem->tot_branch_and_bound));
     val = sequential_branching_conflict(problem);
     CCcheck_val(val, "Failed in sequential_branching");
-    CCutil_suspend_timer(&(problem->tot_branch_and_bound));
+    CCutil_stop_timer(&(problem->tot_branch_and_bound), 0);
+    printf("Compute schedule finished with LB %d and %d\n", root_pd->lower_bound, problem->global_upper_bound);
+
+    if(root_pd->lower_bound == problem->global_upper_bound) {
+        problem->status = optimal;
+        printf("The optimal schedule is given by:\n");
+        print_schedule(root_pd->bestcolors, root_pd->nbbest);
+        printf("with total weighted completion time %d\n", root_pd->besttotwct);
+    } else {
+        problem->status = meta_heur;
+        problem->global_lower_bound = root_pd->lower_bound;
+        printf("The suboptimal schedule is given by:\n");
+        print_schedule(root_pd->bestcolors, root_pd->nbbest);
+        printf("with total weighted completion time\n");
+    }
 CLEAN:
     return val;
 }

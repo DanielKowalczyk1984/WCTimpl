@@ -22,6 +22,7 @@ int add_conflict_constraints(PricerSolver *solver, wctparms *parms, int *elist_s
 int free_conflict_constraints(PricerSolver *solver, wctparms *parms, int ecount_same, int ecount_differ);
 void iterate_dd(PricerSolver *solver);
 void iterate_zdd(PricerSolver *solver);
+size_t get_datasize(PricerSolver *solver);
 /**
  * scatter search data types
  */

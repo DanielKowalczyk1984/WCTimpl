@@ -95,7 +95,6 @@ CLEAN:
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_farkas_double(pd->pi);
-        std::cout << s ;
 
         if (s.obj > 0.000001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
@@ -224,6 +223,10 @@ CLEAN:
         }
 
         return val;
+    }
+
+    size_t get_datasize(PricerSolver *solver){
+        return solver->zdd->size();
     }
 
     void compute_subgradient(Optimal_Solution<double> &sol, double *sub_gradient, int nbjobs, int nbmachines)
