@@ -378,16 +378,16 @@ void children_data_free(wctdata *pd)
     int i;
 
     for (i = 0; i < pd->nsame; ++i) {
-        wctdata_free(&(pd->duetime_child[i]));
+        wctdata_free(&(pd->same_children[i]));
     }
 
-    CC_IFFREE(pd->duetime_child, wctdata);
+    CC_IFFREE(pd->same_children, wctdata);
 
     for (i = 0; i < pd->ndiff; ++i) {
-        wctdata_free(&(pd->releasetime_child[i]));
+        wctdata_free(&(pd->diff_children[i]));
     }
 
-    CC_IFFREE(pd->releasetime_child, wctdata);
+    CC_IFFREE(pd->diff_children, wctdata);
     pd->nsame = pd->ndiff = 0;
 }
 
@@ -399,11 +399,13 @@ void temporary_data_free(wctdata *pd)
 
 void wctdata_free(wctdata *pd)
 {
-    Schedulesets_free(&(pd->bestcolors), &(pd->nbbest));
-    temporary_data_free(pd);
-    CC_IFFREE(pd->elist_same, int);
-    CC_IFFREE(pd->elist_differ, int);
-    CC_IFFREE(pd->orig_node_ids, int);
+    if (pd) {
+        Schedulesets_free(&(pd->bestcolors), &(pd->nbbest));
+        temporary_data_free(pd);
+        CC_IFFREE(pd->elist_same, int);
+        CC_IFFREE(pd->elist_differ, int);
+        CC_IFFREE(pd->orig_node_ids, int);
+    }
 }
 
 /** help functions for heap srong branching */
@@ -644,10 +646,7 @@ int compute_objective(wctdata *pd)
     /** Get the LP lower bound and compute the lower bound of WCT */
     val = wctlp_objval(pd->LP, &(pd->LP_lower_bound));
     CCcheck_val_2(val, "wctlp_objval failed");
-
-    if (pd->lower_bound > (int) ceil(pd->LP_lower_bound)) {
-        pd->lower_bound = (int) ceil(pd->LP_lower_bound);
-    }
+    pd->lower_bound = (int) ceil(pd->LP_lower_bound);
 
     if (dbg_lvl() > 1) {
         printf("Current primal LP objective: %19.16f  (LP_dual-bound %19.16f, lowerbound = %d).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual, pd->lower_bound);
@@ -2034,13 +2033,13 @@ static int trigger_lb_changes(wctdata *child)
     while (pd) {
         for (i = 0;  i < pd->nsame; ++i) {
             if (pd->same_children[i].lower_bound < new_lower_bound) {
-                new_lower_bound = pd->duetime_child[i].lower_bound;
+                new_lower_bound = pd->same_children[i].lower_bound;
             }
         }
 
         for (i = 0;  i < pd->ndiff; ++i) {
             if (pd->diff_children[i].lower_bound < new_lower_bound) {
-                new_lower_bound = pd->releasetime_child[i].lower_bound;
+                new_lower_bound = pd->diff_children[i].lower_bound;
             }
         }
 
@@ -2337,7 +2336,7 @@ int insert_into_branching_heap(wctdata *pd, wctproblem *problem)
     switch (problem->parms.branching_strategy) {
         case dfs_strategy:
             if (pd->parent) {
-                heap_key = (int)(pd->lower_bound) - pd->depth * 10000 - pd->id%2 ;
+                heap_key = (int)(pd->lower_bound) - pd->depth * 10000 - pd->id % 2 ;
             }
 
             break;
@@ -2957,6 +2956,9 @@ int compute_schedule(wctproblem *problem)
     } else {
         CCutil_start_timer(&(problem->tot_lb_lp_root));
         val = compute_lower_bound(problem, root_pd);
+        if(root_pd->lower_bound > problem->global_lower_bound) {
+            problem->global_lower_bound = root_pd->lower_bound;
+        }
         problem->parms.construct = 1;
         CCcheck_val_2(val, "Failed in compute_lower_bound");
         CCutil_stop_timer(&(problem->tot_lb_lp_root), 0);
@@ -2968,9 +2970,9 @@ int compute_schedule(wctproblem *problem)
     val = sequential_branching_conflict(problem);
     CCcheck_val(val, "Failed in sequential_branching");
     CCutil_stop_timer(&(problem->tot_branch_and_bound), 0);
-    printf("Compute schedule finished with LB %d and %d\n", root_pd->lower_bound, problem->global_upper_bound);
+    printf("Compute schedule finished with LB %d and UB %d\n", root_pd->lower_bound, problem->global_upper_bound);
 
-    if(root_pd->lower_bound == problem->global_upper_bound) {
+    if (root_pd->lower_bound == problem->global_upper_bound) {
         problem->status = optimal;
         printf("The optimal schedule is given by:\n");
         print_schedule(root_pd->bestcolors, root_pd->nbbest);
@@ -2982,6 +2984,7 @@ int compute_schedule(wctproblem *problem)
         print_schedule(root_pd->bestcolors, root_pd->nbbest);
         printf("with total weighted completion time\n");
     }
+
 CLEAN:
     return val;
 }
