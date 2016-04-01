@@ -162,12 +162,13 @@ static int print_to_csv(wctproblem *problem)
     wctdata *pd = &(problem->root_pd);
     FILE *file = (FILE *)NULL;
     char filenm[128];
+    int size;
     GDate date;
     g_date_set_time_t(&date, time(NULL));
     problem->real_time = getRealTime() - problem->real_time;
     CCutil_stop_timer(&(problem->tot_cputime), 0);
+    sprintf(filenm, "WCT_%d_%d_%d_%d_%d.csv", pd->nmachines, pd->njobs, date.day, date.month,date.year);
     file = fopen(filenm, "a+");
-    int size = ftell(file);
 
     if (file == NULL) {
         printf("We couldn't open %s in %s at line %d\n", filenm, __FILE__, __LINE__);
@@ -176,24 +177,27 @@ static int print_to_csv(wctproblem *problem)
     }
 
     fseek(file, 0, SEEK_END);
+    size = ftell(file);
 
     if (size == 0) {
         fprintf(file, "%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n", "NameInstance", "tot_Real_time", "tot_cputime",
-                "tot_lb", "tot_feasible_cputime",
-                "tot_lb_cpu_time",
-                "tot_branch_and_bound", "tot_scatter_search", "tot_kpc",
+                "tot_lb",
+                "tot_lb_root",
+                "tot_lb_lp",
+                "tot_branch_and_bound", "tot_scatter_search", "tot_build_dd", "tot_pricing",
                 "rel_error", "status", "global_lower_bound", "global_upper_bound",
-                "first_lower_bound", "first_upper_bound", "first_rel_error",
-                "maxdepth");
+                "first_lower_bound", "first_upper_bound", "first_rel_error");
     }
 
-    fprintf(file, "%s;%f;%f;%f;%f;%f;%f;%f;%f;%d;%d;%d;%d;%d;%f;%d\n", pd->pname,
+    fprintf(file, "%s;%f;%f;%f;%f;%f;%f;%f;%f;%f;%f,%d;%d;%d;%d;%d;%f\n", pd->pname,
             problem->real_time,
             problem->tot_cputime.cum_zeit,
             problem->tot_lb.cum_zeit,
+            problem->tot_lb_lp_root.cum_zeit,
             problem->tot_lb_lp.cum_zeit,
             problem->tot_branch_and_bound.cum_zeit,
             problem->tot_scatter_search.cum_zeit,
+            problem->tot_build_dd.cum_zeit,
             problem->tot_pricing.cum_zeit,
             problem->rel_error,
             problem->status,
@@ -201,8 +205,7 @@ static int print_to_csv(wctproblem *problem)
             problem->global_upper_bound,
             problem->first_lower_bound,
             problem->first_upper_bound,
-            problem->first_rel_error,
-            problem->maxdepth);
+            problem->first_rel_error);
     fclose(file);
 CLEAN:
     return val;
@@ -261,6 +264,7 @@ int main(int ac, char **av)
     pd->id = 0;
     problem.nwctdata = 1;
     val = parseargs(ac, av, parms);
+    problem.real_time = getRealTime();
 
     if (val) {
         goto CLEAN;
@@ -293,7 +297,7 @@ int main(int ac, char **av)
     problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cw(pd->jobarray, pd->njobs, pd->nmachines));
     CCutil_stop_timer(&(problem.tot_lb), 0);
     printf("Computing lowerbound EEI, CP and CW took %f\n", problem.tot_lb.cum_zeit);
-    /** Construction Pricersolver */
+    /** Construction Pricersolver at the root node */
     CCutil_start_resume_time(&(problem.tot_build_dd));
     pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
     CCutil_suspend_timer(&(problem.tot_build_dd));
@@ -311,7 +315,7 @@ int main(int ac, char **av)
     /** Compute Schedule with Branch and Price */
     compute_schedule(&problem);
     /** Print all the information to screen and csv */
-    //print_to_csv(&problem);
+    print_to_csv(&problem);
     print_to_screen(&problem);
 CLEAN:
     wctproblem_free(&problem);

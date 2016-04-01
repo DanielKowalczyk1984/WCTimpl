@@ -2997,8 +2997,6 @@ int compute_schedule(wctproblem *problem)
     problem->first_lower_bound = problem->global_lower_bound;
     problem->first_rel_error = (double)(problem->global_upper_bound -
                                         problem->global_lower_bound) / ((double)problem->global_lower_bound);
-    /** Transform columns into maximal schedule with  respect to the properties of optimal solutions */
-    /** Add maximal schedule sets with respect to the properties of optimal solutions */
     prune_duplicated_sets(root_pd);
 
     if (root_pd->status >= LP_bound_computed) {
@@ -3010,6 +3008,9 @@ int compute_schedule(wctproblem *problem)
 
         if (root_pd->lower_bound > problem->global_lower_bound) {
             problem->global_lower_bound = root_pd->lower_bound;
+            problem->first_lower_bound = root_pd->lower_bound;
+            problem->first_rel_error = (double)(problem->first_upper_bound -
+                                                problem->first_lower_bound) / ((double)problem->first_lower_bound);
         }
 
         problem->parms.construct = 1;
@@ -3026,11 +3027,18 @@ int compute_schedule(wctproblem *problem)
     printf("Compute schedule finished with LB %d and UB %d\n", root_pd->lower_bound, problem->global_upper_bound);
 
     if (root_pd->lower_bound == problem->global_upper_bound) {
+        problem->global_lower_bound = root_pd->lower_bound;
+        problem->rel_error = (double)(problem->global_upper_bound -
+                                                problem->global_lower_bound) / ((double)problem->global_lower_bound);
+
         problem->status = optimal;
         printf("The optimal schedule is given by:\n");
         print_schedule(root_pd->bestcolors, root_pd->nbbest);
         printf("with total weighted completion time %d\n", root_pd->besttotwct);
     } else {
+        problem->global_lower_bound = root_pd->lower_bound;
+        problem->rel_error = (double)(problem->global_upper_bound -
+                                                problem->global_lower_bound) / ((double)problem->global_lower_bound);
         problem->status = meta_heur;
         problem->global_lower_bound = root_pd->lower_bound;
         printf("The suboptimal schedule is given by:\n");
