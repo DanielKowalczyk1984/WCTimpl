@@ -9,18 +9,16 @@ class PricerSolver
     public:
         tdzdd::DdStructure<2> *dd;
         tdzdd::DdStructure<2> *zdd;
-        tdzdd::DdStructure<2> root_dd;
-        tdzdd::DdStructure<2> root_zdd;
         int *p;
         int *w;
         int *r;
         int *d;
-        const int nbjobs;
+        int nbjobs;
         int H_min;
         int H_max;
-        tdzdd::DataTable<PricerWeightZDD<double>> zdd_table;
-        tdzdd::DataTable<PricerWeightBDD<double>> dd_table;
-        tdzdd::DataTable<PricerFarkasZDD<double>> farkas_table;
+        tdzdd::DataTable<PricerWeightZDD<double> > zdd_table;
+        tdzdd::DataTable<PricerWeightBDD<double> > dd_table;
+        tdzdd::DataTable<PricerFarkasZDD<double> > farkas_table;
 
         PricerSolver(int *_p, int *_w,  int *_r, int *_d, int njobs, int Hmin, int Hmax, bool print = false, bool reduce = false): p(_p), w(_w), r(_r), d(_d), nbjobs(njobs), H_min(Hmin), H_max(Hmax)
         {
@@ -33,18 +31,49 @@ class PricerSolver
                 file.close();
             }
 
-            root_dd = tdzdd::DdStructure<2>(ps);
-            root_zdd = root_dd;
-            root_zdd.zddReduce();
+            dd = new tdzdd::DdStructure<2>(ps);
+            zdd = new tdzdd::DdStructure<2>;
+            *zdd = *dd;
+            zdd->zddReduce();
             std::cout << "Reducing the size of DD structure:" <<  std::endl;
-            std::cout << "DD = " << root_dd.size() << " " << "ZDD = " << root_zdd.size() << std::endl;
-
-            if (print) {
-            }
-
+            std::cout << "DD = " << dd->size() << " " << "ZDD = " << zdd->size() << std::endl;
+            init_zdd_table();
+            init_bdd_table();
+            init_table_farkas();
             delete [] ps.sum_p;
             delete [] ps.min_p;
         };
+
+        PricerSolver(const PricerSolver &other)
+        {
+            dd = new tdzdd::DdStructure<2>;
+            zdd = new tdzdd::DdStructure<2>;
+            *dd = *(other.dd);
+            *zdd = *(other.zdd);
+            p = other.p;
+            w = other.w;
+            r = other.r;
+            d = other.d;
+            nbjobs = other.nbjobs;
+            H_min = other.H_min;
+            H_max = other.H_max;
+            zdd_table.init();
+            dd_table.init();
+            farkas_table.init();
+        }
+
+        void init_tables()
+        {
+            init_bdd_table();
+            init_zdd_table();
+            init_table_farkas();
+        }
+
+        ~PricerSolver()
+        {
+            delete dd;
+            delete zdd;
+        }
 
         void create_dot_zdd(const char *name)
         {
@@ -92,7 +121,7 @@ class PricerSolver
             /** init root */
             dd_table[root.row()][root.col()].init_node(0);
 
-            for (size_t i = nbjobs; i > 0 ; i--) {
+            for (size_t i = root.row(); i > 0 ; i--) {
                 size_t const m = dd_table[i].size();
                 int cur_job = nbjobs - i;
 
@@ -136,7 +165,7 @@ class PricerSolver
             /** init root */
             zdd_table[root.row()][root.col()].add_weight(0);
 
-            for (size_t i = nbjobs; i >= 1 ; i--) {
+            for (size_t i = root.row(); i >= 1 ; i--) {
                 size_t const m = zdd_table[i].size();
                 int cur_job = nbjobs - i;
 
@@ -160,19 +189,70 @@ class PricerSolver
             }
         }
 
+        void init_bdd_one_conflict(int v1, int v2, int same)
+        {
+            int ecount_same = 0;
+            int ecount_diff = 0;
+            int *elist_same = (int *) NULL;
+            int *elist_differ = (int *) NULL;
+
+            if (same) {
+                ecount_same = 1;
+                elist_same = new int[2];
+                elist_same[0] = v1;
+                elist_same[1] = v2;
+            } else {
+                ecount_diff = 1;
+                elist_differ = new int[2];
+                elist_differ[0] = v1;
+                elist_differ[1] = v2;
+            }
+
+            ConflictConstraints conflict(nbjobs, elist_same, ecount_same, elist_differ, ecount_diff);
+            dd->zddSubset(conflict);
+            *zdd = *dd;
+            zdd->zddReduce();
+            delete [] elist_same;
+            delete [] elist_differ;
+        }
+
+        void init_zdd_one_conflict(int v1, int v2, int same)
+        {
+            int ecount_same = 0;
+            int ecount_diff = 0;
+            int *elist_same = (int *) NULL;
+            int *elist_differ = (int *) NULL;
+
+            if (same) {
+                ecount_same = 1;
+                elist_same = new int[2];
+                elist_same[0] = v1;
+                elist_same[1] = v2;
+            } else {
+                ecount_diff = 1;
+                elist_differ = new int[2];
+                elist_differ[0] = v1;
+                elist_differ[1] = v2;
+            }
+
+            ConflictConstraints conflict(nbjobs, elist_same, ecount_same, elist_differ, ecount_diff);
+            zdd->zddSubset(conflict);
+            zdd->zddReduce();
+            delete [] elist_same;
+            delete [] elist_differ;
+        }
+
         void init_bdd_conflict_solver(int *elist_same, int ecount_same, int *elist_differ, int ecount_differ)
         {
             if (ecount_differ + ecount_same > 0) {
                 dd = new tdzdd::DdStructure<2>;
-                *dd = root_dd;
+                //*dd = root_dd;
                 ConflictConstraints conflict(nbjobs, elist_same, ecount_same, elist_differ, ecount_differ);
                 dd->zddSubset(conflict);
                 zdd = new tdzdd::DdStructure<2>;
                 *zdd = *dd;
                 zdd->zddReduce();
             } else {
-                dd = &(root_dd);
-                zdd = &(root_zdd);
             }
 
             if (dd->size() == 0) {
@@ -187,12 +267,10 @@ class PricerSolver
         {
             if (ecount_same + ecount_differ > 0) {
                 zdd = new tdzdd::DdStructure<2>;
-                *zdd = root_dd;
                 ConflictConstraints conflict(nbjobs, elist_same, ecount_same, elist_differ, ecount_differ);
                 zdd->zddSubset(conflict);
                 zdd->zddReduce();
             } else {
-                zdd = &(root_zdd);
             }
 
             init_zdd_table();
@@ -201,7 +279,7 @@ class PricerSolver
 
         void free_bdd_solver(int ecount_same, int ecount_differ)
         {
-            if (ecount_differ + ecount_same > 0) {
+            if (ecount_same + ecount_differ > 0) {
                 delete dd;
                 delete zdd;
             }
@@ -212,7 +290,7 @@ class PricerSolver
 
         void free_zdd_solver(int ecount_same, int ecount_differ)
         {
-            if (ecount_differ + ecount_same > 0) {
+            if (ecount_same + ecount_differ > 0) {
                 delete zdd;
             }
 
@@ -339,6 +417,25 @@ class PricerSolver
         {
         }
 
+        PricerSolver &operator=(PricerSolver const &other)
+        {
+            if (this != &other) {
+                dd = new tdzdd::DdStructure<2>;
+                zdd = new tdzdd::DdStructure<2>;
+                *dd = *(other.dd);
+                *zdd = *(other.zdd);
+                H_max = other.H_max;
+                H_min = other.H_min;
+                r = other.r;
+                d = other.d;
+                w = other.w;
+                p = other.p;
+                nbjobs = other.nbjobs;
+            }
+
+            return *this;
+        }
+
         void iterate_zdd()
         {
             tdzdd::DdStructure<2>::const_iterator it = zdd->begin();
@@ -369,10 +466,6 @@ class PricerSolver
                 std::cout << std::endl;
             }
         }
-
-        ~PricerSolver()
-        {
-        };
 
 
 };

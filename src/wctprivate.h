@@ -16,6 +16,8 @@ extern "C" {
 
 typedef struct PricerSolver PricerSolver;
 PricerSolver *newSolver(int *p, int *w, int *r, int *d, int nbjobs, int Hmin, int Hmax);
+PricerSolver *copySolver(PricerSolver *src);
+void freeSolver(PricerSolver *src);
 int calculate_table(PricerSolver *solver, wctparms *parms);
 void deletePricerSolver(PricerSolver *solver);
 int add_conflict_constraints(PricerSolver *solver, wctparms *parms, int *elist_same, int ecount_same, int *elist_differ, int  ecount_differ);
@@ -23,6 +25,11 @@ int free_conflict_constraints(PricerSolver *solver, wctparms *parms, int ecount_
 void iterate_dd(PricerSolver *solver);
 void iterate_zdd(PricerSolver *solver);
 size_t get_datasize(PricerSolver *solver);
+void copy_solver(PricerSolver **dest, PricerSolver *src);
+int add_one_conflict(PricerSolver *solver, wctparms *parms, int v1, int v2, int same);
+int init_tables(PricerSolver *solver);
+size_t get_numberrows_zdd(PricerSolver *solver);
+size_t get_numberrows_bdd(PricerSolver *solver);
 /**
  * scatter search data types
  */
@@ -260,8 +267,6 @@ struct wctproblem {
     CCutil_timer tot_pricing;
     CCutil_timer tot_scatter_search;
     double real_time;
-    /** Pricer Solver */
-    PricerSolver *solver;
 };
 
 /*Initialize pmc data*/

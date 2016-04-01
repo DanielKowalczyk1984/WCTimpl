@@ -43,6 +43,16 @@ extern "C" {
         return new PricerSolver(p, w, r, d, nbjobs, Hmin, Hmax, false, true);
     }
 
+    PricerSolver *copySolver(PricerSolver *src)
+    {
+        return new PricerSolver(*src);
+    }
+
+    void freeSolver(PricerSolver *src)
+    {
+        delete src;
+    }
+
     int solvedblzdd(wctdata *pd)
     {
         int val = 0;
@@ -96,7 +106,7 @@ CLEAN:
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_farkas_double(pd->pi);
 
-        if (s.obj > 0.000001) {
+        if (s.obj > 0.0000001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
             CCcheck_val_2(val, "Failed in constructing jobs");
         } else {
@@ -112,7 +122,7 @@ CLEAN:
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_bdd_double(pd->pi);
 
-        if (s.obj > 0.00001) {
+        if (s.obj > 0.0000001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
             CCcheck_val_2(val, "Failed in construction")
         } else {
@@ -128,7 +138,7 @@ CLEAN:
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_zdd_double(pd->pi);
 
-        if (s.obj > 0.00001) {
+        if (s.obj > 0.0000001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), s, pd->njobs);
             CCcheck_val_2(val, "Failed in construction")
         } else {
@@ -197,11 +207,13 @@ CLEAN:
         return val;
     }
 
-    void iterate_dd(PricerSolver *solver){
+    void iterate_dd(PricerSolver *solver)
+    {
         solver->iterate_dd();
     }
 
-    void iterate_zdd(PricerSolver *solver){
+    void iterate_zdd(PricerSolver *solver)
+    {
         solver->iterate_zdd();
     }
 
@@ -225,8 +237,44 @@ CLEAN:
         return val;
     }
 
-    size_t get_datasize(PricerSolver *solver){
+    size_t get_datasize(PricerSolver *solver)
+    {
         return solver->zdd->size();
+    }
+
+    size_t get_numberrows_zdd(PricerSolver *solver){
+        return solver->zdd->root().row();
+    }
+
+    size_t get_numberrows_bdd(PricerSolver *solver){
+        return solver->dd->root().row();
+    }
+
+    int add_one_conflict(PricerSolver *solver, wctparms *parms, int v1, int v2, int same)
+    {
+        int val = 0;
+
+        switch (parms->solver) {
+            case bdd_solver:
+                solver->init_bdd_one_conflict(v1, v2, same);
+                break;
+
+            case zdd_solver:
+                solver->init_zdd_one_conflict(v1, v2, same);
+                break;
+
+            case DP_solver:
+                break;
+        }
+
+        return val;
+    }
+
+    int init_tables(PricerSolver *solver)
+    {
+        int val = 0;
+        solver->init_tables();
+        return val;
     }
 
     void compute_subgradient(Optimal_Solution<double> &sol, double *sub_gradient, int nbjobs, int nbmachines)
@@ -412,7 +460,7 @@ CLEAN:
             }
         }
 
-        if (dbg_lvl() > 1) {
+        if (dbg_lvl() > 0) {
             printf("heading = %d, alpha = %f, result of primal bound and Lagragian bound: out =%f, in = %f\n", heading_in, pd->alpha, pd->eta_out, pd->eta_in);
         }
 

@@ -162,7 +162,7 @@ class ConflictConstraints: public tdzdd::DdSpec<ConflictConstraints, conflict_st
 
     public:
         ConflictConstraints(int _nbjobs, int *elist_same, int ecount_same, int *elist_differ, int ecount_differ): nbjobs(_nbjobs)
-        {   
+        {
             differsets.resize(_nbjobs);
             samesets.resize(_nbjobs);
 
@@ -171,18 +171,17 @@ class ConflictConstraints: public tdzdd::DdSpec<ConflictConstraints, conflict_st
                 samesets[i].resize(_nbjobs);
             }
 
-            for(size_t i = 0; i < ecount_same; ++i) {
-                samesets[elist_same[2*i]][elist_same[2*i + 1]] = 1;
+            for (size_t i = 0; i < ecount_same; ++i) {
+                samesets[elist_same[2 * i]][elist_same[2 * i + 1]] = 1;
             }
 
-            for(size_t i = 0; i < ecount_differ; ++i) {
-                differsets[elist_differ[2*i]][elist_differ[2*i + 1]] = 1;
+            for (size_t i = 0; i < ecount_differ; ++i) {
+                differsets[elist_differ[2 * i]][elist_differ[2 * i + 1]] = 1;
             }
         };
 
         ~ConflictConstraints()
         {
-            
         }
 
         int getRoot(conflict_state &state) const
@@ -226,8 +225,8 @@ class ConflictConstraints: public tdzdd::DdSpec<ConflictConstraints, conflict_st
             _j = min_job(job, state);
 
             if (_j == nbjobs && take) {
-                return (!state.remove[job]) ? -1:0;
-            } else if(_j == nbjobs) {
+                return (!state.remove[job]) ? -1 : 0;
+            } else if (_j == nbjobs) {
                 return (!state.add[job]) ? -1 : 0;
             }
 
@@ -237,7 +236,6 @@ class ConflictConstraints: public tdzdd::DdSpec<ConflictConstraints, conflict_st
 
         bool equalTo(conflict_state const &state1, conflict_state const &state2) const
         {
-
             if (state2.add != state1.add) {
                 return false;
             }

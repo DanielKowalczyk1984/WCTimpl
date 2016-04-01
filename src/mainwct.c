@@ -295,7 +295,7 @@ int main(int ac, char **av)
     printf("Computing lowerbound EEI, CP and CW took %f\n", problem.tot_lb.cum_zeit);
     /** Construction Pricersolver */
     CCutil_start_resume_time(&(problem.tot_build_dd));
-    problem.solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+    pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
     CCutil_suspend_timer(&(problem.tot_build_dd));
 
     /** Construct Feasible solutions */

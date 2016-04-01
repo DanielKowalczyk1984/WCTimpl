@@ -60,6 +60,7 @@ void Scheduleset_init(Scheduleset *set)
         set->age      = 0;
         set->totweight = 0;
         set->totwct = 0;
+        set->size = 0;
     }
 }
 
@@ -72,6 +73,7 @@ void Scheduleset_free(Scheduleset *set)
         set->totweight = 0;
         set->age      = 0;
         set->totwct = 0;
+        set->size = 0;
     }
 }
 
