@@ -361,6 +361,7 @@ void lpwctdata_free(wctdata *pd)
     CC_IFFREE(pd->subgradient, double);
     CC_IFFREE(pd->subgradient_in, double);
     heur_free(pd);
+    freeSolver(pd->solver);
     Schedulesets_free(&(pd->newsets), &(pd->nnewsets));
     Schedulesets_free(&(pd->cclasses), &(pd->gallocated));
     pd->ccount = 0;
@@ -398,7 +399,6 @@ void wctdata_free(wctdata *pd)
         CC_IFFREE(pd->elist_same, int);
         CC_IFFREE(pd->elist_differ, int);
         CC_IFFREE(pd->orig_node_ids, int);
-        freeSolver(pd->solver);
     }
 }
 
@@ -625,7 +625,7 @@ static void print_ages(wctdata *pd)
     printf("\n");
 }
 
-int compute_objective(wctdata *pd)
+int compute_objective(wctdata *pd, wctparms *parms)
 {
     int val = 0;
     int i;
@@ -641,6 +641,9 @@ int compute_objective(wctdata *pd)
     val = wctlp_objval(pd->LP, &(pd->LP_lower_bound));
     CCcheck_val_2(val, "wctlp_objval failed");
     pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual) < (int) ceil(pd->LP_lower_bound)) ? (int) ceil(pd->LP_lower_bound_dual) : (int) ceil(pd->LP_lower_bound) ;
+    if(parms->solver == bdd_solver || parms->solver == zdd_solver) {
+        pd->lower_bound = ((int) ceil (pd->eta_in) < pd->lower_bound) ? (int) ceil(pd->eta_in) : pd->lower_bound;
+    }
 
     if (dbg_lvl() > 0) {
         printf("Current primal LP objective: %19.16f  (LP_dual-bound %19.16f, lowerbound = %d).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual, pd->lower_bound);
@@ -2318,6 +2321,7 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem)
     }
 
     /*if (pd->depth % 5 == 0) {
+        parms->stab_technique = no_stab;
         val = heur_exec(problem, pd, &result);
         CCcheck_val_2(val, "Failed at heur_exec");
 
@@ -2326,6 +2330,7 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem)
             assert(pd->status = finished);
             goto CLEAN;
         }
+        parms->stab_technique = stab_wentgnes;
     }*/
 
     if (dbg_lvl() > 1) {
@@ -2455,7 +2460,7 @@ int sequential_branching_conflict(wctproblem *problem)
         int i;
         pd->upper_bound = problem->global_upper_bound;
 
-        if (pd->lower_bound >= pd->upper_bound || pd->status == infeasible) {
+        if (pd->lower_bound >= pd->upper_bound || pd->status == infeasible || pd->eta_in > pd->upper_bound - 1) {
             skip_wctdata(pd, problem);
             remove_finished_subtree_conflict(pd);
         } else {
@@ -2804,7 +2809,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 val = wctlp_pi(pd->LP, pd->pi);
                 CCcheck_val_2(val, "wctlp_pi failed");
                 /** Compute the objective function */
-                val = compute_objective(pd);
+                val = compute_objective(pd, parms);
                 CCcheck_val_2(val, "Failed in compute_objective");
 
                 if (iterations < pd->maxiterations) {
@@ -2860,7 +2865,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 switch (parms->stab_technique) {
                     case stab_wentgnes:
                     case stab_dynamic:
-                        break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.0000001);
+                        break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001 || (pd->eta_in > floor(pd->eta_out)));
                         break;
 
                     case no_stab:
@@ -2895,7 +2900,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 CCcheck_val_2(val, "wctlp_optimize failed");
                 val = wctlp_pi(pd->LP, pd->pi);
                 CCcheck_val_2(val, "wctlp_pi failed");
-                val = compute_objective(pd);
+                val = compute_objective(pd, parms);
                 CCcheck_val_2(val, "compute_objective failed");
 
                 if (dbg_lvl() > 1) {

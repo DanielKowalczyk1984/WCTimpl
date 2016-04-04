@@ -196,7 +196,7 @@ static int add_feasible_solution(wctproblem *problem, solution *new_sol)
     wctdata *root_pd = &(problem->root_pd);
     SS *scatter_search = &(problem->scatter_search);
     solution_calc(new_sol, root_pd->jobarray);
-    //localsearch_wrap(new_sol, problem->global_lower_bound, 0);
+    localsearch_wrap(new_sol, problem->global_lower_bound, 0);
     solution_unique(new_sol);
 
     if (!solution_in_pool(scatter_search, new_sol)) {

@@ -232,7 +232,7 @@ int build_lp(wctdata *pd, int construct);
 void make_pi_feasible(wctdata *pd);
 void make_pi_feasible_farkas_pricing(wctdata *pd);
 int heur_colors_with_stable_sets(wctdata *pd);
-int compute_objective(wctdata *pd);
+int compute_objective(wctdata *pd, wctparms *parms);
 
 
 /*Help functions for branching*/
