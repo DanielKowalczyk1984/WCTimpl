@@ -361,7 +361,10 @@ void lpwctdata_free(wctdata *pd)
     CC_IFFREE(pd->subgradient, double);
     CC_IFFREE(pd->subgradient_in, double);
     heur_free(pd);
-    freeSolver(pd->solver);
+    if(pd->solver) {
+        freeSolver(pd->solver);
+        pd->solver = (PricerSolver *) NULL;
+    }
     Schedulesets_free(&(pd->newsets), &(pd->nnewsets));
     Schedulesets_free(&(pd->cclasses), &(pd->gallocated));
     pd->ccount = 0;
@@ -641,11 +644,12 @@ int compute_objective(wctdata *pd, wctparms *parms)
     val = wctlp_objval(pd->LP, &(pd->LP_lower_bound));
     CCcheck_val_2(val, "wctlp_objval failed");
     pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual) < (int) ceil(pd->LP_lower_bound)) ? (int) ceil(pd->LP_lower_bound_dual) : (int) ceil(pd->LP_lower_bound) ;
-    if(parms->solver == bdd_solver || parms->solver == zdd_solver) {
-        pd->lower_bound = ((int) ceil (pd->eta_in) < pd->lower_bound) ? (int) ceil(pd->eta_in) : pd->lower_bound;
+
+    if (parms->solver == bdd_solver || parms->solver == zdd_solver) {
+        pd->lower_bound = ((int) ceil(pd->eta_in) < pd->lower_bound) ? (int) ceil(pd->eta_in) : pd->lower_bound;
     }
 
-    if (dbg_lvl() > 0) {
+    if (dbg_lvl() > 1) {
         printf("Current primal LP objective: %19.16f  (LP_dual-bound %19.16f, lowerbound = %d).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual, pd->lower_bound);
     }
 
@@ -956,8 +960,8 @@ static int collect_duetime_child(wctdata *cd)
     int c;
 
     for (c = 0; c < cd->nsame; ++c) {
-        if (cd->duetime_child[c].nbbest && (!cd->nbbest || cd->duetime_child[c].besttotwct < cd->upper_bound)) {
-            if (cd->besttotwct) {
+        if (cd->duetime_child[c].nbbest && (!cd->nbbest || cd->duetime_child[c].upper_bound < cd->upper_bound)) {
+            if (cd->nbbest) {
                 Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
             }
 
@@ -979,7 +983,7 @@ static int collect_same_child(wctdata *cd)
     int c;
 
     for (c = 0; c < cd->nsame; ++c) {
-        if (cd->same_children[c].nbbest && (!cd->nbbest || cd->same_children[c].besttotwct < cd->upper_bound)) {
+        if (cd->same_children[c].nbbest && (!cd->nbbest || cd->same_children[c].upper_bound < cd->upper_bound)) {
             if (cd->nbbest) {
                 Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
             }
@@ -1002,7 +1006,7 @@ static int collect_diff_child(wctdata *cd)
     int c;
 
     for (c = 0; c < cd->ndiff; ++c) {
-        if (cd->diff_children[c].nbbest && (!cd->nbbest || cd->diff_children[c].besttotwct < cd->upper_bound)) {
+        if (cd->diff_children[c].nbbest && (!cd->nbbest || cd->diff_children[c].upper_bound < cd->upper_bound)) {
             if (cd->nbbest) {
                 Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
             }
@@ -1447,20 +1451,6 @@ static int create_differ(wctproblem *problem, wctdata *parent_pd,
         CCcheck_val_2(val, "Illegal colorset created in create_differ\n!");
     }
 
-    /*if(!v2_covered) {
-         Create the singular set v2 as last set, because we might not add
-         v2 to any set:
-        Scheduleset_init(pd->cclasses + parent_pd->ccount);
-        pd->cclasses[parent_pd->ccount].count  = 1;
-        pd->cclasses[parent_pd->ccount].members =  CC_SAFE_MALLOC(1, int);
-        pd->cclasses[parent_pd->ccount].members[0] = v2;
-        pd->cclasses[parent_pd->ccount].makespan = pd->weights[v2];
-    } else {
-        pd->cclasses[parent_pd->ccount].count   = 0;
-        pd->cclasses[parent_pd->ccount].members = (int *) 0;
-        pd->ccount--;
-    }*/
-    /* END Transfer independent sets: */
     for (i = pd->ccount; i < pd->gallocated; i++) {
         Scheduleset_init(pd->cclasses + i);
     }
@@ -1556,22 +1546,6 @@ static int transfer_same_cclasses(wctdata *pd,
         }
     }
 
-    /*if (!v1_covered) {
-         Create the singular set v1 as last set, because we might not add
-         v1 to any set:
-        if (dbg_lvl()) {
-            printf("Adding extra set %d\n", v1);
-        }
-
-        Scheduleset_init(pd->cclasses + parent_ccount);
-        pd->cclasses[parent_ccount].count  = 1;
-        pd->cclasses[parent_ccount].members = CC_SAFE_MALLOC(1, int);
-        pd->cclasses[parent_ccount].members[0] = v1;
-        pd->cclasses[parent_ccount].makespan = pd->weights[v1];
-    } else {
-        Scheduleset_init(pd->cclasses + parent_ccount);
-        pd->ccount--;
-    }*/
     for (i = pd->ccount; i < pd->gallocated; i++) {
         Scheduleset_init(pd->cclasses + i);
     }
@@ -1855,7 +1829,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
         inodepair_ref_key(&v1, &v2, (int)(min_nodepair - nodepair_refs));
         assert(v1 < v2);
 
-        if (dbg_lvl() > 1) {
+        if (dbg_lvl() == 1) {
             printf("Creating branches for v1 = %d, v2 = %d (node-pair weight %f)\n", v1,
                    v2,
                    nodepair_weights[(int)(min_nodepair - nodepair_refs)]);
@@ -2143,7 +2117,7 @@ static int grab_int_sol(wctdata *pd, double *x, double tolerance)
     for (i = 0; i < pd->ccount; ++i) {
         test_incumbent += x[i];
 
-        if (x[i] >= 1.0  - tolerance) {
+        if (x[i] >= 1.0  - lp_int_tolerance()) {
             int j = pd->nbbest;
             int k;
             Scheduleset_init(pd->bestcolors + j);
@@ -2207,7 +2181,7 @@ static int insert_frac_pairs_into_heap(wctdata *pd, const double x[],
     for (i = 0; i < pd->ccount; ++i) {
         int j;
 
-        if (x[i] <= 0.0  || x[i] >= 1.0) {
+        if (x[i] <= 0.0  || x[i] >= 1.0 - lp_int_tolerance()) {
             continue;
         }
 
@@ -2320,18 +2294,18 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem)
         goto CLEAN;
     }
 
-    /*if (pd->depth % 5 == 0) {
-        parms->stab_technique = no_stab;
-        val = heur_exec(problem, pd, &result);
-        CCcheck_val_2(val, "Failed at heur_exec");
+    /*    if (pd->depth % 5 == 0) {
+            parms->stab_technique = no_stab;
+            val = heur_exec(problem, pd, &result);
+            CCcheck_val_2(val, "Failed at heur_exec");
 
-        if (result == FOUNDSOL) {
-            printf("Heuristic found solution\n");
-            assert(pd->status = finished);
-            goto CLEAN;
-        }
-        parms->stab_technique = stab_wentgnes;
-    }*/
+            if (result == FOUNDSOL) {
+                printf("Heuristic found solution\n");
+                assert(pd->status = finished);
+                goto CLEAN;
+            }
+            parms->stab_technique = stab_wentgnes;
+        }*/
 
     if (dbg_lvl() > 1) {
         printf("Collected %d branching candidates.\n", pmcheap_size(heap));
@@ -2606,10 +2580,12 @@ static int delete_old_cclasses(wctdata *pd)
         CC_IFFREE(pd->cclasses, Scheduleset);
         pd->cclasses = new_cclasses;
         pd->ccount   = new_ccount;
-        //if (dbg_lvl() > 0) {
-        printf("Deleted %d out of %d columns with age > %d.\n",
-               pd->dzcount, pd->dzcount + pd->ccount, pd->retirementage);
-        //}
+
+        if (dbg_lvl() > 0) {
+            printf("Deleted %d out of %d columns with age > %d.\n",
+                   pd->dzcount, pd->dzcount + pd->ccount, pd->retirementage);
+        }
+
         pd->dzcount = 0;
     }
 
@@ -2760,6 +2736,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     CCcheck_NULL_2(pd->subgradient_in, "Failed to allocate memory");
     pd->subgradient = CC_SAFE_MALLOC(pd->njobs + 1, double);
     CCcheck_NULL_2(pd->subgradient, "Failed to allocate memory");
+    pd->retirementage = (int) sqrt(pd->njobs) + 30;
 
     /** Init alpha */
     switch (parms->stab_technique) {
@@ -2865,7 +2842,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 switch (parms->stab_technique) {
                     case stab_wentgnes:
                     case stab_dynamic:
-                        break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001 || (pd->eta_in > floor(pd->eta_out)));
+                        break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001 || pd->eta_in > floor(pd->eta_out));
                         break;
 
                     case no_stab:
@@ -3034,8 +3011,7 @@ int compute_schedule(wctproblem *problem)
     if (root_pd->lower_bound == problem->global_upper_bound) {
         problem->global_lower_bound = root_pd->lower_bound;
         problem->rel_error = (double)(problem->global_upper_bound -
-                                                problem->global_lower_bound) / ((double)problem->global_lower_bound);
-
+                                      problem->global_lower_bound) / ((double)problem->global_lower_bound);
         problem->status = optimal;
         printf("The optimal schedule is given by:\n");
         print_schedule(root_pd->bestcolors, root_pd->nbbest);
@@ -3043,7 +3019,7 @@ int compute_schedule(wctproblem *problem)
     } else {
         problem->global_lower_bound = root_pd->lower_bound;
         problem->rel_error = (double)(problem->global_upper_bound -
-                                                problem->global_lower_bound) / ((double)problem->global_lower_bound);
+                                      problem->global_lower_bound) / ((double)problem->global_lower_bound);
         problem->status = meta_heur;
         problem->global_lower_bound = root_pd->lower_bound;
         printf("The suboptimal schedule is given by:\n");

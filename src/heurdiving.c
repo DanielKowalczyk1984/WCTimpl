@@ -119,10 +119,10 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
             }
         }
 
-        if (dbg_lvl() > 0) {
+        //if (dbg_lvl() > 0) {
             printf("  dive %d/%d,  var <%d>, sol=%g\n",
                    divedepth, maxdivedepth, bestcand, bestcandsol);
-        }
+        //}
 
         val = adjustLP_ceil(pd, bestcand, bestcandsol);
         CCcheck_val_2(val, "Failed to adjust LP");
@@ -167,6 +167,7 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
                 int discrepencie = 0;
 
                 do {
+                    printf("test while\n");
                     int var = GPOINTER_TO_INT(g_queue_pop_tail(branchingvars));
                     adjustLP_floor(pd, var);
                     --divedepth;
@@ -193,6 +194,7 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
             } else {
                 backtracked = 0;
             }
+            printf("test\n");
         } while (backtracked || farkaspricing);
 
         CCutil_suspend_timer(&(problem->tot_cputime));
@@ -206,11 +208,11 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
             nlpcands = branchcand.nlpcands;
         }
 
-        if (dbg_lvl() > 0) {
+        //if (dbg_lvl() > 0) {
             printf(" -> status=%d, objval=%f/%d, nfrac=%d, depth = %d\n", status, objval,
                    searchbound,
                    nlpcands, divedepth);
-        }
+        //}
 
         CCutil_suspend_timer(&(problem->tot_cputime));
         CCutil_resume_timer(&(problem->tot_cputime));
@@ -524,7 +526,8 @@ int constructsolution(wctdata *pd, int nmachines, int *success)
                         covered[pd->cclasses[i].members[k]] = 1;
                         pd->bestcolors[tmp].members[pd->bestcolors[tmp].count++] =
                             pd->cclasses[i].members[k];
-                        pd->bestcolors[tmp].totweight += pd->weights[pd->cclasses[i].members[k]];
+                        pd->bestcolors[tmp].totweight += pd->duration[pd->cclasses[i].members[k]];
+                        pd->bestcolors[tmp].totwct += pd->weights[pd->cclasses[i].members[k]]*pd->bestcolors[tmp].totweight;
                         counter++;
                     }
                 }

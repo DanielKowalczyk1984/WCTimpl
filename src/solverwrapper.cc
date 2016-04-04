@@ -51,6 +51,7 @@ extern "C" {
     void freeSolver(PricerSolver *src)
     {
         delete src;
+        src = (PricerSolver *) NULL;
     }
 
     int solvedblzdd(wctdata *pd)
@@ -460,7 +461,7 @@ CLEAN:
             }
         }
 
-        if (dbg_lvl() > 0) {
+        if (dbg_lvl() > 1) {
             printf("heading = %d, alpha = %f, result of primal bound and Lagragian bound: out =%f, in = %f\n", heading_in, pd->alpha, pd->eta_out, pd->eta_in);
         }
 
@@ -502,9 +503,9 @@ CLEAN:
             memcpy(pd->pi_in, pd->pi_sep, sizeof(double) * (pd->njobs + 1));
         }
 
-        //if(dbg_lvl() > 1) {
-        printf(" alpha = %f, result of primal bound and Lagragian bound: out =%f, in = %f\n",  pd->alpha, pd->eta_out, pd->eta_in);
-        //}
+        if(dbg_lvl() > 1) {
+            printf(" alpha = %f, result of primal bound and Lagragian bound: out =%f, in = %f\n",  pd->alpha, pd->eta_out, pd->eta_in);
+        }
 CLEAN:
         return val;
     }
