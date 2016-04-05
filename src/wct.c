@@ -361,10 +361,12 @@ void lpwctdata_free(wctdata *pd)
     CC_IFFREE(pd->subgradient, double);
     CC_IFFREE(pd->subgradient_in, double);
     heur_free(pd);
-    if(pd->solver) {
+
+    if (pd->solver) {
         freeSolver(pd->solver);
         pd->solver = (PricerSolver *) NULL;
     }
+
     Schedulesets_free(&(pd->newsets), &(pd->nnewsets));
     Schedulesets_free(&(pd->cclasses), &(pd->gallocated));
     pd->ccount = 0;
@@ -396,13 +398,11 @@ void temporary_data_free(wctdata *pd)
 
 void wctdata_free(wctdata *pd)
 {
-    if (pd) {
-        Schedulesets_free(&(pd->bestcolors), &(pd->nbbest));
-        temporary_data_free(pd);
-        CC_IFFREE(pd->elist_same, int);
-        CC_IFFREE(pd->elist_differ, int);
-        CC_IFFREE(pd->orig_node_ids, int);
-    }
+    Schedulesets_free(&(pd->bestcolors), &(pd->nbbest));
+    temporary_data_free(pd);
+    CC_IFFREE(pd->elist_same, int);
+    CC_IFFREE(pd->elist_differ, int);
+    CC_IFFREE(pd->orig_node_ids, int);
 }
 
 /** help functions for heap srong branching */
@@ -1431,7 +1431,7 @@ static int create_differ(wctproblem *problem, wctdata *parent_pd,
             pd->ccount++;
         }
 
-        if (dbg_lvl() > 1) {
+        if (dbg_lvl() > 1 && construct) {
             printf("PARENT SET DIFFER");
 
             for (j = 0; j < parent_pd->cclasses[i].count; ++j) {
@@ -1441,8 +1441,8 @@ static int create_differ(wctproblem *problem, wctdata *parent_pd,
             printf("\n");
             printf("TRANS SET DIFFER");
 
-            for (j = 0; j < pd->cclasses[i].count; ++j) {
-                printf(" %d", pd->cclasses[i].members[j]);
+            for (j = 0; j < pd->cclasses[pd->ccount - 1].count; ++j) {
+                printf(" %d", pd->cclasses[pd->ccount - 1].members[j]);
             }
 
             printf("\n");
@@ -1528,7 +1528,7 @@ static int transfer_same_cclasses(wctdata *pd,
             pd->ccount++;
         }
 
-        if (dbg_lvl() > 1) {
+        if (dbg_lvl() > 1 && construct) {
             printf("PARENT SET SAME ");
 
             for (j = 0; j < parent_cclasses[i].count; ++j) {
@@ -1538,8 +1538,8 @@ static int transfer_same_cclasses(wctdata *pd,
             printf("\n");
             printf("TRANS SET SAME");
 
-            for (j = 0; j < pd->cclasses[i].count; ++j) {
-                printf(" %d", pd->cclasses[i].members[j]);
+            for (j = 0; j < pd->cclasses[pd->ccount - 1].count; ++j) {
+                printf(" %d", pd->cclasses[pd->ccount - 1].members[j]);
             }
 
             printf("\n");
@@ -2581,7 +2581,7 @@ static int delete_old_cclasses(wctdata *pd)
         pd->cclasses = new_cclasses;
         pd->ccount   = new_ccount;
 
-        if (dbg_lvl() > 0) {
+        if (dbg_lvl() > 1) {
             printf("Deleted %d out of %d columns with age > %d.\n",
                    pd->dzcount, pd->dzcount + pd->ccount, pd->retirementage);
         }
@@ -2756,9 +2756,9 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         iterations++;
 
         /** delete old columns */
-        if (pd->dzcount > pd->njobs * min_ndelrow_ratio && status == GRB_OPTIMAL) {
-            val = delete_old_cclasses(pd);
-        }
+        // if (pd->dzcount > pd->njobs * min_ndelrow_ratio && status == GRB_OPTIMAL) {
+        //     val = delete_old_cclasses(pd);
+        // }
 
         /** Compute LP relaxation */
         cur_cputime = CCutil_zeit();
