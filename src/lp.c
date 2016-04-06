@@ -156,7 +156,7 @@ int wctlp_addrow(wctlp *lp, int nzcount, int *cind , double *cval,
             val = 1;
             return val;
     }
-    
+
     val = GRBaddconstr(lp->model, nzcount, cind, cval, isense, rhs, name);
     CHECK_VAL_GRB(val, "Failed GRBadd", lp->env);
     val = GRBupdatemodel(lp->model);
@@ -234,6 +234,27 @@ int wctlp_pi(wctlp *lp, double *pi)
     }
 
     val = GRBgetdblattrarray(lp->model, GRB_DBL_ATTR_PI, 0, nrows, pi);
+    CHECK_VAL_GRB(val, "Failed to get the dual prices", lp->env);
+    return val;
+}
+
+int wctlp_pi_inf(wctlp *lp, double *pi)
+{
+    int val = 0;
+    int nrows;
+    int solstat;
+    val = GRBgetintattr(lp->model, GRB_INT_ATTR_STATUS, &solstat);
+    CHECK_VAL_GRB(val, "failed to get attribute status gurobi", lp->env);
+    val = GRBgetintattr(lp->model, GRB_INT_ATTR_NUMCONSTRS, &nrows);
+    CHECK_VAL_GRB(val, "Failed to get nrows", lp->env);
+
+    if (nrows == 0) {
+        fprintf(stderr, "No rows in the LP\n");
+        val = 1;
+        return val;
+    }
+
+    val = GRBgetdblattrarray(lp->model, GRB_DBL_ATTR_FARKASDUAL, 0, nrows, pi);
     CHECK_VAL_GRB(val, "Failed to get the dual prices", lp->env);
     return val;
 }
@@ -339,7 +360,16 @@ int wctlp_set_coltypes(wctlp *lp, char sense)
     return val;
 }
 
-
+int wctlp_get_rhs(wctlp *lp, double *rhs)
+{
+    int val = 0;
+    int nconstr;
+    val = GRBgetintattr(lp->model, GRB_INT_ATTR_NUMCONSTRS, &nconstr);
+    CHECK_VAL_GRB(val, "Failed in getting the number of variables", lp->env);
+    val = GRBgetdblattrarray(lp->model, GRB_DBL_ATTR_RHS, 0, nconstr, rhs);
+    CHECK_VAL_GRB(val, "Failed in getting the RHS", lp->env);
+    return  val;
+}
 
 
 int wctlp_setbound(wctlp *lp, int col, char lb_or_ub, double bound)

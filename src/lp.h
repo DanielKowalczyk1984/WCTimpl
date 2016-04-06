@@ -93,8 +93,11 @@ void wctlp_printerrorcode(int c);
 
 int wctlp_status(wctlp *lp, int *status);
 int wctlp_chg_lb_var(wctlp *lp, int var, double lb);
+int wctlp_pi_inf(wctlp *lp, double *pi);
 
 double lp_int_tolerance(void);
+
+int wctlp_get_rhs(wctlp *lp, double *rhs);
 
 #ifdef __cplusplus
 }

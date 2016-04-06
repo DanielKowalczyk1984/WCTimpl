@@ -243,11 +243,13 @@ CLEAN:
         return solver->zdd->size();
     }
 
-    size_t get_numberrows_zdd(PricerSolver *solver){
+    size_t get_numberrows_zdd(PricerSolver *solver)
+    {
         return solver->zdd->root().row();
     }
 
-    size_t get_numberrows_bdd(PricerSolver *solver){
+    size_t get_numberrows_bdd(PricerSolver *solver)
+    {
         return solver->dd->root().row();
     }
 
@@ -342,7 +344,7 @@ CLEAN:
         return val;
     }
 
-    double compute_lagrange(Optimal_Solution<double> &sol, double *pi, int nbjobs, int nbmachines)
+    double compute_lagrange(Optimal_Solution<double> &sol, double *rhs, double *pi, int nbjobs, int nbmachines)
     {
         double result = pi[nbjobs];
         double a = 0.0;
@@ -354,13 +356,26 @@ CLEAN:
         }
 
         for (i = 0; i < nbjobs; ++i) {
-            a += pi[i];
+            a += rhs[i] * pi[i];
         }
 
-        a += nbmachines * pi[nbjobs];
+        a += rhs[nbjobs] * pi[nbjobs];
         result = CC_MIN(0.0, sol.cost - result);
-        result = (double)nbmachines * result;
+        result = (double)rhs[nbjobs] * result;
         result += a;
+        return result;
+    }
+
+    double compute_reduced_cost(Optimal_Solution<double> &sol, double *pi, int nbjobs)
+    {
+        double result = pi[nbjobs];
+        std::vector<int> *v = &(sol.jobs);
+
+        for (std::vector<int>::iterator it = v->begin();  it != v->end(); it++) {
+            result += pi[*it];
+        }
+
+        result = sol.cost - result;
         return result;
     }
 
@@ -388,23 +403,13 @@ CLEAN:
         switch (parms->solver) {
             case bdd_solver:
             case zdd_solver:
-                if (sol.obj > 0.000001) {
-                    val = construct_sol(&(pd->newsets), &(pd->nnewsets), sol, pd->njobs);
-                    CCcheck_val_2(val, "Failed in construction of solution");
-                } else {
-                    pd->nnewsets = 0;
-                }
-
+                val = construct_sol(&(pd->newsets), &(pd->nnewsets), sol, pd->njobs);
+                CCcheck_val_2(val, "Failed in construction of solution");
                 break;
 
             case DP_solver:
-                if (sol.obj < -0.000001) {
-                    val = construct_sol<double, true>(&(pd->newsets), &(pd->nnewsets), sol, pd->njobs);
-                    CCcheck_val_2(val, "Failed in construction of solution");
-                } else {
-                    pd->nnewsets = 0;
-                }
-
+                val = construct_sol<double, true>(&(pd->newsets), &(pd->nnewsets), sol, pd->njobs);
+                CCcheck_val_2(val, "Failed in construction of solution");
                 break;
         }
 
@@ -418,16 +423,16 @@ CLEAN:
         int heading_in = 0;
         PricerSolver *solver = pd->solver;
         Optimal_Solution<double> sol;
-        heading_in = (pd->eta_in == 0.0) ? 1 : !(CC_OURABS((pd->eta_out - pd->eta_in) / (pd->eta_in)) < 4.0);
+        heading_in = (pd->eta_in == 0.0) ? 1 : !(CC_OURABS((pd->eta_out - pd->eta_in) / (pd->eta_in)) < 1.0);
 
         if (heading_in) {
             double result;
             compute_sol_stab(solver, parms, pd->pi, &sol);
-            result = compute_lagrange(sol, pd->pi, pd->njobs, pd->nmachines);
+            result = compute_lagrange(sol, pd->rhs, pd->pi, pd->njobs, pd->nmachines);
 
             if (result > pd->eta_in) {
                 pd->eta_in = result;
-                memcpy(pd->pi_in, pd->pi, sizeof(double)*pd->njobs + 1);
+                memcpy(pd->pi_in, pd->pi, sizeof(double) * (pd->njobs + 1));
             }
 
             val = construct_sol_stab(pd, parms, sol);
@@ -435,28 +440,38 @@ CLEAN:
         } else {
             double k = 0.0;
             double alpha;
-            double  result;
+            bool mispricing = false;
+            double  result_sep;
+            double result_out;
 
             do {
                 k += 1.0;
                 alpha = CC_MAX(0, 1.0 - k * (1.0 - pd->alpha));
                 compute_pi_eta_sep(pd->njobs, pd->pi_sep, &(pd->eta_sep), alpha, pd->pi_in, &(pd->eta_in), pd->pi_out, &(pd->eta_out));
                 compute_sol_stab(solver, parms, pd->pi_sep, &sol);
-                result = compute_lagrange(sol, pd->pi_sep, pd->njobs, pd->nmachines);
+                result_sep = compute_lagrange(sol, pd->rhs, pd->pi_sep, pd->njobs, pd->nmachines);
 
-                if (result < pd->eta_sep) {
+                if (result_sep < pd->eta_sep) {
                     val = construct_sol_stab(pd, parms, sol);
                     CCcheck_val_2(val, "Failed in construct_sol_stab");
+                    pd->update = 1;
+                    mispricing = false;
+                } else {
+                    result_out = compute_lagrange(sol, pd->rhs, pd->pi_out, pd->njobs, pd->nmachines);
 
-                    if (result > pd->eta_in) {
-                        pd->eta_in = result;
-                        memcpy(pd->pi_in, pd->pi_sep, sizeof(double) * (pd->njobs + 1));
+                    if (result_out < pd->eta_out) {
+                        val = construct_sol_stab(pd, parms, sol);
+                        CCcheck_val_2(val, "Failed in construct_sol_stab");
+                        mispricing = false;
+                        pd->update = 0;
+                    } else {
+                        mispricing = true;
                     }
                 }
-            } while (pd->nnewsets == 0 && alpha > 0.0); /** mispricing check */
+            } while (mispricing && alpha > 0); /** mispricing check */
 
-            if (result > pd->eta_in) {
-                pd->eta_in = result;
+            if (result_sep > pd->eta_in) {
+                pd->eta_in = result_sep;
                 memcpy(pd->pi_in, pd->pi_sep, sizeof(double) * (pd->njobs + 1));
             }
         }
@@ -483,7 +498,7 @@ CLEAN:
             alpha = CC_MAX(0.0, 1.0 - k * (1 - pd->alpha));
             compute_pi_eta_sep(pd->njobs, pd->pi_sep, &(pd->eta_sep), alpha, pd->pi_in, &(pd->eta_in), pd->pi_out, &(pd->eta_out));
             compute_sol_stab(solver, parms, pd->pi_sep, &(sol));
-            result = compute_lagrange(sol, pd->pi_sep, pd->njobs, pd->nmachines);
+            result = compute_lagrange(sol, pd->rhs, pd->pi_sep, pd->njobs, pd->nmachines);
 
             if (result < pd->eta_sep) {
                 val = construct_sol_stab(pd, parms, sol);
@@ -503,9 +518,10 @@ CLEAN:
             memcpy(pd->pi_in, pd->pi_sep, sizeof(double) * (pd->njobs + 1));
         }
 
-        if(dbg_lvl() > 1) {
+        if (dbg_lvl() > 1) {
             printf(" alpha = %f, result of primal bound and Lagragian bound: out =%f, in = %f\n",  pd->alpha, pd->eta_out, pd->eta_in);
         }
+
 CLEAN:
         return val;
     }

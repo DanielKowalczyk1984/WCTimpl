@@ -12,6 +12,7 @@ int recover_elist(wctdata *pd);
 int create_branches_conflict(wctdata *pd, wctproblem *problem);
 int sequential_branching_conflict(wctproblem *problem);
 static int create_same(wctproblem *problem, wctdata *parent_pd, int v1, int v2);
+static int submiping(wctdata *cd);
 
 int debug = 0;
 
@@ -271,6 +272,8 @@ void wctdata_init(wctdata *pd)
     pd->lower_scaled_bound = 1;
     pd->kpc_pi_scalef = 1;
     pd->LP_lower_bound = 0.0;
+    pd->partial_sol = 0.0;
+    pd->rhs = (double *) NULL;
     /*Initialization  of the LP*/
     pd->LP = (wctlp *)NULL;
     pd->x = (double *)NULL;
@@ -284,6 +287,7 @@ void wctdata_init(wctdata *pd)
     pd->subgradient = (double *) NULL;
     pd->subgradient_in = (double *) NULL;
     pd->alpha = 0.8;
+    pd->update = 1;
     /*Initialization pricing_problem*/
     pd->solver = (PricerSolver *) NULL;
     pd->nnonimprovements = 0;
@@ -317,6 +321,9 @@ void wctdata_init(wctdata *pd)
     pd->ecount_differ = 0;
     pd->v1 = -1;
     pd->v2 = -1;
+    pd->v1_wide = (int *) NULL;
+    pd->v2_wide = (int *) NULL;
+    pd->nb_wide = 0;
     heur_init(pd);
 }
 
@@ -360,6 +367,7 @@ void lpwctdata_free(wctdata *pd)
     CC_IFFREE(pd->pi_sep, double);
     CC_IFFREE(pd->subgradient, double);
     CC_IFFREE(pd->subgradient_in, double);
+    CC_IFFREE(pd->rhs, double);
     heur_free(pd);
 
     if (pd->solver) {
@@ -403,6 +411,8 @@ void wctdata_free(wctdata *pd)
     CC_IFFREE(pd->elist_same, int);
     CC_IFFREE(pd->elist_differ, int);
     CC_IFFREE(pd->orig_node_ids, int);
+    CC_IFFREE(pd->v1_wide, int);
+    CC_IFFREE(pd->v2_wide, int);
 }
 
 /** help functions for heap srong branching */
@@ -635,18 +645,17 @@ int compute_objective(wctdata *pd, wctparms *parms)
     pd->LP_lower_bound_dual = .0;
 
     /** compute lower bound with the dual variables */
-    for (i = 0; i < pd->njobs; i++) {
-        pd->LP_lower_bound_dual += (double) pd->pi[i];
+    for (i = 0; i < pd->njobs + 1; i++) {
+        pd->LP_lower_bound_dual += (double) pd->pi[i] * pd->rhs[i];
     }
 
-    pd->LP_lower_bound_dual += pd->nmachines * pd->pi[pd->njobs];
     /** Get the LP lower bound and compute the lower bound of WCT */
     val = wctlp_objval(pd->LP, &(pd->LP_lower_bound));
     CCcheck_val_2(val, "wctlp_objval failed");
     pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual) < (int) ceil(pd->LP_lower_bound)) ? (int) ceil(pd->LP_lower_bound_dual) : (int) ceil(pd->LP_lower_bound) ;
 
-    if (parms->solver == bdd_solver || parms->solver == zdd_solver) {
-        pd->lower_bound = ((int) ceil(pd->eta_in) < pd->lower_bound) ? (int) ceil(pd->eta_in) : pd->lower_bound;
+    if (parms->stab_technique == stab_wentgnes || parms->stab_technique == stab_dynamic) {
+         pd->lower_bound = (int) ceil(pd->eta_in);
     }
 
     if (dbg_lvl() > 1) {
@@ -898,7 +907,7 @@ static int grab_integral_solution_ahv(wctdata *pd, int *completion_time)
     }
 
     val = wctlp_objval(pd->LP, &testincumbent);
-    CCcheck_val_2(val, "COLORlp_objval failed");
+    CCcheck_val_2(val, "wctlp_objval failed");
     Schedulesets_free(&(pd->bestcolors), &(pd->nbbest));
     pd->bestcolors = (Scheduleset *) realloc(pd->bestcolors,
                      pd->nmachines * sizeof(Scheduleset));
@@ -934,7 +943,7 @@ static void adapt_global_upper_bound(wctproblem *problem, int new_upper_bound)
 
 static int collect_releasetime_child(wctdata *cd)
 {
-    int rval = 0;
+    int val = 0;
     int c;
 
     for (c = 0; c < cd->ndiff; ++c) {
@@ -951,7 +960,7 @@ static int collect_releasetime_child(wctdata *cd)
         }
     }
 
-    return rval;
+    return val;
 }
 
 static int collect_duetime_child(wctdata *cd)
@@ -2117,7 +2126,7 @@ static int grab_int_sol(wctdata *pd, double *x, double tolerance)
     for (i = 0; i < pd->ccount; ++i) {
         test_incumbent += x[i];
 
-        if (x[i] >= 1.0  - lp_int_tolerance()) {
+        if (x[i] >= 1.0  - tolerance) {
             int j = pd->nbbest;
             int k;
             Scheduleset_init(pd->bestcolors + j);
@@ -2146,11 +2155,11 @@ static int grab_int_sol(wctdata *pd, double *x, double tolerance)
         }
     }
 
+    print_schedule(pd->bestcolors, pd->nbbest);
+    printf("with total weight %d\n", tot_weighted);
     val = Scheduleset_check(pd->bestcolors, pd->nbbest, pd->njobs);
     CCcheck_val_2(val, "ERROR: An incorrect coloring was created.");
     printf("Intermediate schedule:\n");
-    print_schedule(pd->bestcolors, pd->nbbest);
-    printf("with total weight %d\n", tot_weighted);
     assert(fabs((double)tot_weighted -  incumbent) <=
            integral_incumbent_tolerance);
 
@@ -2281,31 +2290,144 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem)
     pd->x = CC_SAFE_MALLOC(pd->ccount, double);
     CCcheck_NULL_2(pd->x, "Failed to allocate memory to pd->x");
     memcpy(pd->x, x, pd->ccount * sizeof(double));
-    val = insert_frac_pairs_into_heap(pd, pd->x, nodepair_refs,
-                                      nodepair_weights, npairs, heap);
+    val = insert_frac_pairs_into_heap(pd, pd->x, nodepair_refs, nodepair_weights, npairs, heap);
     CCcheck_val_2(val, "Failed in insert_frac_pairs_into_heap");
 
     if (pmcheap_size(heap) == 0) {
-        double integrality_tolerance = .0;
         printf("LP returned integral solution\n");
-        val = grab_int_sol(pd, x, integrality_tolerance);
+        val = grab_int_sol(pd, x, lp_int_tolerance());
         CCcheck_val_2(val, "Failed in grab_int_sol");
         assert(pd->status = finished);
         goto CLEAN;
     }
 
-    /*    if (pd->depth % 5 == 0) {
-            parms->stab_technique = no_stab;
-            val = heur_exec(problem, pd, &result);
-            CCcheck_val_2(val, "Failed at heur_exec");
+        // if (pd->depth % 5 == 0) {
+        //     val = heur_exec(problem, pd, &result);
+        //     CCcheck_val_2(val, "Failed at heur_exec");
 
-            if (result == FOUNDSOL) {
-                printf("Heuristic found solution\n");
-                assert(pd->status = finished);
-                goto CLEAN;
-            }
-            parms->stab_technique = stab_wentgnes;
-        }*/
+        //     if (result == FOUNDSOL) {
+        //         printf("Heuristic found solution\n");
+        //         assert(pd->status = finished);
+        //         goto CLEAN;
+        //     }
+        // }
+
+    if (dbg_lvl() > 1) {
+        printf("Collected %d branching candidates.\n", pmcheap_size(heap));
+    }
+
+    val = find_strongest_children_conflict(&strongest_v1, &strongest_v2, pd, problem, heap, nodepair_refs, nodepair_weights);
+    CCcheck_val_2(val, "Failed in find_strongest_children");
+    val = create_same(problem, pd, strongest_v1, strongest_v2);
+    CCcheck_val(val, "Failed in create_same");
+    val = set_id_and_name(pd->same_children, problem->nwctdata++, pd->pname);
+    CCcheck_val_2(val, "Failed in set_id_and_name");
+    val = compute_lower_bound(problem, pd->same_children);
+    CCcheck_val_2(val, "Failed in compute_lower_bound");
+    val = create_differ(problem, pd, strongest_v1, strongest_v2);
+    CCcheck_val_2(val, "Failed in create_differ");
+    val = set_id_and_name(pd->diff_children, problem->nwctdata++, pd->pname);
+    CCcheck_val_2(val, "Failed in set_id_and_name");
+    val = compute_lower_bound(problem, pd->diff_children);
+    CCcheck_val_2(val, "Failed in compute_lower_bound");
+    free_elist(pd->same_children, &(problem->parms));
+    free_elist(pd->diff_children, &(problem->parms));
+CLEAN:
+    lpwctdata_free(pd);
+    free_elist(pd, &(problem->parms));
+
+    if (heap) {
+        pmcheap_free(heap);
+        heap = (pmcheap *)NULL;
+    }
+
+    CC_IFFREE(x, double);
+    CC_IFFREE(mf_col, int);
+    CC_IFFREE(nodepair_refs, int);
+    CC_IFFREE(nodepair_weights, double);
+    return val;
+}
+
+int create_wide_branches_conflict(wctdata *pd, wctproblem *problem)
+{
+    int val = 0;
+    int result = DELEYAD;
+    int status;
+    int i;
+    double *x = (double *)NULL;
+    wctparms *parms = &(problem->parms);
+    int strongest_v1 = -1, strongest_v2 = -1;
+    int *nodepair_refs = (int *) NULL;
+    double *nodepair_weights = (double *) NULL;
+    int npairs = pd->njobs * (pd->njobs + 1) / 2;
+    int *mf_col = (int *)NULL;
+    pmcheap *heap = (pmcheap *)NULL;
+    val = pmcheap_init(&heap, npairs);
+    CCcheck_val_2(val, "Failed pmcheap_init");
+    nodepair_refs = CC_SAFE_MALLOC(npairs, int);
+    CCcheck_NULL_2(nodepair_refs, "Failed to allocate memory to nodepair_refs");
+    nodepair_weights = CC_SAFE_MALLOC(npairs, double);
+    CCcheck_NULL_2(nodepair_weights,
+                   "Failed to allocate memory to nodepair_weights");
+
+    for (i = 0; i < npairs; i++) {
+        nodepair_refs[i] = -1;
+        nodepair_weights[i] = .0;
+    }
+
+    mf_col = CC_SAFE_MALLOC(pd->njobs, int);
+    CCcheck_NULL_2(mf_col, "Failed to allocate memory to mf_col");
+
+    for (i = 0; i < pd->njobs; i++) {
+        mf_col[i] = -1;
+    }
+
+    if (!pd->LP) {
+        val = build_lp(pd, parms->construct);
+        CCcheck_val_2(val, "Failed at build_lp");
+    }
+
+    if (!pd->ccount) {
+        compute_lower_bound(problem, pd);
+    }
+
+    assert(pd->ccount != 0);
+    val = wctlp_optimize(pd->LP, &status);
+    CCcheck_val_2(val, "Failed at wctlp_optimize");
+
+    if (status == GRB_INFEASIBLE) {
+        goto CLEAN;
+    }
+
+    x = CC_SAFE_MALLOC(pd->ccount, double);
+    CCcheck_NULL_2(x, "Failed to allocate memory to x");
+    val = wctlp_x(pd->LP, x, 0);
+    CCcheck_val_2(val, "Failed at wctlp_x");
+    CC_IFFREE(pd->x, double);
+    pd->x = CC_SAFE_MALLOC(pd->ccount, double);
+    CCcheck_NULL_2(pd->x, "Failed to allocate memory to pd->x");
+    memcpy(pd->x, x, pd->ccount * sizeof(double));
+    val = insert_frac_pairs_into_heap(pd, pd->x, nodepair_refs, nodepair_weights, npairs, heap);
+    CCcheck_val_2(val, "Failed in insert_frac_pairs_into_heap");
+
+    if (pmcheap_size(heap) == 0) {
+        printf("LP returned integral solution\n");
+        val = grab_int_sol(pd, x, lp_int_tolerance());
+        CCcheck_val_2(val, "Failed in grab_int_sol");
+        assert(pd->status = finished);
+        goto CLEAN;
+    }
+
+    if (pd->depth % 5 == 0) {
+        val = heur_exec(problem, pd, &result);
+        CCcheck_val_2(val, "Failed at heur_exec");
+
+        if (result == FOUNDSOL) {
+            printf("Heuristic found solution\n");
+            assert(pd->status = finished);
+            goto CLEAN;
+        }
+    }
 
     if (dbg_lvl() > 1) {
         printf("Collected %d branching candidates.\n", pmcheap_size(heap));
@@ -2426,6 +2548,72 @@ int sequential_branching_conflict(wctproblem *problem)
     pmcheap *br_heap = problem->br_heap;
     wctparms *parms = &(problem->parms);
     printf("ENTERED SEQUANTIAL BRANCHING:\n");
+    CCutil_suspend_timer(&problem->tot_branch_and_bound);
+
+    while ((pd = (wctdata *) pmcheap_min(br_heap))
+            && problem->tot_branch_and_bound.cum_zeit < parms->branching_cpu_limit) {
+        CCutil_resume_timer(&problem->tot_branch_and_bound);
+        int i;
+        pd->upper_bound = problem->global_upper_bound;
+
+        if (pd->lower_bound >= pd->upper_bound || pd->status == infeasible || pd->eta_in > pd->upper_bound - 1) {
+            skip_wctdata(pd, problem);
+            remove_finished_subtree_conflict(pd);
+        } else {
+            branching_msg(pd, problem);
+            /** Construct PricerSolver */
+            val = recover_elist(pd);
+            CCcheck_val_2(val, "Failed in recover_elist");
+
+            if (problem->maxdepth < pd->depth) {
+                problem->maxdepth = pd->depth;
+            }
+
+            val = create_branches_conflict(pd, problem);
+            CCcheck_val_2(val, "Failed at create_branches");
+
+            for (i = 0; i < pd->nsame; i++) {
+                val = insert_into_branching_heap(&(pd->same_children[i]), problem);
+                CCcheck_val_2(val, "Failed in insert_into_branching_heap");
+            }
+
+            for (i = 0; i < pd->ndiff; i++) {
+                val = insert_into_branching_heap(pd->diff_children + i, problem);
+                CCcheck_val_2(val, "Faield at insert_into_branching_heap");
+            }
+
+            assert(pd->lower_bound <= pd->upper_bound);
+            adapt_global_upper_bound(problem, pd->upper_bound);
+
+            if (pd->upper_bound == pd->lower_bound) {
+                remove_finished_subtree_conflict(pd);
+            }
+
+            /** Check for integer solutions */
+        }
+
+        CCutil_suspend_timer(&problem->tot_branch_and_bound);
+    }
+
+    CCutil_resume_timer(&problem->tot_branch_and_bound);
+
+    if (pd) {
+        printf("Branching timeout of %f second reached\n",
+               parms->branching_cpu_limit);
+    }
+
+    children_data_free(&problem->root_pd);
+CLEAN:
+    return val;
+}
+
+int sequential_wide_branching_conflict(wctproblem *problem)
+{
+    int val = 0;
+    wctdata *pd;
+    pmcheap *br_heap = problem->br_heap;
+    wctparms *parms = &(problem->parms);
+    printf("ENTERED SEQUANTIAL WIDE BRANCHING:\n");
     CCutil_suspend_timer(&problem->tot_branch_and_bound);
 
     while ((pd = (wctdata *) pmcheap_min(br_heap))
@@ -2736,6 +2924,10 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     CCcheck_NULL_2(pd->subgradient_in, "Failed to allocate memory");
     pd->subgradient = CC_SAFE_MALLOC(pd->njobs + 1, double);
     CCcheck_NULL_2(pd->subgradient, "Failed to allocate memory");
+    pd->rhs = CC_SAFE_MALLOC(pd->njobs + 1, double);
+    CCcheck_NULL_2(pd->rhs, "Failed to allocate memory");
+    val = wctlp_get_rhs(pd->LP, pd->rhs);
+    CCcheck_val_2(val, "Failed to get RHS");
     pd->retirementage = (int) sqrt(pd->njobs) + 30;
 
     /** Init alpha */
@@ -2752,58 +2944,69 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
             break;
     }
 
-    do {
-        iterations++;
+    /** Compute LP relaxation */
+    cur_cputime = CCutil_zeit();
+    val = wctlp_optimize(pd->LP, &status);
+    CCcheck_val_2(val, "wctlp_optimize failed");
+    cur_cputime = CCutil_zeit() - cur_cputime;
 
+    if (dbg_lvl() > 1) {
+        printf("Simplex took %f seconds.\n", CCutil_zeit() - cur_cputime);
+        fflush(stdout);
+    }
+
+    if (dbg_lvl() > 1) {
+        print_ages(pd);
+    }
+
+    break_while_loop = 0;
+    CCutil_suspend_timer(&(problem->tot_cputime));
+    CCutil_resume_timer(&(problem->tot_cputime));
+
+    switch (status) {
+        case GRB_OPTIMAL:
+            /** grow ages of the different columns */
+            val = grow_ages(pd);
+            CCcheck_val_2(val, "Failed in grow_ages");
+            /** get the dual variables and make them feasible */
+            val = wctlp_pi(pd->LP, pd->pi);
+            CCcheck_val_2(val, "wctlp_pi failed");
+            /** Compute the objective function */
+            val = compute_objective(pd, parms);
+            CCcheck_val_2(val, "Failed in compute_objective");
+            memcpy(pd->pi_out, pd->pi, sizeof(double) * (pd->njobs + 1));
+            pd->eta_out = pd->LP_lower_bound_dual;
+            break;
+
+        case GRB_INFEASIBLE:
+            /** get the dual variables and make them feasible */
+            val = wctlp_pi(pd->LP, pd->pi);
+            CCcheck_val_2(val, "wctlp_pi failed");
+            break;
+    }
+
+    while ((iterations < pd->maxiterations)
+            && !break_while_loop
+            && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit) {
+        iterations++;
         /** delete old columns */
         // if (pd->dzcount > pd->njobs * min_ndelrow_ratio && status == GRB_OPTIMAL) {
         //     val = delete_old_cclasses(pd);
         // }
-
-        /** Compute LP relaxation */
-        cur_cputime = CCutil_zeit();
-        val = wctlp_optimize(pd->LP, &status);
-        CCcheck_val_2(val, "wctlp_optimize failed");
-        cur_cputime = CCutil_zeit() - cur_cputime;
-
-        if (dbg_lvl() > 1) {
-            printf("Simplex took %f seconds.\n", CCutil_zeit() - cur_cputime);
-            fflush(stdout);
-        }
-
-        if (dbg_lvl() > 1) {
-            print_ages(pd);
-        }
+        /** Solve the pricing problem*/
 
         CCutil_start_resume_time(&problem->tot_pricing);
 
         switch (status) {
             case GRB_OPTIMAL:
-                /** grow ages of the different columns */
-                val = grow_ages(pd);
-                CCcheck_val_2(val, "Failed in grow_ages");
-                /** get the dual variables and make them feasible */
-                val = wctlp_pi(pd->LP, pd->pi);
-                CCcheck_val_2(val, "wctlp_pi failed");
-                /** Compute the objective function */
-                val = compute_objective(pd, parms);
-                CCcheck_val_2(val, "Failed in compute_objective");
-
                 if (iterations < pd->maxiterations) {
-                    /** nnonimprovements? */
-
-                    /** Solve the pricing problem */
                     switch (parms->stab_technique) {
                         case stab_wentgnes:
-                            memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
-                            pd->eta_out = pd->LP_lower_bound;
                             val = solve_stab(pd, parms);
                             CCcheck_val_2(val, "Failed in solve_stab");
                             break;
 
                         case stab_dynamic:
-                            memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
-                            pd->eta_out = pd->LP_lower_bound;
                             val = solve_stab_dynamic(pd, parms);
                             CCcheck_val_2(val, "Failed in solve_stab");
                             break;
@@ -2818,10 +3021,6 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 break;
 
             case GRB_INFEASIBLE:
-                /** get the dual variables and make them feasible */
-                val = wctlp_pi(pd->LP, pd->pi);
-                CCcheck_val_2(val, "wctlp_pi failed");
-
                 if (iterations < pd->maxiterations) {
                     val = solve_farkas_dbl(pd);
                     CCcheck_val_2(val, "Failed in solving farkas");
@@ -2858,11 +3057,135 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         }
 
         add_newsets(pd);
+
+        /** Compute LP relaxation */
+        cur_cputime = CCutil_zeit();
+        val = wctlp_optimize(pd->LP, &status);
+        CCcheck_val_2(val, "wctlp_optimize failed");
+        cur_cputime = CCutil_zeit() - cur_cputime;
+
+        if (dbg_lvl() > 1) {
+            printf("Simplex took %f seconds.\n", CCutil_zeit() - cur_cputime);
+            fflush(stdout);
+        }
+
+        if (dbg_lvl() > 1) {
+            print_ages(pd);
+        }
+
+        switch (status) {
+            case GRB_OPTIMAL:
+                /** grow ages of the different columns */
+                val = grow_ages(pd);
+                CCcheck_val_2(val, "Failed in grow_ages");
+                /** get the dual variables and make them feasible */
+                val = wctlp_pi(pd->LP, pd->pi);
+                CCcheck_val_2(val, "wctlp_pi failed");
+                /** Compute the objective function */
+                val = compute_objective(pd, parms);
+                CCcheck_val_2(val, "Failed in compute_objective");
+                if(pd->update) {
+                    memcpy(pd->pi_out, pd->pi, sizeof(double)*(pd->njobs + 1));
+                    pd->eta_out = pd->LP_lower_bound_dual;
+                }
+                break;
+
+            case GRB_INFEASIBLE:
+                /** get the dual variables and make them feasible */
+                val = wctlp_pi(pd->LP, pd->pi);
+                CCcheck_val_2(val, "wctlp_pi failed");
+                break;
+        }
+
+
         CCutil_suspend_timer(&(problem->tot_cputime));
         CCutil_resume_timer(&(problem->tot_cputime));
-    } while ((iterations < pd->maxiterations)
-             && !break_while_loop
-             && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit);
+    }
+
+    // do {
+    //     iterations++;
+    //     /** delete old columns */
+    //     // if (pd->dzcount > pd->njobs * min_ndelrow_ratio && status == GRB_OPTIMAL) {
+    //     //     val = delete_old_cclasses(pd);
+    //     // }
+    //     /** Solve the pricing problem*/
+
+    //     CCutil_start_resume_time(&problem->tot_pricing);
+
+    //     switch (status) {
+    //         case GRB_OPTIMAL:
+    //             if (iterations < pd->maxiterations) {
+    //                 /** nnonimprovements? */
+
+    //                 /** Solve the pricing problem */
+    //                 switch (parms->stab_technique) {
+    //                     case stab_wentgnes:
+    //                         memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
+    //                         //pd->eta_out = pd->LP_lower_bound - pd->partial_sol;
+    //                         val = solve_stab(pd, parms);
+    //                         CCcheck_val_2(val, "Failed in solve_stab");
+    //                         break;
+
+    //                     case stab_dynamic:
+    //                         memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
+    //                         //pd->eta_out = pd->LP_lower_bound - pd->partial_sol;
+    //                         val = solve_stab_dynamic(pd, parms);
+    //                         CCcheck_val_2(val, "Failed in solve_stab");
+    //                         break;
+
+    //                     case no_stab:
+    //                         val = solve_pricing(pd, parms);
+    //                         CCcheck_val_2(val, "Failed in solving pricing");
+    //                         break;
+    //                 }
+    //             }
+
+    //             break;
+
+    //         case GRB_INFEASIBLE:
+    //             if (iterations < pd->maxiterations) {
+    //                 val = solve_farkas_dbl(pd);
+    //                 CCcheck_val_2(val, "Failed in solving farkas");
+    //             }
+
+    //             break;
+    //     }
+
+    //     CCutil_suspend_timer(&problem->tot_pricing);
+
+    //     for (j = 0; j < pd->nnewsets; j++) {
+    //         val = wctlp_addcol(pd->LP, pd->newsets[j].count + 1, pd->newsets[j].members, pd->coef, pd->newsets[j].totwct, 0.0, 1.0, wctlp_CONT, NULL);
+    //         CCcheck_val_2(val, "wctlp_addcol failed");
+    //     }
+
+    //     switch (status) {
+    //         case GRB_OPTIMAL:
+    //             switch (parms->stab_technique) {
+    //                 case stab_wentgnes:
+    //                 case stab_dynamic:
+    //                     break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001 || pd->eta_in > floor(pd->eta_out));
+    //                     break;
+
+    //                 case no_stab:
+    //                     break_while_loop = (pd->nnewsets == 0 || nnonimprovements > 5);
+    //                     break;
+    //             }
+
+    //             break;
+
+    //         case GRB_INFEASIBLE:
+    //             break_while_loop = (pd->nnewsets == 0);
+    //             break;
+    //     }
+
+    //     add_newsets(pd);
+
+
+    //     CCutil_suspend_timer(&(problem->tot_cputime));
+    //     CCutil_resume_timer(&(problem->tot_cputime));
+    // } while ((iterations < pd->maxiterations)
+    //          && !break_while_loop
+    //          && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit);
 
     if (iterations < pd->maxiterations && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit) {
         switch (status) {
@@ -2873,12 +3196,12 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                     problem->status = lp_feasible;
                 }
 
-                val = wctlp_optimize(pd->LP, &status);
-                CCcheck_val_2(val, "wctlp_optimize failed");
-                val = wctlp_pi(pd->LP, pd->pi);
-                CCcheck_val_2(val, "wctlp_pi failed");
-                val = compute_objective(pd, parms);
-                CCcheck_val_2(val, "compute_objective failed");
+                // val = wctlp_optimize(pd->LP, &status);
+                // CCcheck_val_2(val, "wctlp_optimize failed");
+                // val = wctlp_pi(pd->LP, pd->pi);
+                // CCcheck_val_2(val, "wctlp_pi failed");
+                // val = compute_objective(pd, parms);
+                // CCcheck_val_2(val, "compute_objective failed");
 
                 if (dbg_lvl() > 1) {
                     printf("Found lb = %d (%f) upper_bound = %d (id= %d, iterations = %d,opt_track = %d).\n",
@@ -2891,6 +3214,12 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 val = wctlp_x(pd->LP, pd->x, 0);
                 CCcheck_val_2(val, "Failed in wctlp_x");
                 pd->status = LP_bound_computed;
+                /*                val = grow_ages(pd);
+                                CCcheck_val_2(val, "Failed in grow ages");
+                                pd->retirementage = 0;
+                                val = delete_old_cclasses(pd);
+                                CCcheck_val_2(val, "Failed in deleted old classes");*/
+                
                 break;
 
             case GRB_INFEASIBLE:
@@ -2908,9 +3237,54 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     fflush(stdout);
     CCutil_suspend_timer(&(problem->tot_lb_lp));
 CLEAN:
-    //prune_duplicated_sets(pd);
-    // free_conflict_constraints(pd->solver, parms, pd->ecount_same, pd->ecount_differ);
-    // pd->solver = (PricerSolver *) NULL;
+    return val;
+}
+
+
+
+MAYBE_UNUSED static int submiping(wctdata *cd)
+{
+    int val = 0;
+    double incumbent;
+    int status;
+    double *colsol;
+    int *colored = (int *) NULL;
+    int i;
+    colsol = (double *) CC_SAFE_MALLOC(cd->ccount, double);
+    CCcheck_NULL_2(colsol, "Failed to allocate colsol");
+    colored = (int *) CC_SAFE_MALLOC(cd->njobs, int);
+    CCcheck_NULL_2(colored, "Failed to allocate colored");
+
+    for (i = 0; i < cd->njobs; ++i) {
+        colored[i] = 0;
+    }
+
+    val = wctlp_set_coltypes(cd->LP, wctlp_BIN);
+    CCcheck_val_2(val,
+                  "wctlp_set_all_coltypes "
+                  "(this warning can be ignored if you are using "
+                  "CPLEX or QSopt as an LP-solver)");
+    /* wctlp_write (cd->LP, "lpheur.lp"); */
+    val = wctlp_setnodelimit(cd->LP, 1);
+    CCcheck_val_2(val, "wctlp_setnodelimit failed");
+    val = wctlp_optimize(cd->LP, &status);
+    CCcheck_val_2(val, "wctlp_optimize failed");
+    val =  wctlp_x(cd->LP, colsol, 0);
+    CCcheck_val_2(val, "wctlp_x failed");
+    val = wctlp_objval(cd->LP, &incumbent);
+    CCcheck_val_2(val, "wctlp_objval failed");
+    grab_int_sol(cd, colsol, lp_int_tolerance());
+    wctlp_set_coltypes(cd->LP, wctlp_CONT);
+    CCcheck_val_2(val, "wctlp_set_all_coltypes");
+    printf("Found lower bound of %lld and upper bound of %g.\n",
+           (long long) cd->lower_bound, incumbent);
+    CCcheck_val_2(val, "ERROR: An incorrect coloring was created.");
+    print_schedule(cd->bestcolors, cd->nbbest);
+    printf("status = %d\n", status);
+    getchar();
+CLEAN:
+    CC_IFFREE(colsol, double)
+    CC_IFFREE(colored, int)
     return val;
 }
 
@@ -2987,6 +3361,7 @@ int compute_schedule(wctproblem *problem)
     } else {
         CCutil_start_timer(&(problem->tot_lb_lp_root));
         val = compute_lower_bound(problem, root_pd);
+        CCcheck_val_2(val, "Failed in compute_lower_bound");
 
         if (root_pd->lower_bound > problem->global_lower_bound) {
             problem->global_lower_bound = root_pd->lower_bound;

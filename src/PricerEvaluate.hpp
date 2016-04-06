@@ -615,7 +615,7 @@ class Farkas: public tdzdd::DdEval<E, PricerInfoBDD<T> >
             PricerInfoBDD<T> *n0 = values.get_ptr(0);
             PricerInfoBDD<T> *n1 = values.get_ptr(1);
 
-            if (n0->obj <= n.obj) {
+            if (n0->obj < n.obj) {
                 n0->obj = n.obj;
                 n0->cost = n.cost;
                 n0->sum_p = n.sum_p;

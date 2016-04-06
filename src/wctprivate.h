@@ -147,12 +147,14 @@ struct wctdata {
     int lower_bound;
     int upper_bound;
     int lower_scaled_bound;
+    double partial_sol;
     double dbl_safe_lower_bound;
     double dbl_est_lower_bound;
     double dbl_est_lower_bound_heur;
     double LP_lower_bound;
     double LP_lower_bound_heur;
     double LP_lower_bound_dual;
+    double *rhs;
     int nnonimprovements;
     /** Wentges smoothing technique */
     double *pi_in;
@@ -164,6 +166,7 @@ struct wctdata {
     double eta_out;
     double eta_sep;
     double alpha;
+    int update;
 
 
     // Best Solution
@@ -200,6 +203,9 @@ struct wctdata {
     wctdata *releasetime_child;
     int nreleasetime;
     int v1, v2;
+    int *v1_wide;
+    int *v2_wide;
+    int nb_wide;
 
     //heur_diving
     heur_diving heur_data;
