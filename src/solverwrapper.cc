@@ -150,7 +150,6 @@ CLEAN:
         return val;
     }
 
-
     void deletePricerSolver(PricerSolver *solver)
     {
         if (solver) {
@@ -280,16 +279,14 @@ CLEAN:
         return val;
     }
 
-    void compute_subgradient(Optimal_Solution<double> &sol, double *sub_gradient, int nbjobs, int nbmachines)
+    void compute_subgradient(Optimal_Solution<double> &sol, double *sub_gradient, double *rhs, int nbjobs, int nbmachines)
     {
         fill_dbl(sub_gradient, nbjobs, 1.0);
         sub_gradient[nbjobs] = nbmachines;
 
         for (auto &v : sol.jobs) {
-            sub_gradient[v] -= 1.0;
+            sub_gradient[v] -= (double) nbmachines*1.0;
         }
-
-        sub_gradient[nbjobs] -= 1.0;
     }
 
     void adjust_alpha(double *pi_out, double *pi_in, double *subgradient, int nbjobs, double &alpha)
@@ -361,7 +358,7 @@ CLEAN:
 
         a += rhs[nbjobs] * pi[nbjobs];
         result = CC_MIN(0.0, sol.cost - result);
-        result = (double)rhs[nbjobs] * result;
+        result = rhs[nbjobs] * result;
         result += a;
         return result;
     }
@@ -423,7 +420,7 @@ CLEAN:
         int heading_in = 0;
         PricerSolver *solver = pd->solver;
         Optimal_Solution<double> sol;
-        heading_in = (pd->eta_in == 0.0) ? 1 : !(CC_OURABS((pd->eta_out - pd->eta_in) / (pd->eta_in)) < 1.0);
+        heading_in = (pd->eta_in == 0.0) ? 1 : !(CC_OURABS((pd->eta_out - pd->eta_in) / (pd->eta_in)) < 4.0);
 
         if (heading_in) {
             double result;
@@ -476,7 +473,7 @@ CLEAN:
             }
         }
 
-        if (dbg_lvl() > 1) {
+        if (dbg_lvl() > 0) {
             printf("heading = %d, alpha = %f, result of primal bound and Lagragian bound: out =%f, in = %f\n", heading_in, pd->alpha, pd->eta_out, pd->eta_in);
         }
 
@@ -503,7 +500,7 @@ CLEAN:
             if (result < pd->eta_sep) {
                 val = construct_sol_stab(pd, parms, sol);
                 CCcheck_val_2(val, "Failed in construct_sol_stab");
-                compute_subgradient(sol, pd->subgradient, pd->njobs, pd->nmachines);
+                compute_subgradient(sol, pd->subgradient, pd->rhs, pd->njobs, pd->nmachines);
                 adjust_alpha(pd->pi_out, pd->pi_in, pd->subgradient, pd->njobs, pd->alpha);
 
                 if (result > pd->eta_in) {
