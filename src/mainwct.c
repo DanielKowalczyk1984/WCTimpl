@@ -30,6 +30,7 @@ static void usage(char *f)
     fprintf(stderr, "   -S int  Stabilization technique: 0 = no stabilization(default), 1 = stabilization wentgnes, 2 = stabilization dynamic\n");
     fprintf(stderr, "   -z int  Pricing solver technique: 0 = BDD(default), 1 = ZDD, 2 = DP\n");
     fprintf(stderr, "   -c int  Construct heuristically solutions: 0 = yes(default), 1 = no\n");
+    fprintf(stderr, "   -D int  Use diving heuristic: 0 = no(default), 1 = yes\n");
 }
 
 
@@ -39,7 +40,7 @@ static int parseargs(int ac, char **av, wctparms *parms)
     int val = 0;
     int debug = dbg_lvl();
 
-    while ((c = getopt(ac, av, "dr:f:s:l:L:C:B:z:S:c:")) != EOF) {
+    while ((c = getopt(ac, av, "dr:f:s:l:L:C:B:z:S:c:D:")) != EOF) {
         switch (c) {
             case 'd':
                 ++(debug);
@@ -94,6 +95,10 @@ static int parseargs(int ac, char **av, wctparms *parms)
             case 'c':
                 val = wctparms_set_construct(parms, atoi(optarg));
                 CCcheck_val(val, "Failed in construct sol");
+                break;
+            case 'D':
+                val = wctparms_set_diving_heuristic(parms, atoi(optarg));
+                CCcheck_val(val, "Failed in diving_heuristic");
                 break;
 
             default:

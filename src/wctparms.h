@@ -67,6 +67,11 @@ enum construct_solutions {
     no_construct = 0,
 };
 
+enum diving_heur{
+    min_diving_heur = 0,
+    select_diving_heur = 1,
+};
+
 
 typedef struct wctparms {
     /**
@@ -92,6 +97,7 @@ typedef struct wctparms {
     int stab_technique;
     int solver;
     int construct;
+    int diving_heuristic;
 
     int delete_elists;
     int delete_cclasses;
@@ -127,6 +133,7 @@ int wctparms_set_dual_var_type(wctparms *parms, int);
 int wctparms_set_stab_technique(wctparms *parms, int stab_technique);
 int wctparms_set_solver(wctparms *parms, int solver);
 int wctparms_set_construct(wctparms *parms, int construct);
+int wctparms_set_diving_heuristic(wctparms *parms, int diving);
 
 /**
  * scatter search
