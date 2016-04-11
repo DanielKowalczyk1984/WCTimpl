@@ -1697,22 +1697,13 @@ static int create_differ(wctproblem *problem, wctdata *parent_pd,
 
     for (i = 0; i < parent_pd->ccount; ++i) {
         int j;
-        int v1_found = 0;
         int construct = 1;
+        gboolean v1_in;
+        gboolean v2_in;
 
-        for (j = 0; j < parent_pd->cclasses[i].count; ++j) {
-            int current_elm = parent_pd->cclasses[i].members[j];
-
-            if (current_elm ==  v1) {
-                v1_found = 1;
-            }
-
-            if (current_elm ==  v2) {
-                if (v1_found) {
-                    construct = 0;
-                }
-            }
-        }
+        v1_in = g_hash_table_contains(parent_pd->cclasses[i].table, GINT_TO_POINTER(v1));
+        v2_in = g_hash_table_contains(parent_pd->cclasses[i].table, GINT_TO_POINTER(v2));
+        construct = (v1_in && v2_in) ? 0 : 1;
 
         if (construct) {
             Scheduleset_init(pd->cclasses + pd->ccount);
