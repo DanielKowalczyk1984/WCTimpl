@@ -21,34 +21,53 @@ void iterator(gpointer key, gpointer value, gpointer user_data)
     g_hash_table_insert(new_table, key, value);
 }
 
-static int copy_Schedulesets(Scheduleset *dst, const Scheduleset *src, int nsrc);
-#define copy_sets() {                                                   \
+/*dst->members = CC_SAFE_MALLOC(dst->count + 1, int);                 \
+CCcheck_NULL_2(dst->members, "Failed to allocate memory");      \
+dst->C = CC_SAFE_MALLOC(dst->count, int); \
+CCcheck_NULL_2(dst->C, "Failed to allocate memory"); \
+memcpy(dst->members, src->members, (dst->count + 1)*sizeof(int));     \
+memcpy(dst->members, src->members, (dst->count)*sizeof(int));\*/
+
+            /*dst[x].members = CC_SAFE_MALLOC(dst[x].count + 1, int);             \
+            CCcheck_NULL_2(dst[x].members, "Failed to allocate memory");    \
+            memcpy(dst[x].members, src[x].members, (dst[x].count + 1)*sizeof(int));\*/
+
+static int copy_Schedulesets(Scheduleset *dst, Scheduleset *src, int nsrc);
+#define copy_sets() {                                                       \
         dst->count = src->count;                                            \
-        dst->totweight = src->totweight;                                      \
+        dst->totweight = src->totweight;                                    \
         dst->age = src->age;                                                \
-        dst->totwct = src->totwct; \
+        dst->totwct = src->totwct;                                          \
         if(dst->count == 0){                                                \
-            dst->members = (int*)NULL;                                      \
+            dst->members = (int*) NULL;                                     \
+            dst->C = (int *) NULL;                                          \
+            dst->table = (GHashTable *) NULL;                               \
         } else {                                                            \
-            dst->members = CC_SAFE_MALLOC(dst->count + 1, int);                 \
-            CCcheck_NULL_2(dst->members, "Failed to allocate memory");      \
-            memcpy(dst->members, src->members, (dst->count + 1)*sizeof(int));     \
+            dst->members = src->members;                                    \
+            src->members = (int *) NULL;                                    \
+            dst->C = src->C;                                                \
+            src->C = (int *) NULL;                                         \
+            dst->table = src->table;                                       \
+            src->table = (GHashTable *) NULL;                               \
         }                                                                   \
         dst++;                                                              \
         src++;                                                              \
-    }
+    }                                                                       
 
-#define ncopy_sets(x){                                                  \
+#define ncopy_sets(x){                                                      \
         dst[x].count = src[x].count;                                        \
-        dst[x].totweight = src[x].totweight;                                  \
+        dst[x].totweight = src[x].totweight;                                \
         dst[x].age = src[x].age;                                            \
-        dst[x].totwct = src[x].totwct; \
+        dst[x].totwct = src[x].totwct;                                      \
         if(dst[x].count == 0){                                              \
             dst[x].members = (int*)NULL;                                    \
         } else {                                                            \
-            dst[x].members = CC_SAFE_MALLOC(dst[x].count + 1, int);             \
-            CCcheck_NULL_2(dst[x].members, "Failed to allocate memory");    \
-            memcpy(dst[x].members, src[x].members, (dst[x].count + 1)*sizeof(int));\
+            dst[x].members = src[x].members;                                \
+            src[x].members = (int *) NULL;                                  \
+            dst[x].C = src[x].C;                                            \
+            src[x].C = (int *) NULL;                                        \
+            dst[x].table = src[x].table;                                    \
+            src[x].table = (GHashTable *) NULL;                             \
         }                                                                   \
     }
 
@@ -56,6 +75,8 @@ void Scheduleset_init(Scheduleset *set)
 {
     if (set) {
         set->members  = (int *) NULL;
+        set->C = (int *) NULL;
+        set->table = (GHashTable *) NULL;
         set->count    = 0;
         set->age      = 0;
         set->totweight = 0;
@@ -68,7 +89,10 @@ void Scheduleset_free(Scheduleset *set)
 {
     if (set && set->members) {
         CC_IFFREE(set->members, int);
-        set->members  = (int *)NULL;
+        CC_IFFREE(set->C, int);
+        if (set->table) {
+            g_hash_table_destroy(set->table);
+        }
         set->count    = 0;
         set->totweight = 0;
         set->age      = 0;
@@ -92,7 +116,7 @@ void Schedulesets_free(Scheduleset **sets, int *nsets)
     *nsets = 0;
 }
 
-int COLORcopy_sets(Scheduleset **s, int *nsets, const Scheduleset *src_s,
+int COLORcopy_sets(Scheduleset **s, int *nsets,  Scheduleset *src_s,
                    int src_nsets)
 {
     int val = 0;
@@ -123,7 +147,7 @@ CLEAN:
     return val;
 }
 
-int update_Schedulesets(Scheduleset **dst, int *ndst, const Scheduleset *src, int nsrc)
+int update_Schedulesets(Scheduleset **dst, int *ndst,  Scheduleset *src, int nsrc)
 {
     int val  = 0;
     Schedulesets_free(dst, ndst);
@@ -133,7 +157,7 @@ CLEAN:
     return val;
 }
 
-static int copy_Schedulesets(Scheduleset *dst, const Scheduleset *src, int nsrc)
+static int copy_Schedulesets(Scheduleset *dst,  Scheduleset *src, int nsrc)
 {
     int val = 0;
 
@@ -159,7 +183,6 @@ static int copy_Schedulesets(Scheduleset *dst, const Scheduleset *src, int nsrc)
         src += 4;
     }
 
-CLEAN:
     return val;
 }
 
@@ -480,16 +503,22 @@ int partlist_to_Scheduleset(partlist *part, int nbpart, int njobs, Scheduleset *
             temp_sets[k].count = g_queue_get_length(part[i].list);
             temp_sets[k].totweight = part[i].completiontime;
             temp_sets[k].members = CC_SAFE_MALLOC(temp_sets[k].count + 1, int);
-            temp_sets[k].totwct = 0;
             CCcheck_NULL(temp_sets[k].members, "Failed to allocate memory to members");
+            temp_sets[k].totwct = 0;
+            temp_sets[k].C = CC_SAFE_MALLOC(temp_sets[k].count, int);
+            CCcheck_NULL(temp_sets[k].C, "Failed to allocate memory to C");
+            temp_sets[k].table = g_hash_table_new(g_direct_hash, g_direct_equal);
+            CCcheck_NULL(temp_sets[k].table, "Failed to construct table");
             GList *v = part[i].list->head;
             j = 0;
             int completion = 0;
 
             while (v != NULL) {
                 Job *job = (Job *)v->data;
-                temp_sets[k].members[j] = job->job;
                 completion += job->processingime;
+                temp_sets[k].C[j] = completion;
+                temp_sets[k].members[j] = job->job;
+                g_hash_table_insert(temp_sets[k].table, GINT_TO_POINTER(job->job), temp_sets[k].C + j);
                 temp_sets[k].totwct += job->weight * completion;
                 v = g_list_next(v);
                 j++;

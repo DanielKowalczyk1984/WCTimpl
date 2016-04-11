@@ -61,6 +61,8 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
     startnlpcands = nlpcands;
     status = GRB_OPTIMAL;
     val =  wctlp_objval(pd->LP, &objval);
+    pd->LP_lower_bound_heur = pd->partial_sol + pd->LP_lower_bound_dual;
+    objval = pd->LP_lower_bound_heur;
     CCcheck_val_2(val, "Failed in wctlp_objval");
     searchbound = pd->lower_bound;
     maxdivedepth = problem->parms.nmachines + 1;
@@ -136,6 +138,9 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
 
             if (!cutoff || backtracked || farkaspricing) {
                 val = compute_lower_bound(problem, pd);
+                wctlp_write(pd->LP, "testheur.lp");
+                getchar();
+                pd->LP_lower_bound_heur = pd->LP_lower_bound_dual + pd->partial_sol;
 
                 if (val) {
                     printf("Failed at heur_compute_lower_bound\n");
@@ -149,11 +154,10 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
             }
 
             if (status == GRB_INFEASIBLE && !farkaspricing && !backtracked) {
-                if (dbg_lvl() > 0) {
-                    printf("*** infeasibility detected at level %d - perform Farkas pricing\n",
-                           divedepth);
-                }
-
+                //if (dbg_lvl() > 0) {
+                printf("*** infeasibility detected at level %d - perform Farkas pricing\n",
+                       divedepth);
+                //}
                 farkaspricing = 1;
             } else {
                 farkaspricing = 0;
@@ -162,7 +166,7 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
             CCutil_suspend_timer(&(problem->tot_cputime));
             CCutil_resume_timer(&(problem->tot_cputime));
 
-            if (cutoff && !backtracked && heur->backtrack 
+            if (cutoff && !backtracked && heur->backtrack
                     && *result != FOUNDSOL && problem->tot_cputime.cum_zeit < problem->parms.branching_cpu_limit) {
                 int discrepencie = 0;
 
@@ -200,6 +204,7 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
 
         if (!lperror && !cutoff && status == GRB_OPTIMAL && problem->tot_cputime.cum_zeit < problem->parms.branching_cpu_limit) {
             val = wctlp_objval(pd->LP , &objval);
+            objval = pd->LP_lower_bound_dual + pd->partial_sol;
             WCTbranchcand_free(&branchcand);
             val = branchcandlp(pd, &branchcand);
             CCcheck_val_2(val, "Failed at branchcandlp");
@@ -694,8 +699,8 @@ int adjustLP_ceil(wctdata *pd, int bestcand, double bestcandsol)
     val = GRBgetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs + 1, rhs);
     CHECK_VAL_GRB(val, "Failed in getting the RHS", pd->LP->env);
 
-    for (i = 0; i < pd->cclasses[bestcand].count + 1; i++) {
-        rhs[pd->cclasses[bestcand].members[i]] -= 1.0;
+    for (i = 0; i < pd->cclasses[bestcand].count + 1 ; i++) {
+        pd->rhs[pd->cclasses[bestcand].members[i]] -= 1.0;
     }
 
     value = CC_SAFE_MALLOC(pd->cclasses[bestcand].count + 1, double);
@@ -705,16 +710,16 @@ int adjustLP_ceil(wctdata *pd, int bestcand, double bestcandsol)
     CCcheck_NULL_2(vind, "Failed to allocate memory");
 
     for (i = 0; i < pd->ccount; ++i) {
-        if (i != bestcandsol) {
-            fill_int(vind, pd->cclasses[bestcand].count + 1, i);
-            val = GRBchgcoeffs(pd->LP->model, pd->cclasses[bestcand].count,
-                               pd->cclasses[bestcand].members, vind, value);
-            CHECK_VAL_GRB(val, "Failed at GRBchgcoeffs", pd->LP->env);
-        }
+        // if (i != bestcandsol) {
+        // fill_int(vind, pd->cclasses[bestcand].count + 1, i);
+        // val = GRBchgcoeffs(pd->LP->model, pd->cclasses[bestcand].count,
+        //                    pd->cclasses[bestcand].members, vind, value);
+        // CHECK_VAL_GRB(val, "Failed at GRBchgcoeffs", pd->LP->env);
+        // }
     }
 
-    val = GRBsetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs + 1, rhs);
-    CHECK_VAL_GRB(val, "Failed at GRB_DBL_ATTR_RHS", pd->LP->env);
+    // val = GRBsetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs , pd->rhs);
+    // CHECK_VAL_GRB(val, "Failed at GRB_DBL_ATTR_RHS", pd->LP->env);
     val = GRBupdatemodel(pd->LP->model);
     CHECK_VAL_GRB(val, "Failed to update model", pd->LP->env);
 CLEAN:
@@ -731,9 +736,9 @@ int adjustLP_floor(wctdata *pd, int var)
     double *rhs = (double *) NULL;
     int *vind = (int *) NULL;
     wctlp *LP = pd->LP;
-    pd -= pd->cclasses[var].totwct;
+    pd->partial_sol -= (double) pd->cclasses[var].totwct;
     val = wctlp_setbound(LP, var, 'L', 0.0);
-    CCcheck_val_2(val, "Failed in ")
+    CCcheck_val_2(val, "Failed in ");
     rhs = CC_SAFE_MALLOC(pd->njobs + 1, double);
     CCcheck_NULL_2(rhs, "Failed to allocate memory");
     GRBgetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs + 1, rhs);
@@ -742,15 +747,15 @@ int adjustLP_floor(wctdata *pd, int var)
     fill_dbl(value, pd->cclasses[var].count + 1, 1.0);
 
     for (int i = 0; i < pd->cclasses[var].count + 1; i++) {
-        rhs[pd->cclasses[var].members[i]] += 1.0;
+        pd->rhs[pd->cclasses[var].members[i]] += 1.0;
     }
 
     vind = CC_SAFE_MALLOC(pd->cclasses[var].count, int);
     CCcheck_NULL_2(vind, "Failed to allocate memory");
     fill_int(vind, pd->cclasses[var].count, var);
-    val = GRBsetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs + 1, rhs);
+    val = GRBsetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs, pd->rhs);
     CHECK_VAL_GRB2(val, "Failed to update RHS", LP->env);
-    val = GRBchgcoeffs(LP->model, pd->cclasses[var].count + 1,
+    val = GRBchgcoeffs(LP->model, pd->cclasses[var].count,
                        pd->cclasses[var].members, vind, value);
     val = GRBupdatemodel(pd->LP->model);
     CHECK_VAL_GRB(val, "Failed to update model", pd->LP->env);
@@ -777,5 +782,61 @@ int compute_objective_heur(wctdata *pd)
     }
 
 CLEAN:
+    return val;
+}
+
+int diving_LDS(Scheduleset *cclasses, int *ccount, int nbjobs, double *rhs, Scheduleset *partsol, int *nbpartsol, Scheduleset *add_column, int *nbadd_column)
+{
+    int val = 0;
+    double *new_rhs = (double *) NULL;
+    Scheduleset *new_cclasses = (Scheduleset *) NULL;
+    int new_ccount = 0;
+    Scheduleset *new_partsol = (Scheduleset *) NULL;
+    int new_nbpartsol = 0;
+    /** alloc memory */
+    new_rhs = CC_SAFE_MALLOC(nbjobs + 1, double);
+    CCcheck_val_2(val, "Failed to allocate memory");
+
+    for (unsigned i = 0; i < nbjobs + 1; i++) {
+        new_rhs[i] = rhs[i];
+    }
+
+    new_cclasses = CC_SAFE_MALLOC(*ccount, Scheduleset);
+    CCcheck_val_2(val, "Failed to allocate memory");
+
+    for (unsigned i = 0; i < *ccount; i++) {
+        Scheduleset_init(new_cclasses + i);
+    }
+
+    /** Adjust RHS and partial solution */
+    if (add_column != NULL) {
+        for (unsigned i = 0; i < *nbadd_column; i++) {
+            for (unsigned j = 0; j < add_column[i].count; j++) {
+                new_rhs[add_column[i].members[j]] -= 1.0;
+                assert(new_rhs[add_column[i].members[j]] >= 0.0);
+            }
+
+            new_rhs[nbjobs] -= 1.0;
+        }
+
+        new_partsol = CC_SAFE_MALLOC(*nbpartsol + *nbadd_column, Scheduleset);
+        new_nbpartsol = *nbpartsol + *nbadd_column;
+
+        for (unsigned i = 0; i < *nbpartsol; i++) {
+            Scheduleset_init(new_partsol + i);
+            new_partsol[i].count = partsol[i].count;
+            new_partsol[i].totwct = partsol[i].totwct;
+            new_partsol[i].totweight = partsol[i].totweight;
+            new_partsol[i].members = partsol[i].members;
+        }
+
+        for(unsigned i = 0; i < *nbadd_column; i++) {
+            new_partsol[i + *nbpartsol];
+        }
+    }
+
+CLEAN:
+    CC_IFFREE(new_rhs, double);
+    CC_IFFREE(new_cclasses, Scheduleset);
     return val;
 }

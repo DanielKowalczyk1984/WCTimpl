@@ -134,8 +134,9 @@ typedef struct Scheduleset {
     int age;
     int totweight;
     int totwct;
-    //GHashTable *completiontime;
+    GHashTable *table;
     int *members;
+    int *C;
 } Scheduleset;
 
 void Scheduleset_SWAP(Scheduleset *c1, Scheduleset *c2, Scheduleset *t);
@@ -144,7 +145,7 @@ void Scheduleset_SWAP(Scheduleset *c1, Scheduleset *c2, Scheduleset *t);
 void Scheduleset_init(Scheduleset *set);
 void Scheduleset_free(Scheduleset *set);
 void Schedulesets_free(Scheduleset **set, int *nsets);
-int  COLORcopy_sets(Scheduleset **dsts, int *nsets, const Scheduleset *src_s, int src_nsets);
+int  COLORcopy_sets(Scheduleset **dsts, int *nsets, Scheduleset *src_s, int src_nsets);
 
 /*Check if the coloring is feasible*/
 int Scheduleset_check_set(Scheduleset *set, int vcount);
@@ -161,7 +162,7 @@ int Scheduleset_more(Scheduleset *c1, Scheduleset *c2);
 int Scheduleset_less_wct(Scheduleset *c1, Scheduleset *c2);
 int print_schedule(Scheduleset *cclasses, int ccount);
 int Scheduleset_max(Scheduleset *cclasses, int ccount);
-int update_Schedulesets(Scheduleset **dst, int *ndst, const Scheduleset *src, int nsrc);
+int update_Schedulesets(Scheduleset **dst, int *ndst, Scheduleset *src, int nsrc);
 int add_Schedulesets(Scheduleset **dst, int *ndst, Scheduleset *src, int nsrc);
 int Scheduleset_less_totweight(Scheduleset *c1, Scheduleset *c2);
 int Scheduleset_more_totweight(Scheduleset *c1, Scheduleset *c2);

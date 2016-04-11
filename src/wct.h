@@ -233,6 +233,12 @@ void make_pi_feasible(wctdata *pd);
 void make_pi_feasible_farkas_pricing(wctdata *pd);
 int heur_colors_with_stable_sets(wctdata *pd);
 int compute_objective(wctdata *pd, wctparms *parms);
+/** Wide Branching functions */
+int create_wide_branches_conflict(wctdata *pd, wctproblem *problem);
+int sequential_wide_branching_conflict(wctproblem *problem);
+/** Conflict Branching functions */
+int create_branches_conflict(wctdata *pd, wctproblem *problem);
+int sequential_branching_conflict(wctproblem *problem);
 
 
 /*Help functions for branching*/

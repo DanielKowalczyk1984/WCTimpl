@@ -285,7 +285,7 @@ CLEAN:
         sub_gradient[nbjobs] = nbmachines;
 
         for (auto &v : sol.jobs) {
-            sub_gradient[v] -= (double) nbmachines*1.0;
+            sub_gradient[v] -= (double) nbmachines * 1.0;
         }
     }
 
@@ -298,9 +298,9 @@ CLEAN:
         }
 
         if (sum > 0) {
-            alpha = alpha + (1 - alpha) * 0.1;
+            alpha = alpha + (1 - alpha) * 0.05;
         } else {
-            alpha = CC_MAX(0, alpha - 0.01);
+            alpha = CC_MAX(0, alpha - 0.05);
         }
     }
 
@@ -488,34 +488,45 @@ CLEAN:
         Optimal_Solution<double> sol;
         double k = 0.0;
         double alpha;
-        double result;
+        double result_sep;
+        double result_out;
+        bool mispricing = false;
 
         do {
             k += 1.0;
             alpha = CC_MAX(0.0, 1.0 - k * (1 - pd->alpha));
             compute_pi_eta_sep(pd->njobs, pd->pi_sep, &(pd->eta_sep), alpha, pd->pi_in, &(pd->eta_in), pd->pi_out, &(pd->eta_out));
             compute_sol_stab(solver, parms, pd->pi_sep, &(sol));
-            result = compute_lagrange(sol, pd->rhs, pd->pi_sep, pd->njobs, pd->nmachines);
+            result_sep = compute_lagrange(sol, pd->rhs, pd->pi_sep, pd->njobs, pd->nmachines);
 
-            if (result < pd->eta_sep) {
+            if (result_sep < pd->eta_sep) {
                 val = construct_sol_stab(pd, parms, sol);
                 CCcheck_val_2(val, "Failed in construct_sol_stab");
+                pd->update = 1;
                 compute_subgradient(sol, pd->subgradient, pd->rhs, pd->njobs, pd->nmachines);
-                adjust_alpha(pd->pi_out, pd->pi_in, pd->subgradient, pd->njobs, pd->alpha);
+                adjust_alpha(pd->pi_out, pd->pi_in, pd->subgradient, pd->njobs, alpha);
+                pd->alpha =alpha;
+                mispricing = false;
+            } else {
+                result_out = compute_lagrange(sol, pd->rhs, pd->pi_out, pd->njobs, pd->nmachines);
 
-                if (result > pd->eta_in) {
-                    pd->eta_in = result;
-                    memcpy(pd->pi_in, pd->pi_sep, sizeof(double) * (pd->njobs + 1));
+                if (result_out < pd->eta_out) {
+                    val = construct_sol_stab(pd, parms, sol);
+                    CCcheck_val_2(val, "Failed in construct_sol_stab");
+                    mispricing = false;
+                    pd->update = 0;
+                } else {
+                    mispricing = true;
                 }
             }
-        } while (pd->nnewsets == 0 && alpha > 0.0);
+        } while (mispricing && alpha > 0.0);
 
-        if (result > pd->eta_in) {
-            pd->eta_in = result;
+        if (result_sep > pd->eta_in) {
+            pd->eta_in = result_sep;
             memcpy(pd->pi_in, pd->pi_sep, sizeof(double) * (pd->njobs + 1));
         }
 
-        if (dbg_lvl() > 1) {
+        if (dbg_lvl() > 0) {
             printf(" alpha = %f, result of primal bound and Lagragian bound: out =%f, in = %f\n",  pd->alpha, pd->eta_out, pd->eta_in);
         }
 

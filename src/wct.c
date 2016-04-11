@@ -5,13 +5,15 @@
 #include "wctparms.h"
 #include "heurdiving.h"
 
+int recover_elist(wctdata *pd);
+
+/** help functions for branching */
+static int create_same(wctproblem *problem, wctdata *parent_pd, int v1, int v2);
+static int create_differ(wctproblem *problem, wctdata *parent_pd, int v1, int v2);
 static int collect_same_child(wctdata *cd);
 static int collect_diff_child(wctdata *cd);
 static int remove_finished_subtree_conflict(wctdata *child);
-int recover_elist(wctdata *pd);
-int create_branches_conflict(wctdata *pd, wctproblem *problem);
-int sequential_branching_conflict(wctproblem *problem);
-static int create_same(wctproblem *problem, wctdata *parent_pd, int v1, int v2);
+/** small submipping heuristic */
 static int submiping(wctdata *cd);
 
 int debug = 0;
@@ -646,7 +648,7 @@ int compute_objective(wctdata *pd, wctparms *parms)
 
     /** compute lower bound with the dual variables */
     for (i = 0; i < pd->njobs + 1; i++) {
-        pd->LP_lower_bound_dual += (double) pd->pi[i] * pd->rhs[i];
+        pd->LP_lower_bound_dual += (double) pd->pi[i]*pd->rhs[i];
     }
 
     /** Get the LP lower bound and compute the lower bound of WCT */
@@ -655,10 +657,10 @@ int compute_objective(wctdata *pd, wctparms *parms)
     pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual) < (int) ceil(pd->LP_lower_bound)) ? (int) ceil(pd->LP_lower_bound_dual) : (int) ceil(pd->LP_lower_bound) ;
 
     if (parms->stab_technique == stab_wentgnes || parms->stab_technique == stab_dynamic) {
-         pd->lower_bound = (int) ceil(pd->eta_in);
+        pd->lower_bound = (int) ceil(pd->eta_in);
     }
 
-    if (dbg_lvl() > 1) {
+    if (dbg_lvl() > 0) {
         printf("Current primal LP objective: %19.16f  (LP_dual-bound %19.16f, lowerbound = %d).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual, pd->lower_bound);
     }
 
@@ -1345,7 +1347,8 @@ static int create_differ(wctproblem *problem, wctdata *parent_pd,
     pd->LP_lower_bound_dual = parent_pd->LP_lower_bound_dual;
     pd->dbl_safe_lower_bound = parent_pd->dbl_safe_lower_bound;
     /* Create  graph with extra edge (v1,v2) */
-    // pd->ecount_differ = parent_pd->ecount_differ + 1;
+    pd->ecount_differ = parent_pd->ecount_differ + 1;
+    pd->ecount_same = parent_pd->ecount_same;
     // pd->elist_differ  = CC_SAFE_MALLOC(2 * pd->ecount_differ, int);
     // CCcheck_NULL_2(pd->elist_differ, "Failed to allocate pd->elist");
     // if (parent_pd->ecount_differ > 0) {
@@ -1357,7 +1360,6 @@ static int create_differ(wctproblem *problem, wctdata *parent_pd,
     // pd->ndebugcolors = parent_pd->ndebugcolors;
     // /** Copy same list */
     // if (parent_pd->ecount_same > 0) {
-    //     pd->ecount_same = parent_pd->ecount_same;
     //     pd->elist_same = CC_SAFE_MALLOC(2 * pd->ecount_same, int);
     //     memcpy(pd->elist_same, parent_pd->elist_same, 2 * pd->ecount_same * sizeof(int));
     // }
@@ -1428,12 +1430,17 @@ static int create_differ(wctproblem *problem, wctdata *parent_pd,
             Scheduleset_init(pd->cclasses + pd->ccount);
             pd->cclasses[pd->ccount].members = CC_SAFE_MALLOC(parent_pd->cclasses[i].count + 1, int);
             CCcheck_NULL_2(pd->cclasses[pd->ccount].members, "Failed to allocate pd->cclasses[i].members");
+            pd->cclasses[pd->ccount].C = CC_SAFE_MALLOC(parent_pd->cclasses[i].count, int);
+            CCcheck_NULL_2(pd->cclasses[pd->ccount].members, "Failed to allocate memory");
+            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash, g_direct_equal);
 
             for (j = 0;  j < parent_pd->cclasses[i].count; j++) {
                 pd->cclasses[pd->ccount].members[pd->cclasses[pd->ccount].count] = parent_pd->cclasses[i].members[j];
-                (pd->cclasses[pd->ccount].count)++;
                 pd->cclasses[pd->ccount].totweight += parent_pd->duration[parent_pd->cclasses[i].members[j]];
+                pd->cclasses[pd->ccount].C[pd->cclasses[pd->ccount].count] = pd->cclasses[pd->ccount].totweight;
+                g_hash_table_insert(pd->cclasses[pd->ccount].table, GINT_TO_POINTER(pd->cclasses[pd->ccount].members[pd->cclasses[pd->ccount].count] ), pd->cclasses[pd->ccount].C + pd->cclasses[pd->ccount].count );
                 pd->cclasses[pd->ccount].totwct += parent_pd->weights[parent_pd->cclasses[i].members[j]] * pd->cclasses[pd->ccount].totweight;
+                (pd->cclasses[pd->ccount].count)++;
             }
 
             pd->cclasses[pd->ccount].members[pd->cclasses[pd->ccount].count] = pd->njobs;
@@ -1517,8 +1524,10 @@ static int transfer_same_cclasses(wctdata *pd,
         if ((v1_in == 1 && v2_in == 0) || (v1_in == 0 && v2_in == 1)) {
             construct = 0;
         } else {
-            Scheduleset_init(pd->cclasses + i);
+            Scheduleset_init(pd->cclasses + pd->ccount);
             pd->cclasses[pd->ccount].members =  CC_SAFE_MALLOC(parent_cclasses[i].count + 1, int);
+            pd->cclasses[pd->ccount].C = CC_SAFE_MALLOC(parent_cclasses[i].count, int);
+            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash, g_direct_equal);
             pd->cclasses[pd->ccount].count = 0;
             pd->cclasses[pd->ccount].age = 0;
             pd->cclasses[pd->ccount].totweight = 0;
@@ -1526,9 +1535,12 @@ static int transfer_same_cclasses(wctdata *pd,
         }
 
         for (j = 0; j < parent_cclasses[i].count && construct; ++j) {
-            pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)++] = parent_cclasses[i].members[j];
+            pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)] = parent_cclasses[i].members[j];
             pd->cclasses[pd->ccount].totweight += pd->duration[parent_cclasses[i].members[j]];
+            pd->cclasses[pd->ccount].C[(pd->cclasses[pd->ccount].count)] = pd->cclasses[pd->ccount].totweight;
+            g_hash_table_insert(pd->cclasses[pd->ccount].table, GINT_TO_POINTER(pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)]), pd->cclasses[pd->ccount].C+ (pd->cclasses[pd->ccount].count));
             pd->cclasses[pd->ccount].totwct += pd->weights[parent_cclasses[i].members[j]] * pd->cclasses[pd->ccount].totweight;
+            pd->cclasses[pd->ccount].count++;
             /* else 'parent_cclasses[i].members[j] == v2' and we skip it*/
         }
 
@@ -1619,6 +1631,8 @@ static int create_same(wctproblem *problem, wctdata *parent_pd, int v1, int v2)
     pd->duetime = parent_pd->duetime;
     pd->weights = parent_pd->weights;
     pd->jobarray = parent_pd->jobarray;
+    pd->ecount_same = parent_pd->ecount_same + 1;
+    pd->ecount_differ = parent_pd->ecount_differ;
     /** Init lower bound and upper bound */
     pd->upper_bound = parent_pd->upper_bound;
     pd->lower_bound = parent_pd->lower_bound;
@@ -1663,7 +1677,6 @@ static int create_same(wctproblem *problem, wctdata *parent_pd, int v1, int v2)
     }
 
     /* Create  graph with extra edge (v1,v2) in same_elist*/
-    // pd->ecount_same = parent_pd->ecount_same + 1;
     // pd->elist_same  = CC_SAFE_MALLOC(2 * pd->ecount_same, int);
     // CCcheck_NULL_2(pd->elist_same, "Failed to allocate pd->elist");
     // if (parent_pd->ecount_same > 0) {
@@ -1674,7 +1687,6 @@ static int create_same(wctproblem *problem, wctdata *parent_pd, int v1, int v2)
     // /** Copy differ elist */
     // if (parent_pd->ecount_differ > 0) {
     //     pd->elist_differ = CC_SAFE_MALLOC(2 * parent_pd->ecount_differ, int);
-    //     pd->ecount_differ = parent_pd->ecount_differ;
     //     memcpy(pd->elist_differ, parent_pd->elist_differ, 2 * parent_pd->ecount_differ * sizeof(int));
     // }
     // CCcheck_val_2(val, "Failed in create_contracted_graph_and_intersect");
@@ -2301,21 +2313,22 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem)
         goto CLEAN;
     }
 
-        // if (pd->depth % 5 == 0) {
-        //     val = heur_exec(problem, pd, &result);
-        //     CCcheck_val_2(val, "Failed at heur_exec");
+    if (pd->depth % 5 == 0 && parms->diving_heuristic) {
+            
+        parms->stab_technique = no_stab;
+        val = heur_exec(problem, pd, &result);
+        CCcheck_val_2(val, "Failed at heur_exec");
+        
+        if (result == FOUNDSOL) {
+            printf("Heuristic found solution\n");
+        }
 
-        //     if (result == FOUNDSOL) {
-        //         printf("Heuristic found solution\n");
-        //         assert(pd->status = finished);
-        //         goto CLEAN;
-        //     }
-        // }
+        parms->stab_technique = stab_wentgnes;
+    }
 
     if (dbg_lvl() > 1) {
         printf("Collected %d branching candidates.\n", pmcheap_size(heap));
     }
-
     val = find_strongest_children_conflict(&strongest_v1, &strongest_v2, pd, problem, heap, nodepair_refs, nodepair_weights);
     CCcheck_val_2(val, "Failed in find_strongest_children");
     val = create_same(problem, pd, strongest_v1, strongest_v2);
@@ -2530,10 +2543,10 @@ int branching_msg(wctdata *pd, wctproblem *problem)
     if (pd->lower_bound < pd->upper_bound) {
         CCutil_suspend_timer(&problem->tot_cputime);
         printf("Branching with lb %d (est. %f and %f) at depth %d (id = %d, "
-               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, v1 = %d, v2 = %d ).\n",
+               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, v1 = %d, v2 = %d, nbdiff = %d, nbsame = %d ).\n",
                pd->lower_bound, pd->dbl_safe_lower_bound, pd->LP_lower_bound,
                pd->depth,
-               pd->id, problem->tot_cputime.cum_zeit, pmcheap_size(br_heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2
+               pd->id, problem->tot_cputime.cum_zeit, pmcheap_size(br_heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2, pd->ecount_differ, pd->ecount_same
               );
         CCutil_resume_timer(&problem->tot_cputime);
     }
@@ -2959,10 +2972,6 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         print_ages(pd);
     }
 
-    break_while_loop = 0;
-    CCutil_suspend_timer(&(problem->tot_cputime));
-    CCutil_resume_timer(&(problem->tot_cputime));
-
     switch (status) {
         case GRB_OPTIMAL:
             /** grow ages of the different columns */
@@ -2985,20 +2994,24 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
             break;
     }
 
+    break_while_loop = 0;
+    CCutil_suspend_timer(&(problem->tot_cputime));
+    CCutil_resume_timer(&(problem->tot_cputime));
+
     while ((iterations < pd->maxiterations)
             && !break_while_loop
             && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit) {
-        iterations++;
         /** delete old columns */
         // if (pd->dzcount > pd->njobs * min_ndelrow_ratio && status == GRB_OPTIMAL) {
         //     val = delete_old_cclasses(pd);
         // }
         /** Solve the pricing problem*/
-
         CCutil_start_resume_time(&problem->tot_pricing);
 
         switch (status) {
             case GRB_OPTIMAL:
+                iterations++;
+
                 if (iterations < pd->maxiterations) {
                     switch (parms->stab_technique) {
                         case stab_wentgnes:
@@ -3021,11 +3034,8 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 break;
 
             case GRB_INFEASIBLE:
-                if (iterations < pd->maxiterations) {
-                    val = solve_farkas_dbl(pd);
-                    CCcheck_val_2(val, "Failed in solving farkas");
-                }
-
+                val = solve_farkas_dbl(pd);
+                CCcheck_val_2(val, "Failed in solving farkas");
                 break;
         }
 
@@ -3041,7 +3051,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 switch (parms->stab_technique) {
                     case stab_wentgnes:
                     case stab_dynamic:
-                        break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001 || pd->eta_in > floor(pd->eta_out));
+                        break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001 );
                         break;
 
                     case no_stab:
@@ -3057,7 +3067,6 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         }
 
         add_newsets(pd);
-
         /** Compute LP relaxation */
         cur_cputime = CCutil_zeit();
         val = wctlp_optimize(pd->LP, &status);
@@ -3084,10 +3093,11 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 /** Compute the objective function */
                 val = compute_objective(pd, parms);
                 CCcheck_val_2(val, "Failed in compute_objective");
-                if(pd->update) {
-                    memcpy(pd->pi_out, pd->pi, sizeof(double)*(pd->njobs + 1));
+                if (pd->update) {
+                    memcpy(pd->pi_out, pd->pi, sizeof(double) * (pd->njobs + 1));
                     pd->eta_out = pd->LP_lower_bound_dual;
                 }
+
                 break;
 
             case GRB_INFEASIBLE:
@@ -3097,95 +3107,9 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 break;
         }
 
-
         CCutil_suspend_timer(&(problem->tot_cputime));
         CCutil_resume_timer(&(problem->tot_cputime));
     }
-
-    // do {
-    //     iterations++;
-    //     /** delete old columns */
-    //     // if (pd->dzcount > pd->njobs * min_ndelrow_ratio && status == GRB_OPTIMAL) {
-    //     //     val = delete_old_cclasses(pd);
-    //     // }
-    //     /** Solve the pricing problem*/
-
-    //     CCutil_start_resume_time(&problem->tot_pricing);
-
-    //     switch (status) {
-    //         case GRB_OPTIMAL:
-    //             if (iterations < pd->maxiterations) {
-    //                 /** nnonimprovements? */
-
-    //                 /** Solve the pricing problem */
-    //                 switch (parms->stab_technique) {
-    //                     case stab_wentgnes:
-    //                         memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
-    //                         //pd->eta_out = pd->LP_lower_bound - pd->partial_sol;
-    //                         val = solve_stab(pd, parms);
-    //                         CCcheck_val_2(val, "Failed in solve_stab");
-    //                         break;
-
-    //                     case stab_dynamic:
-    //                         memcpy(pd->pi_out, pd->pi, sizeof(double)*pd->njobs + 1);
-    //                         //pd->eta_out = pd->LP_lower_bound - pd->partial_sol;
-    //                         val = solve_stab_dynamic(pd, parms);
-    //                         CCcheck_val_2(val, "Failed in solve_stab");
-    //                         break;
-
-    //                     case no_stab:
-    //                         val = solve_pricing(pd, parms);
-    //                         CCcheck_val_2(val, "Failed in solving pricing");
-    //                         break;
-    //                 }
-    //             }
-
-    //             break;
-
-    //         case GRB_INFEASIBLE:
-    //             if (iterations < pd->maxiterations) {
-    //                 val = solve_farkas_dbl(pd);
-    //                 CCcheck_val_2(val, "Failed in solving farkas");
-    //             }
-
-    //             break;
-    //     }
-
-    //     CCutil_suspend_timer(&problem->tot_pricing);
-
-    //     for (j = 0; j < pd->nnewsets; j++) {
-    //         val = wctlp_addcol(pd->LP, pd->newsets[j].count + 1, pd->newsets[j].members, pd->coef, pd->newsets[j].totwct, 0.0, 1.0, wctlp_CONT, NULL);
-    //         CCcheck_val_2(val, "wctlp_addcol failed");
-    //     }
-
-    //     switch (status) {
-    //         case GRB_OPTIMAL:
-    //             switch (parms->stab_technique) {
-    //                 case stab_wentgnes:
-    //                 case stab_dynamic:
-    //                     break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001 || pd->eta_in > floor(pd->eta_out));
-    //                     break;
-
-    //                 case no_stab:
-    //                     break_while_loop = (pd->nnewsets == 0 || nnonimprovements > 5);
-    //                     break;
-    //             }
-
-    //             break;
-
-    //         case GRB_INFEASIBLE:
-    //             break_while_loop = (pd->nnewsets == 0);
-    //             break;
-    //     }
-
-    //     add_newsets(pd);
-
-
-    //     CCutil_suspend_timer(&(problem->tot_cputime));
-    //     CCutil_resume_timer(&(problem->tot_cputime));
-    // } while ((iterations < pd->maxiterations)
-    //          && !break_while_loop
-    //          && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit);
 
     if (iterations < pd->maxiterations && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit) {
         switch (status) {
@@ -3195,13 +3119,6 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 if (problem->status == no_sol) {
                     problem->status = lp_feasible;
                 }
-
-                // val = wctlp_optimize(pd->LP, &status);
-                // CCcheck_val_2(val, "wctlp_optimize failed");
-                // val = wctlp_pi(pd->LP, pd->pi);
-                // CCcheck_val_2(val, "wctlp_pi failed");
-                // val = compute_objective(pd, parms);
-                // CCcheck_val_2(val, "compute_objective failed");
 
                 if (dbg_lvl() > 1) {
                     printf("Found lb = %d (%f) upper_bound = %d (id= %d, iterations = %d,opt_track = %d).\n",
@@ -3214,12 +3131,6 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 val = wctlp_x(pd->LP, pd->x, 0);
                 CCcheck_val_2(val, "Failed in wctlp_x");
                 pd->status = LP_bound_computed;
-                /*                val = grow_ages(pd);
-                                CCcheck_val_2(val, "Failed in grow ages");
-                                pd->retirementage = 0;
-                                val = delete_old_cclasses(pd);
-                                CCcheck_val_2(val, "Failed in deleted old classes");*/
-                
                 break;
 
             case GRB_INFEASIBLE:
@@ -3230,7 +3141,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         pd->status = LP_bound_estimated;
     }
 
-    if (dbg_lvl() > 2) {
+    if (dbg_lvl() > 1) {
         printf("iterations = %d\n", iterations);
     }
 
