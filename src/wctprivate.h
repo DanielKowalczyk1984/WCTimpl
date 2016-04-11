@@ -206,6 +206,8 @@ struct wctdata {
     int *v1_wide;
     int *v2_wide;
     int nb_wide;
+    wctdata **same_children_wide;
+    wctdata **diff_children_wide;
 
     //heur_diving
     heur_diving heur_data;
