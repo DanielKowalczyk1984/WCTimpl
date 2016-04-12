@@ -839,30 +839,32 @@ int double2int(int *kpc_pi, int *scalef, const double *pi, int njobs)
 
 /** Branch and Price Algorithm */
 
-static int test_theorem_ahv(wctdata *pd, const double x[], GList *branchjobs, int *min_completiontime)
+static int test_theorem_ahv(wctdata *pd, GList **branchjobs, int **min_completiontime)
 {
     int val = 0;
     int i, j;
-    min_completiontime = CC_SAFE_MALLOC(pd->njobs, int);
-    CCcheck_NULL_2(min_completiontime, "failed to allocate memory");
-    fill_int(min_completiontime, pd->njobs, INT_MAX);
+    int *temp_completiontime = (int *) NULL;
+    GList *temp_branchjobs = (GList*) NULL;
+    temp_completiontime = CC_SAFE_MALLOC(pd->njobs, int);
+    CCcheck_NULL_2(temp_completiontime, "Failed to allocate memory");
+    fill_int(temp_completiontime, pd->njobs, INT_MAX);
 
     for (j = 0; j < pd->njobs; ++j) {
         int found = 0;
-        int C = 0 ;
+        int *C = (int *) NULL;
 
         for (i = 0; i < pd->ccount; ++i) {
-            //C = GPOINTER_TO_INT(g_hash_table_lookup(pd->cclasses[i].completiontime, GINT_TO_POINTER(j)));
-            if (x[i] <= 0.0 || !C) {
+            C = (int *) g_hash_table_lookup(pd->cclasses[i].table, GINT_TO_POINTER(j));
+            if (pd->x[i] <= 0.0 + lp_int_tolerance() || !C) {
                 continue;
             }
 
-            if (C < min_completiontime[j]) {
-                min_completiontime[j] = C;
+            if (*C < temp_completiontime[j]) {
+                temp_completiontime[j] = *C;
             }
 
-            if (C != min_completiontime[j] && !found) {
-                branchjobs = g_list_append(branchjobs, GINT_TO_POINTER(j));
+            if (*C != temp_completiontime[j] && !found) {
+                temp_branchjobs = g_list_append(temp_branchjobs, GINT_TO_POINTER(j));
                 found = 1;
             }
         }
@@ -871,9 +873,11 @@ static int test_theorem_ahv(wctdata *pd, const double x[], GList *branchjobs, in
 CLEAN:
 
     if (val) {
-        CC_IFFREE(min_completiontime, int);
-        g_list_free(branchjobs);
+        CC_IFFREE(temp_completiontime, int);
+        g_list_free(*branchjobs);
     }
+    *min_completiontime = temp_completiontime;
+    *branchjobs = temp_branchjobs;
 
     return val;
 }
@@ -882,37 +886,38 @@ static int grab_integral_solution_ahv(wctdata *pd, int *completion_time)
 {
     int val = 0;
     int incumbent;
-    double testincumbent;
-    int *perm = (int *) NULL;
-    pmcheap *heap = (pmcheap *) NULL;
-    solution *sol = (solution *) NULL;
     int i;
-    perm = CC_SAFE_MALLOC(pd->njobs, int);
-    CCcheck_NULL_2(perm, "Failed to allocate memory");
-
-    for (i = 0; i < pd->njobs; ++i) {
-        perm[i] = i;
-    }
-
+    double testincumbent;
+    pmcheap *heap_sol = (pmcheap *) NULL;
+    pmcheap *heap_jobs = (pmcheap *) NULL;
+    solution *sol = (solution *) NULL;
+    partlist *part = (partlist *) NULL;
+    Job *job = (Job *) NULL;
     sol = CC_SAFE_MALLOC(1, solution);
     CCcheck_NULL_2(sol, "Failed to allocate memory")
     solution_init(sol);
     solution_alloc(sol, pd->nmachines, pd->njobs);
-    val = pmcheap_init(&heap, pd->nmachines);
+    val = pmcheap_init(&heap_sol, pd->nmachines);
+    CCcheck_val_2(val, "Failed at pmcheap_init");
+    val = pmcheap_init(&(heap_jobs), pd->njobs);
+    CCcheck_val_2(val, "Failed at pmcheap_init");
 
     for (i = 0; i < pd->nmachines; i++) {
-        pmcheap_insert(heap, sol->part[i].completiontime, sol->part + i);
+        pmcheap_insert(heap_sol, sol->part[i].completiontime, sol->part + i);
     }
 
-    CCutil_int_perm_quicksort(perm, completion_time, pd->njobs);
+    for (i = 0; i < pd->njobs; ++i) {
+        completion_time[i] -= pd->duration[i];
+        pmcheap_insert(heap_jobs, completion_time[i], pd->jobarray + i);
+    }
+
     incumbent = 0;
 
-    for (i = 0; i < pd->njobs; ++i) {
-        Job *j = pd->jobarray + perm[i];
-        partlist *part = (partlist *) pmcheap_min(heap);
-        partlist_insert(part, sol->vlist, j);
-        pmcheap_insert(heap, part->completiontime, part);
-        incumbent += pd->jobarray[perm[i]].weight * (part->completiontime);
+    while( (job = (Job *) pmcheap_min(heap_jobs))){
+        part = (partlist *) pmcheap_min(heap_sol);
+        partlist_insert(part, sol->vlist, job);
+        pmcheap_insert(heap_sol, part->completiontime, part);
+        incumbent += job->weight*part->completiontime;
     }
 
     val = wctlp_objval(pd->LP, &testincumbent);
@@ -925,19 +930,21 @@ static int grab_integral_solution_ahv(wctdata *pd, int *completion_time)
     val = partlist_to_Scheduleset(sol->part, sol->nmachines, pd->njobs, &(pd->bestcolors), &(pd->nbbest));
     CCcheck_val_2(val, "Failed in conversion");
     printf("Intermediate solution:\n");
+    print_schedule(pd->bestcolors, pd->nbbest);
+    printf("the incumbent = %d\n", incumbent);
     /** Print Solution */
 
-    if (pd->besttotwct < pd->upper_bound) {
-        pd->upper_bound = pd->besttotwct;
-    }
+    // if (pd->besttotwct < pd->upper_bound) {
+    //     pd->upper_bound = pd->besttotwct;
+    // }
 
-    if (pd->upper_bound == pd->lower_bound) {
-        pd->status = finished;
-    }
+    // if (pd->upper_bound == pd->lower_bound) {
+    //     pd->status = finished;
+    // }
 
 CLEAN:
-    CC_IFFREE(perm, int);
-    pmcheap_free(heap);
+    pmcheap_free(heap_sol);
+    pmcheap_free(heap_jobs);
     solution_free(sol);
     CC_IFFREE(sol, solution);
     return val;
@@ -1788,8 +1795,8 @@ static int transfer_same_cclasses_wide(wctdata *pd,
 
         for (j = 0; j < pd->nb_wide; j++) {
 
-            v1_in =  g_hash_table_contains(parent_cclasses[i].table, GINT_TO_POINTER(pd->v1_wide[i]));
-            v2_in =  g_hash_table_contains(parent_cclasses[i].table, GINT_TO_POINTER(pd->v2_wide[i]));
+            v1_in =  g_hash_table_contains(parent_cclasses[i].table, GINT_TO_POINTER(v1_wide[i]));
+            v2_in =  g_hash_table_contains(parent_cclasses[i].table, GINT_TO_POINTER(v2_wide[i]));
             if ((v1_in == 1 && v2_in == 0) || (v1_in == 0 && v2_in == 1)) {
                 construct = 0;
                 break;
@@ -2016,7 +2023,7 @@ static int create_same_wide(wctproblem *problem, wctdata *parent_pd, int *v1_wid
     memcpy(pd->v2_wide, v2_wide, sizeof(int)*nb_wide);
     pd->elist_same = CC_SAFE_MALLOC(2 * pd->nb_wide, int);
     CCcheck_NULL_2(pd->elist_same, "Failed to allocate memory");
-    for (unsigned i = 0; i < nb_wide; i++) {
+    for (int i = 0; i < nb_wide; i++) {
         pd->elist_same[2 * i] = v1_wide[i];
         pd->elist_same[2 * i + 1] = v2_wide[i];
     }
@@ -2521,7 +2528,7 @@ int create_branches(wctdata *pd, wctproblem *problem)
     pd->x = CC_SAFE_MALLOC(pd->ccount, double);
     CCcheck_NULL_2(pd->x, "Failed to allocate memory to pd->x");
     memcpy(pd->x, x, pd->ccount * sizeof(double));
-    val = test_theorem_ahv(pd, pd->x, branchjobs, min_completiontime);
+    val = test_theorem_ahv(pd, &branchjobs, &min_completiontime);
     CCcheck_val_2(val, "Failed in test ahv");
 
     if (g_list_length(branchjobs) == 0) {
@@ -2752,6 +2759,8 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem)
     double *nodepair_weights = (double *) NULL;
     int npairs = pd->njobs * (pd->njobs + 1) / 2;
     int *mf_col = (int *)NULL;
+    GList *branchjobs = (GList *) NULL;
+    int *completion_time = (int *) NULL;
     pmcheap *heap = (pmcheap *)NULL;
     val = pmcheap_init(&heap, npairs);
     CCcheck_val_2(val, "Failed pmcheap_init");
@@ -2798,6 +2807,13 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem)
     pd->x = CC_SAFE_MALLOC(pd->ccount, double);
     CCcheck_NULL_2(pd->x, "Failed to allocate memory to pd->x");
     memcpy(pd->x, x, pd->ccount * sizeof(double));
+    val = test_theorem_ahv(pd, &branchjobs, &completion_time);
+    CCcheck_val_2(val, "failed in test_theorem_ahv");
+
+    if (g_list_length(branchjobs) == 0) {
+        printf("Test ahv found a integral solution:\n");
+        grab_integral_solution_ahv(pd, completion_time);
+    }
     val = insert_frac_pairs_into_heap(pd, pd->x, nodepair_refs, nodepair_weights, npairs, heap);
     CCcheck_val_2(val, "Failed in insert_frac_pairs_into_heap");
 
@@ -2854,6 +2870,8 @@ CLEAN:
     CC_IFFREE(mf_col, int);
     CC_IFFREE(nodepair_refs, int);
     CC_IFFREE(nodepair_weights, double);
+    CC_IFFREE(completion_time, int);
+    g_list_free(branchjobs);
     return val;
 }
 
@@ -2947,7 +2965,7 @@ int create_branches_wide(wctdata *pd, wctproblem *problem)
     CCcheck_NULL_2(v1_wide, "Failed to allocate");
     v2_wide = CC_SAFE_MALLOC(nb_wide, int);
     CCcheck_NULL_2(v2_wide, "Failed to allocate");
-    for (int i = 0; i < nb_wide; i++) {
+    for (i = 0; i < nb_wide; i++) {
         min_nodepair = (int *) pmcheap_min(heap);
         int v1 = -1, v2 = -1;
         inodepair_ref_key(&v1, &v2, (int)(min_nodepair - nodepair_refs));
@@ -2968,7 +2986,7 @@ int create_branches_wide(wctdata *pd, wctproblem *problem)
     CCcheck_val_2(val, "Failed in set_id_and_name");
     val = compute_lower_bound(problem, *(pd->same_children_wide));
     CCcheck_val_2(val, "Failed in compute_lower_bound");
-    for (int i = 0; i < nb_wide; ++i)
+    for (i = 0; i < nb_wide; ++i)
     {
         create_differ_wide(problem, pd, v1_wide[i], v2_wide[i]);
         CCcheck_val_2(val, "Failed in create_differ");

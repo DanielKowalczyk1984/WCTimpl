@@ -236,6 +236,7 @@ int compute_objective(wctdata *pd, wctparms *parms);
 /** Wide Branching functions */
 int create_wide_branches_conflict(wctdata *pd, wctproblem *problem);
 int sequential_wide_branching_conflict(wctproblem *problem);
+int create_branches_wide(wctdata *pd, wctproblem *problem);
 /** Conflict Branching functions */
 int create_branches_conflict(wctdata *pd, wctproblem *problem);
 int sequential_branching_conflict(wctproblem *problem);
@@ -245,6 +246,7 @@ int sequential_branching_conflict(wctproblem *problem);
 int insert_into_branching_heap(wctdata *pd, wctproblem *problem);
 int skip_wctdata(wctdata *pd, wctproblem *problem);
 int branching_msg(wctdata *pd, wctproblem *problem);
+int branching_msg_wide(wctdata *pd, wctproblem *problem);
 int collect_same_children(wctdata *pd);
 int collect_diff_children(wctdata *pd);
 void temporary_data_free(wctdata *pd);
