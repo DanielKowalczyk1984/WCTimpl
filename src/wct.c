@@ -3376,17 +3376,23 @@ int build_lp(wctdata *pd, int construct)
         /** Farkas Pricing */
         for (i = 0; i < pd->njobs; i++) {
             if (!covered[i]) {
+                pd->nnewsets = 1;
                 pd->newsets = CC_SAFE_MALLOC(1, Scheduleset);
                 Scheduleset_init(pd->newsets);
                 pd->newsets[0].members = CC_SAFE_MALLOC(2, int);
-                pd->nnewsets = 1;
                 CCcheck_NULL_2(pd->newsets[0].members,
                                "Failed to allocate memory to pd->newsets->members");
+                pd->newsets[0].C = CC_SAFE_MALLOC(1, int);
+                CCcheck_NULL_2(pd->newsets[0].C, "Failed to allocate memory");
+                pd->newsets[0].table = g_hash_table_new(g_direct_hash, g_direct_equal);
+                CCcheck_NULL_2(pd->newsets[0].table, "Failed to allocate memory");
                 pd->newsets[0].count++;
                 pd->newsets[0].members[0] = i;
                 pd->newsets[0].members[1] = pd->njobs;
                 pd->newsets[0].totwct = pd->weights[i] * pd->duration[i];
                 pd->newsets[0].totweight = pd->duration[i];
+                pd->newsets[0].C[0] = pd->duration[i];
+                g_hash_table_insert(pd->newsets[0].table, GINT_TO_POINTER(i), pd->newsets[0].C);
                 pd->newsets->age = 0;
                 val = wctlp_addcol(pd->LP, 2, pd->newsets[0].members, pd->coef, pd->newsets[0].totwct, 0.0, 1.0,
                                    wctlp_CONT, NULL);
