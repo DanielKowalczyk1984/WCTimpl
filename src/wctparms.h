@@ -72,6 +72,16 @@ enum diving_heur{
     select_diving_heur = 1,
 };
 
+enum test_ahv{
+    min_use_test = 0,
+    use_test = 1,
+};
+
+enum print{
+    min_print_size = 0,
+    use_print = 1,
+};
+
 
 typedef struct wctparms {
     /**
@@ -98,6 +108,8 @@ typedef struct wctparms {
     int solver;
     int construct;
     int diving_heuristic;
+    int test_ahv;
+    int print;
 
     int delete_elists;
     int delete_cclasses;
@@ -134,6 +146,8 @@ int wctparms_set_stab_technique(wctparms *parms, int stab_technique);
 int wctparms_set_solver(wctparms *parms, int solver);
 int wctparms_set_construct(wctparms *parms, int construct);
 int wctparms_set_diving_heuristic(wctparms *parms, int diving);
+int wctparms_set_test_ahv(wctparms *parms, int use);
+int wctparms_set_print(wctparms *parms, int print);
 
 /**
  * scatter search

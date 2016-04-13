@@ -31,6 +31,8 @@ static void usage(char *f)
     fprintf(stderr, "   -z int  Pricing solver technique: 0 = BDD(default), 1 = ZDD, 2 = DP\n");
     fprintf(stderr, "   -c int  Construct heuristically solutions: 0 = yes(default), 1 = no\n");
     fprintf(stderr, "   -D int  Use diving heuristic: 0 = no(default), 1 = yes\n");
+    fprintf(stderr, "   -t int  Use ahv test: 0 = no(default), 1 = yes\n");
+    fprintf(stderr, "   -p int  Print csv-files: 0 = no(default), 1 = yes\n");
 }
 
 
@@ -40,7 +42,7 @@ static int parseargs(int ac, char **av, wctparms *parms)
     int val = 0;
     int debug = dbg_lvl();
 
-    while ((c = getopt(ac, av, "dr:f:s:l:L:C:B:z:S:c:D:")) != EOF) {
+    while ((c = getopt(ac, av, "dr:f:s:l:L:C:B:z:S:c:D:t:p:")) != EOF) {
         switch (c) {
             case 'd':
                 ++(debug);
@@ -96,9 +98,18 @@ static int parseargs(int ac, char **av, wctparms *parms)
                 val = wctparms_set_construct(parms, atoi(optarg));
                 CCcheck_val(val, "Failed in construct sol");
                 break;
+
             case 'D':
                 val = wctparms_set_diving_heuristic(parms, atoi(optarg));
                 CCcheck_val(val, "Failed in diving_heuristic");
+                break;
+            case 't':
+                val = wctparms_set_test_ahv(parms, atoi(optarg));
+                CCcheck_val(val, "Failed in use_test");
+                break;
+            case 'p':
+                val = wctparms_set_print(parms, atoi(optarg));
+                CCcheck_val(val, "Failed in print");
                 break;
 
             default:
@@ -172,7 +183,7 @@ static int print_to_csv(wctproblem *problem)
     g_date_set_time_t(&date, time(NULL));
     problem->real_time = getRealTime() - problem->real_time;
     CCutil_stop_timer(&(problem->tot_cputime), 0);
-    sprintf(filenm, "WCT_%d_%d_%d_%d_%d.csv", pd->nmachines, pd->njobs, date.day, date.month,date.year);
+    sprintf(filenm, "WCT_%d_%d_%d_%d_%d.csv", pd->nmachines, pd->njobs, date.day, date.month, date.year);
     file = fopen(filenm, "a+");
 
     if (file == NULL) {
@@ -229,13 +240,11 @@ static int print_to_screen(wctproblem *problem)
         case feasible:
         case lp_feasible:
         case meta_heur:
-            printf("The suboptimal schedule with relative error %f is given by:\n", (double)(problem->global_upper_bound - problem->global_lower_bound) / (problem->global_lower_bound));
-            print_schedule(problem->root_pd.bestcolors, problem->root_pd.nbbest);
+            printf("A suboptimal schedule with relative error %f is found.\n", (double)(problem->global_upper_bound - problem->global_lower_bound) / (problem->global_lower_bound));
             break;
 
         case optimal:
-            printf("The optimal schedule is given by:\n");
-            print_schedule(problem->root_pd.bestcolors, problem->root_pd.nbbest);
+            printf("The optimal schedule is found.\n");
             break;
     }
 
@@ -320,7 +329,9 @@ int main(int ac, char **av)
     /** Compute Schedule with Branch and Price */
     compute_schedule(&problem);
     /** Print all the information to screen and csv */
-    print_to_csv(&problem);
+    if(problem.parms.print) {
+        print_to_csv(&problem);
+    }
     print_to_screen(&problem);
 CLEAN:
     wctproblem_free(&problem);

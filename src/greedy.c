@@ -10,7 +10,6 @@ int compare_func1(gconstpointer a, gconstpointer b, void *user_data)
 {
     const int *v = &(((const partlist *)a)->completiontime);
     const int *w = &(((const partlist *)b)->completiontime);
-    user_data = NULL;
 
     if (*v != *w) {
         return *v - *w;

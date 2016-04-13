@@ -21,6 +21,8 @@ void wctparms_init(wctparms *parms)
     parms->solver = min_solver;
     parms->construct = min_construct_solutions;
     parms->diving_heuristic = min_diving_heur;
+    parms->test_ahv = min_use_test;
+    parms->print = min_print_size;
     parms->delete_elists = 1;
     parms->delete_cclasses = 0;
     parms->jobfile = (char *) NULL;
@@ -174,6 +176,18 @@ int wctparms_set_construct(wctparms *parms, int construct)
 int wctparms_set_diving_heuristic(wctparms *parms, int diving)
 {
     parms->diving_heuristic = diving;
+    return 0;
+}
+
+int wctparms_set_test_ahv(wctparms *parms, int use)
+{
+    parms->test_ahv = use;
+    return 0;
+}
+
+int wctparms_set_print(wctparms *parms, int print)
+{
+    parms->print = print;
     return 0;
 }
 
