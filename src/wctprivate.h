@@ -30,6 +30,7 @@ int add_one_conflict(PricerSolver *solver, wctparms *parms, int v1, int v2, int 
 int init_tables(PricerSolver *solver);
 size_t get_numberrows_zdd(PricerSolver *solver);
 size_t get_numberrows_bdd(PricerSolver *solver);
+void set_release_due_time(PricerSolver *solver, int *releasetime, int *duetime);
 /**
  * scatter search data types
  */
@@ -96,10 +97,10 @@ typedef struct heur_diving {
  */
 typedef enum {
     initialized             = 0,
-    infeasible              = 1,
-    LP_bound_estimated      = 2,
-    LP_bound_computed       = 3,
-    submitted_for_branching = 4,
+    LP_bound_estimated      = 1,
+    LP_bound_computed       = 2,
+    submitted_for_branching = 3,
+    infeasible              = 4,
     finished                = 5,
 } data_status;
 
@@ -183,10 +184,9 @@ struct wctdata {
     int maxiterations;
     int retirementage;
 
-    //Branches
-    int branch_job;
-    int completiontime;
-    //Conflict Branching
+
+    /** Branching strategies */
+    /** conflict */
     int *elist_same;
     int ecount_same;
     int *elist_differ;
@@ -195,20 +195,22 @@ struct wctdata {
     int nsame;
     wctdata *diff_children;
     int ndiff;
-    
-
-    wctdata *parent;
+    int v1, v2;
+    /** ahv branching */
     wctdata *duetime_child;
     int nduetime;
     wctdata *releasetime_child;
     int nreleasetime;
-    int v1, v2;
+    int branch_job;
+    int completiontime;
+    /** wide branching conflict */
     int *v1_wide;
     int *v2_wide;
     int nb_wide;
     wctdata **same_children_wide;
     wctdata **diff_children_wide;
 
+    wctdata *parent;
     //heur_diving
     heur_diving heur_data;
 

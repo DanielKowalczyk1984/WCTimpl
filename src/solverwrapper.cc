@@ -9,7 +9,7 @@ int construct_sol(Scheduleset **set, int *nnewsets, int *d, Optimal_Solution<T> 
 {
     int val = 0;
     int nbset = 1;
-    int C = 0; 
+    int C = 0;
     std::vector<int> *v = &(sol.jobs);
     Scheduleset *newset = CC_SAFE_MALLOC(1, Scheduleset);
     CCcheck_NULL_2(newset, "Failed to allocate memory newset");
@@ -52,7 +52,7 @@ CLEAN:
 extern "C" {
     PricerSolver *newSolver(int *p, int *w, int *r, int *d, int nbjobs, int Hmin, int Hmax)
     {
-        return new PricerSolver(p, w, r, d, nbjobs, Hmin, Hmax, false, true);
+        return new PricerSolver(p, w, r, d, nbjobs, Hmin, Hmax, true, true);
     }
 
     PricerSolver *copySolver(PricerSolver *src)
@@ -72,7 +72,7 @@ extern "C" {
         Optimal_Solution<double> s = pd->solver->solve_duration_zdd_double(pd->pi);
 
         if (s.obj > 0.00001) {
-            val = construct_sol(&(pd->newsets), &(pd->nnewsets),pd->duration, s, pd->njobs);
+            val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
             CCcheck_val_2(val, "Failed in construct_sol_zdd");
         } else {
             pd->nnewsets = 0;
@@ -175,25 +175,25 @@ CLEAN:
         int val = 0;
 
         switch (parms->solver) {
-            case bdd_solver:
-                solver->init_bdd_table();
-                break;
+        case bdd_solver:
+            solver->init_bdd_table();
+            break;
 
-            case zdd_solver:
-                solver->init_zdd_table();
-                break;
+        case zdd_solver:
+            solver->init_zdd_table();
+            break;
 
-            case DP_solver:
-                break;
+        case DP_solver:
+            break;
         }
 
         switch (parms->construct) {
-            case yes_construct:
-                break;
+        case yes_construct:
+            break;
 
-            case no_construct:
-                solver->init_table_farkas();
-                break;
+        case no_construct:
+            solver->init_table_farkas();
+            break;
         }
 
         return val = 0;
@@ -204,16 +204,16 @@ CLEAN:
         int val = 0;
 
         switch (parms->solver) {
-            case bdd_solver:
-                solver->init_bdd_conflict_solver(elist_same, ecount_same, elist_differ, ecount_differ);
-                break;
+        case bdd_solver:
+            solver->init_bdd_conflict_solver(elist_same, ecount_same, elist_differ, ecount_differ);
+            break;
 
-            case zdd_solver:
-                solver->init_zdd_conflict_solver(elist_same, ecount_same, elist_differ, ecount_differ);
-                break;
+        case zdd_solver:
+            solver->init_zdd_conflict_solver(elist_same, ecount_same, elist_differ, ecount_differ);
+            break;
 
-            case DP_solver:
-                break;
+        case DP_solver:
+            break;
         }
 
         return val;
@@ -234,16 +234,16 @@ CLEAN:
         int val = 0;
 
         switch (parms->solver) {
-            case bdd_solver:
-                solver->free_bdd_solver(ecount_same, ecount_differ);
-                break;
+        case bdd_solver:
+            solver->free_bdd_solver(ecount_same, ecount_differ);
+            break;
 
-            case zdd_solver:
-                solver->free_zdd_solver(ecount_same, ecount_differ);
-                break;
+        case zdd_solver:
+            solver->free_zdd_solver(ecount_same, ecount_differ);
+            break;
 
-            case DP_solver:
-                break;
+        case DP_solver:
+            break;
         }
 
         return val;
@@ -269,16 +269,16 @@ CLEAN:
         int val = 0;
 
         switch (parms->solver) {
-            case bdd_solver:
-                solver->init_bdd_one_conflict(v1, v2, same);
-                break;
+        case bdd_solver:
+            solver->init_bdd_one_conflict(v1, v2, same);
+            break;
 
-            case zdd_solver:
-                solver->init_zdd_one_conflict(v1, v2, same);
-                break;
+        case zdd_solver:
+            solver->init_zdd_one_conflict(v1, v2, same);
+            break;
 
-            case DP_solver:
-                break;
+        case DP_solver:
+            break;
         }
 
         return val;
@@ -289,6 +289,11 @@ CLEAN:
         int val = 0;
         solver->init_tables();
         return val;
+    }
+
+    void set_release_due_time(PricerSolver *solver, int *releasetime, int *duetime)
+    {
+        solver->set_release_due_time(releasetime, duetime);
     }
 
     void compute_subgradient(Optimal_Solution<double> &sol, double *sub_gradient, double *rhs, int nbjobs, int nbmachines)
@@ -333,20 +338,20 @@ CLEAN:
         int val = 0;
 
         switch (parms->solver) {
-            case bdd_solver:
-                val = solve_weight_dbl_bdd(pd);
-                CCcheck_val_2(val, "Failed solve_weight_dbl_bdd");
-                break;
+        case bdd_solver:
+            val = solve_weight_dbl_bdd(pd);
+            CCcheck_val_2(val, "Failed solve_weight_dbl_bdd");
+            break;
 
-            case zdd_solver:
-                val = solve_weight_dbl_zdd(pd);
-                CCcheck_val_2(val, "Failed solve_weight_dbl_zdd")
-                break;
+        case zdd_solver:
+            val = solve_weight_dbl_zdd(pd);
+            CCcheck_val_2(val, "Failed solve_weight_dbl_zdd")
+            break;
 
-            case DP_solver:
-                val = solve_dynamic_programming_ahv(pd);
-                CCcheck_val_2(val, "Failed in solve_dynamic_programming_ahv")
-                break;
+        case DP_solver:
+            val = solve_dynamic_programming_ahv(pd);
+            CCcheck_val_2(val, "Failed in solve_dynamic_programming_ahv")
+            break;
         }
 
 CLEAN:
@@ -391,17 +396,17 @@ CLEAN:
     void compute_sol_stab(PricerSolver *solver, wctparms *parms, double *pi, Optimal_Solution<double> *sol)
     {
         switch (parms->solver) {
-            case bdd_solver:
-                *sol = solver->solve_weight_bdd_double(pi);
-                break;
+        case bdd_solver:
+            *sol = solver->solve_weight_bdd_double(pi);
+            break;
 
-            case zdd_solver:
-                *sol = solver->solve_weight_zdd_double(pi);
-                break;
+        case zdd_solver:
+            *sol = solver->solve_weight_zdd_double(pi);
+            break;
 
-            case DP_solver:
-                *sol = solver->dynamic_programming_ahv(pi);
-                break;
+        case DP_solver:
+            *sol = solver->dynamic_programming_ahv(pi);
+            break;
         }
     }
 
@@ -410,16 +415,16 @@ CLEAN:
         int val = 0;
 
         switch (parms->solver) {
-            case bdd_solver:
-            case zdd_solver:
-                val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, sol, pd->njobs);
-                CCcheck_val_2(val, "Failed in construction of solution");
-                break;
+        case bdd_solver:
+        case zdd_solver:
+            val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, sol, pd->njobs);
+            CCcheck_val_2(val, "Failed in construction of solution");
+            break;
 
-            case DP_solver:
-                val = construct_sol<double, true>(&(pd->newsets), &(pd->nnewsets), pd->duration, sol, pd->njobs);
-                CCcheck_val_2(val, "Failed in construction of solution");
-                break;
+        case DP_solver:
+            val = construct_sol<double, true>(&(pd->newsets), &(pd->nnewsets), pd->duration, sol, pd->njobs);
+            CCcheck_val_2(val, "Failed in construction of solution");
+            break;
         }
 
 CLEAN:
@@ -517,7 +522,7 @@ CLEAN:
                 pd->update = 1;
                 compute_subgradient(sol, pd->subgradient, pd->rhs, pd->njobs, pd->nmachines);
                 adjust_alpha(pd->pi_out, pd->pi_in, pd->subgradient, pd->njobs, alpha);
-                pd->alpha =alpha;
+                pd->alpha = alpha;
                 mispricing = false;
             } else {
                 result_out = compute_lagrange(sol, pd->rhs, pd->pi_out, pd->njobs, pd->nmachines);

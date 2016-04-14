@@ -13,6 +13,8 @@ typedef struct _Job {
     int processingime;
     int releasetime;
     int duetime;
+    GList *ready_list;
+    GList *due_list;
 } Job;
 
 

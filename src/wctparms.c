@@ -8,10 +8,10 @@
 void wctparms_init(wctparms *parms)
 {
     parms->init_upper_bound = INT_MAX;
-    parms->branching_strategy = 0;
     parms->parallel_branching = 0;
-    parms->branching_strategy = min_strategy;
-    parms->rounding_strategy = min_rounding;
+    parms->bb_branch_strategy = min_bb_strategy;
+    parms->bb_search_strategy = min_search_strategy;
+    parms->strong_branching = min_strong_branching;
     parms->nb_feas_sol = 10;
     parms->combine_method = min_combine_method;
     parms->scatter_search = 0;
@@ -104,12 +104,19 @@ int wctparms_set_branching_cpu_limit(wctparms *parms, double limit)
 }
 int wctparms_set_branching_strategy(wctparms *parms, int strategy)
 {
-    parms->branching_strategy = strategy;
+    parms->bb_branch_strategy = strategy;
     return 0;
 }
-int wctparms_set_rounding_strategy(wctparms *parms, int strategy)
+
+int wctparms_set_search_strategy(wctparms *parms, int strategy)
 {
-    parms->branching_strategy = strategy;
+    parms->bb_search_strategy = strategy;
+    return 0;
+}
+
+int wctparms_set_strong_branching(wctparms *parms, int strong)
+{
+    parms->strong_branching = strong;
     return 0;
 }
 

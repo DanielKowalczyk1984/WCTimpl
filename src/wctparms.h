@@ -15,22 +15,13 @@
 extern "C" {
 #endif
 
-enum wctBranchStrat {
-    min_strategy    = 0,
-    no_branching    = min_strategy,
+enum BBSearchStrat {
+    min_search_strategy    = 0,
+    no_branching    = min_search_strategy,
     min_lb_strategy = 1,
     dfs_strategy    = 2,
     max_strategy    = 3,
 };
-
-enum RoundingStrat {
-    min_rounding      = 0,
-    neighbor_rounding = min_rounding,
-    uniform_rounding  = 1,
-    no_rounding       = 2,
-    max_rounding      = 3,
-};
-
 
 enum CombineMethod {
     min_combine_method = 0,
@@ -82,14 +73,28 @@ enum print{
     use_print = 1,
 };
 
+enum BranchandBoundStrat{
+    min_bb_strategy = 0,
+    conflict_strategy = min_bb_strategy,
+    ahv_strategy = 1,
+};
+
+enum Strong_Branching{
+    min_strong_branching = 0,
+    use_strong_branching = min_strong_branching,
+    no_strong_branching =1,
+};
+
+
 
 typedef struct wctparms {
     /**
      * General parameters
      */
     int init_upper_bound;
-    int branching_strategy;
-    int rounding_strategy;
+    int bb_search_strategy;
+    int bb_branch_strategy;
+    int strong_branching;
     int parallel_branching;
     int nb_feas_sol;
     double branching_cpu_limit;
@@ -133,8 +138,9 @@ void wctparms_free(wctparms *parms);
 int wctparms_set_init_upper_bound(wctparms *parms, int bound);
 int wctparms_set_parallel(wctparms *parms, int parallel);
 int wctparms_set_branching_cpu_limit(wctparms *parms, double limit);
+int wctparms_set_search_strategy(wctparms *parms, int strategy);
 int wctparms_set_branching_strategy(wctparms *parms, int strategy);
-int wctparms_set_rounding_strategy(wctparms *parms, int strategy);
+int wctparms_set_strong_branching(wctparms *parms, int strong);
 int wctparms_set_nb_feas_sol(wctparms *parms, int nb_sol);
 
 /**

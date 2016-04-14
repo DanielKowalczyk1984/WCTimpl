@@ -33,6 +33,7 @@ static void usage(char *f)
     fprintf(stderr, "   -D int  Use diving heuristic: 0 = no(default), 1 = yes\n");
     fprintf(stderr, "   -t int  Use ahv test: 0 = no(default), 1 = yes\n");
     fprintf(stderr, "   -p int  Print csv-files: 0 = no(default), 1 = yes\n");
+    fprintf(stderr, "   -b int  Branching strategy: 0 = conflict(default), 1 = ahv\n");
 }
 
 
@@ -42,7 +43,7 @@ static int parseargs(int ac, char **av, wctparms *parms)
     int val = 0;
     int debug = dbg_lvl();
 
-    while ((c = getopt(ac, av, "dr:f:s:l:L:C:B:z:S:c:D:t:p:")) != EOF) {
+    while ((c = getopt(ac, av, "dr:f:s:l:L:C:B:z:S:c:D:t:p:b:")) != EOF) {
         switch (c) {
             case 'd':
                 ++(debug);
@@ -60,7 +61,7 @@ static int parseargs(int ac, char **av, wctparms *parms)
                 break;
 
             case 's':
-                val = wctparms_set_branching_strategy(parms, atoi(optarg));
+                val = wctparms_set_search_strategy(parms, atoi(optarg));
                 CCcheck_val(val, "Failed set_branching_strategy");
                 break;
 
@@ -110,6 +111,10 @@ static int parseargs(int ac, char **av, wctparms *parms)
             case 'p':
                 val = wctparms_set_print(parms, atoi(optarg));
                 CCcheck_val(val, "Failed in print");
+                break;
+            case 'b':
+                val = wctparms_set_branching_strategy(parms, atoi(optarg));
+                CCcheck_val(val, "Failed in set branching strategy");
                 break;
 
             default:
