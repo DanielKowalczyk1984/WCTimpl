@@ -34,6 +34,7 @@ static void usage(char *f)
     fprintf(stderr, "   -t int  Use ahv test: 0 = no(default), 1 = yes\n");
     fprintf(stderr, "   -p int  Print csv-files: 0 = no(default), 1 = yes\n");
     fprintf(stderr, "   -b int  Branching strategy: 0 = conflict(default), 1 = ahv\n");
+    fprintf(stderr, "   -Z int  Use strong branching: 0 = use strong branching(default), 1 = no strong branching\n");
 }
 
 
@@ -43,7 +44,7 @@ static int parseargs(int ac, char **av, wctparms *parms)
     int val = 0;
     int debug = dbg_lvl();
 
-    while ((c = getopt(ac, av, "dr:f:s:l:L:C:B:z:S:c:D:t:p:b:")) != EOF) {
+    while ((c = getopt(ac, av, "dr:f:s:l:L:C:B:z:S:c:D:t:p:b:Z:")) != EOF) {
         switch (c) {
             case 'd':
                 ++(debug);
@@ -115,6 +116,10 @@ static int parseargs(int ac, char **av, wctparms *parms)
             case 'b':
                 val = wctparms_set_branching_strategy(parms, atoi(optarg));
                 CCcheck_val(val, "Failed in set branching strategy");
+                break;
+            case 'Z':
+                val = wctparms_set_strong_branching(parms, atoi(optarg));
+                CCcheck_val(val, "Failed in set strong branching");
                 break;
 
             default:

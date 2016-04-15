@@ -2806,7 +2806,7 @@ static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd, wctproble
             break;
 
         case no_strong_branching:
-            v1 = GPOINTER_TO_INT(it);
+            v1 = GPOINTER_TO_INT(it->data);
 
             if (dbg_lvl() == 0) {
                 printf("Creating branches for v1 = %d, C = %d.\n", v1, completiontime[v1]);
