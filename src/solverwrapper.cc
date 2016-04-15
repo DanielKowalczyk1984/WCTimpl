@@ -52,7 +52,7 @@ CLEAN:
 extern "C" {
     PricerSolver *newSolver(int *p, int *w, int *r, int *d, int nbjobs, int Hmin, int Hmax)
     {
-        return new PricerSolver(p, w, r, d, nbjobs, Hmin, Hmax, true, true);
+        return new PricerSolver(p, w, r, d, nbjobs, Hmin, Hmax, false);
     }
 
     PricerSolver *copySolver(PricerSolver *src)
