@@ -218,7 +218,7 @@ class PricerFarkasZDD
 
         void init_terminal_node(int one)
         {
-            obj = one ? 0.0 : -1871286761.0;
+            obj = one ? 0.0 : 1871286761.0;
         }
 
         void init_node()
@@ -670,7 +670,7 @@ class FarkasZDD: public tdzdd::DdEval<E, PricerFarkasZDD<T>, Optimal_Solution<T>
             PricerFarkasZDD<T> *n0 = values.get_ptr(0);
             PricerFarkasZDD<T> *n1 = values.get_ptr(1);
 
-            if (n0->obj >= n1->obj + pi[j]) {
+            if (n0->obj < n1->obj + pi[j]) {
                 n->obj = n0->obj;
                 n->take = false;
             } else {

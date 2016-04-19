@@ -1,6 +1,7 @@
 #include "PricerConstruct.hpp"
 #include "PricerEvaluate.hpp"
 #include "tdzdd/DdStructure.hpp"
+#include "tdzdd/op/Lookahead.hpp"
 #include <iostream>
 #include <vector>
 
@@ -234,7 +235,7 @@ public:
         }
 
         ConflictConstraints conflict(nbjobs, elist_same, ecount_same, elist_differ, ecount_diff);
-        zdd->zddSubset(conflict);
+        zdd->zddSubset(tdzdd::ZddLookahead<ConflictConstraints>(conflict));
         zdd->zddReduce();
         delete [] elist_same;
         delete [] elist_differ;

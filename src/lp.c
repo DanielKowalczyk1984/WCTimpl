@@ -37,10 +37,12 @@ int wctlp_init(wctlp **lp, const char *name)
     CHECK_VAL_GRB(val, "GRBsetintparam OUTPUTFLAG failed", (*lp)->env);
     val = GRBsetintparam((*lp)->env, GRB_INT_PAR_THREADS, 1);
     CHECK_VAL_GRB(val, "GRBsetintparam TREADS failed", (*lp)->env);
-    val = GRBsetintparam((*lp)->env, GRB_INT_PAR_METHOD, GRB_METHOD_PRIMAL);
+    val = GRBsetintparam((*lp)->env, GRB_INT_PAR_METHOD, GRB_METHOD_DUAL);
     CHECK_VAL_GRB(val, "GRBsetintparam LPMETHOD failed", (*lp)->env);
     val = GRBsetintparam((*lp)->env, GRB_INT_PAR_INFUNBDINFO, 1);
     CHECK_VAL_GRB(val, "GRBsetintparam INFUNBDINFO", (*lp)->env);
+    val =  GRBsetintparam((*lp)->env, GRB_INT_PAR_PRESOLVE, 0);
+    CHECK_VAL_GRB(val, "Failed in setting parameter", (*lp)->env);
     val = GRBnewmodel((*lp)->env, &((*lp)->model), name, 0, (double *)NULL,
                       (double *)NULL, (double *)NULL, (char *)NULL, NULL);
     CHECK_VAL_GRB(val, "GRBnewmodel failed", (*lp)->env);

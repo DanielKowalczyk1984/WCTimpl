@@ -21,6 +21,7 @@ static int collect_diff_child_wide(wctdata *cd);
 static int collect_same_child_wide(wctdata *cd);
 static int remove_finished_subtree_wide(wctdata *child);
 /** help functions for ahv branching */
+int branching_msg_ahv(wctdata *pd, wctproblem *problem);
 static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_pd, wctdata **child, int branch_job, int completion_time);
 static int create_duetime_ahv(wctproblem *problem, wctdata *parent_pd, wctdata **child, int branch_job, int completiontime);
 static int collect_duetime_child_ahv(wctdata *pd);
@@ -226,12 +227,14 @@ static int print_size_to_csv(wctproblem *problem, wctdata *pd)
     size = ftell(file);
 
     if (size == 0) {
-        fprintf(file, "%s;%s;%s;%s;%s\n", "NameInstance", "depth", "size ZDD",
+        fprintf(file, "%s;%s;%s;%s;%s;%s;%s\n", "NameInstance", "depth", "size ZDD",
                 "nb_same",
-                "nb_diff");
+                "nb_diff",
+                "v1",
+                "v2");
     }
 
-    fprintf(file, "%s;%d;%lu;%d;%d\n", root_node->pname, pd->depth, get_datasize(pd->solver), pd->ecount_same, pd->ecount_differ);
+    fprintf(file, "%s;%d;%lu;%d;%d;%d;%d\n", root_node->pname, pd->depth, get_datasize(pd->solver), pd->ecount_same, pd->ecount_differ,pd->v1,pd->v2);
     fclose(file);
 CLEAN:
     return val;
@@ -331,7 +334,7 @@ void wctdata_init(wctdata *pd)
     pd->H_max = 0;
     pd->H_min = 0;
     pd->upper_bound = INT_MAX;
-    pd->lower_bound = INT_MAX;
+    pd->lower_bound = 0;
     pd->dbl_safe_lower_bound = 0.0;
     pd->dbl_est_lower_bound = 0.0;
     pd->lower_scaled_bound = 1;
@@ -528,7 +531,7 @@ gint compare_readytime(gconstpointer a, gconstpointer b)
     return *x - *y;
 }
 
-int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, int Hmin)
+int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, double H)
 {
     int i, j, val = 0;
     int *sumleft = (int *) NULL;
@@ -557,7 +560,7 @@ int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, int Hmin)
 
         for (j = 0; j < i; ++j) {
             if ((jobarray[j].processingime <= temp_duration && jobarray[i].weight >= temp_weight)
-                    || (sumleft[j] <= Hmin - sumright[i])) {
+                    || ((double)sumleft[j] <= H - (double) sumright[i])) {
                 temp_list = g_list_append(temp_list, jobarray + j);
             }
         }
@@ -587,7 +590,7 @@ int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, int Hmin)
 
         for (j = i + 1; j < njobs; ++j) {
             if ((jobarray[j].processingime >= temp_duration && jobarray[i].weight <= temp_weight)
-                    || (sumleft[j] >= Hmin - sumright[i])) {
+                    || (sumleft[j] >= H - sumright[i])) {
                 sum += jobarray[j].processingime;
                 templist = g_list_append(templist, jobarray + j);
             }
@@ -628,7 +631,7 @@ int calculate_Hmax(int *durations, int nmachines, int njobs)
     return val;
 }
 
-int calculate_Hmin(int *durations, int nmachines, int njobs, int *perm)
+int calculate_Hmin(int *durations, int nmachines, int njobs, int *perm, double *H)
 {
     int i, val = 0;
     double temp;
@@ -642,8 +645,8 @@ int calculate_Hmin(int *durations, int nmachines, int njobs, int *perm)
     }
 
     temp = (double) val;
-    temp = temp / (double)nmachines;
-    val = (int) ceil(temp);
+    *H = temp / (double)nmachines;
+    val = (int) ceil(*H);
     return val;
 }
 
@@ -656,6 +659,7 @@ int Preprocessdata(wctproblem *problem, wctdata *pd)
     int *perm = (int *) NULL;
     int *release_time = (int *) NULL;
     int *due_time = (int *) NULL;
+    double H;
     jobarray = CC_SAFE_MALLOC(pd->njobs, Job);
     CCcheck_NULL_2(jobarray, "Failed to allocate memory");
     perm = CC_SAFE_MALLOC(njobs, int);
@@ -687,10 +691,10 @@ int Preprocessdata(wctproblem *problem, wctdata *pd)
 
     printf("H_max = %d\n", pd->H_max);
     /** Calculate H_min */
-    pd->H_min = calculate_Hmin(problem->duration, pd->nmachines, njobs, perm);
+    pd->H_min = calculate_Hmin(problem->duration, pd->nmachines, njobs, perm, &H);
     printf("H_min = %d\n", pd->H_min);
     /** Calculate ready times and due times */
-    calculate_ready_due_times(jobarray, njobs, nmachines, pd->H_min);
+    calculate_ready_due_times(jobarray, njobs, nmachines, H);
     problem->jobarray = jobarray;
 
     for (i = 0; i < njobs; ++i) {
@@ -773,11 +777,12 @@ void make_pi_feasible(wctdata *pd)
             colsum = nextafter(colsum, DBL_MAX);
         }
 
-        if (!signbit(pd->pi[pd->cclasses[i].members[i]])) {
-            pd->pi[pd->cclasses[c].members[i]] = 0;
+        if (!signbit(pd->pi[pd->cclasses[c].members[i]])) {
+            pd->pi[pd->cclasses[c].members[i]] = 0.0;
         }
 
         colsum +=  pd->pi[pd->cclasses[c].members[i]];
+        colsum = nextafter(colsum, DBL_MAX);
 
         if (colsum > pd->cclasses[c].totwct) {
             for (i = 0; i < pd->cclasses[c].count; ++i) {
@@ -790,7 +795,7 @@ void make_pi_feasible(wctdata *pd)
             pd->pi[pd->cclasses[c].members[i]] *= pd->cclasses[c].totwct;
             newcolsum += pd->pi[pd->cclasses[c].members[i]];
 
-            if (dbg_lvl() > 1) {
+            if (dbg_lvl()  > 1) {
                 printf("Decreased column sum of %5d from  %30.20f to  %30.20f\n", c, colsum,
                        newcolsum);
             }
@@ -1076,7 +1081,7 @@ static int collect_duetime_child_ahv(wctdata *cd)
     int c;
 
     for (c = 0; c < cd->nduetime; ++c) {
-        if (cd->duetime_child[c].nbbest && (!cd->nbbest || cd->duetime_child[c].upper_bound < cd->upper_bound)) {
+        if (cd->duetime_child[c].nbbest && (!cd->nbbest || cd->duetime_child[c].upper_bound <= cd->upper_bound)) {
             if (cd->nbbest) {
                 Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
             }
@@ -1099,7 +1104,7 @@ static int collect_same_child_wide(wctdata *cd)
     int c;
 
     for (c = 0; c < cd->nsame; ++c) {
-        if (cd->same_children_wide[c]->nbbest && (!cd->nbbest || cd->same_children_wide[c]->upper_bound < cd->upper_bound)) {
+        if (cd->same_children_wide[c]->nbbest && (!cd->nbbest || cd->same_children_wide[c]->upper_bound <= cd->upper_bound)) {
             if (cd->nbbest) {
                 Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
             }
@@ -1122,12 +1127,12 @@ static int collect_same_child_conflict(wctdata *cd)
     int c;
 
     for (c = 0; c < cd->nsame; ++c) {
-        if (cd->same_children[c].nbbest && (!cd->nbbest || cd->same_children[c].upper_bound < cd->upper_bound)) {
+        if (cd->same_children[c].nbbest && (!cd->nbbest || cd->same_children[c].besttotwct < cd->upper_bound)) {
             if (cd->nbbest) {
                 Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
             }
 
-            cd->upper_bound = cd->same_children[c].upper_bound;
+            cd->upper_bound = cd->besttotwct =  cd->same_children[c].besttotwct;
             cd->nbbest = cd->same_children[c].nbbest;
             cd->same_children[c].nbbest = 0;
             cd->bestcolors = cd->same_children[c].bestcolors;
@@ -1168,12 +1173,12 @@ static int collect_diff_child_conflict(wctdata *cd)
     int c;
 
     for (c = 0; c < cd->ndiff; ++c) {
-        if (cd->diff_children[c].nbbest && (!cd->nbbest || cd->diff_children[c].upper_bound < cd->upper_bound)) {
+        if (cd->diff_children[c].nbbest && (!cd->nbbest || cd->diff_children[c].besttotwct < cd->upper_bound)) {
             if (cd->nbbest) {
                 Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
             }
 
-            cd->upper_bound = cd->diff_children[c].upper_bound;
+            cd->upper_bound = cd->besttotwct =  cd->diff_children[c].besttotwct;
             cd->nbbest = cd->diff_children[c].nbbest;
             cd->diff_children[c].nbbest = 0;
             cd->bestcolors = cd->diff_children[c].bestcolors;
@@ -1259,7 +1264,7 @@ static int remove_finished_subtree_conflict(wctdata *child)
 
     while (cd) {
         for (i = 0; i < cd->nsame; ++i) {
-            if (cd->same_children[i].status < finished) {
+            if (cd->same_children[i].status < infeasible) {
                 all_same_finished = 0;
                 break;
             }
@@ -1279,7 +1284,7 @@ static int remove_finished_subtree_conflict(wctdata *child)
         }
 
         for (i = 0; i < cd->ndiff; ++i) {
-            if (cd->diff_children[i].status < finished) {
+            if (cd->diff_children[i].status < infeasible) {
                 all_diff_finished = 0;
                 break;
             }
@@ -1663,8 +1668,7 @@ static int is_same_child(wctdata *pd)
     return 0;
 }
 
-static int create_differ_wide(wctproblem *problem, wctdata *parent_pd,
-                              int v1, int v2)
+static int create_diff_wide(wctproblem *problem, wctdata *parent_pd, int v1, int v2, int nbwide)
 {
     int val = 0;
     int i;
@@ -2634,7 +2638,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
                 wctdata *same_children = (wctdata *) NULL;
                 wctdata *diff_children = (wctdata *) NULL;
 
-                if (dbg_lvl() == 0) {
+                if (dbg_lvl() > 0) {
                     printf("Creating branches for v1 = %d, v2 = %d (node-pair weight %f)\n", v1,
                            v2,
                            nodepair_weights[(int)(min_nodepair - nodepair_refs)]);
@@ -2748,7 +2752,7 @@ static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd, wctproble
                 wctdata *duetime_child = (wctdata *) NULL;
                 wctdata *releasetime_child = (wctdata *) NULL;
 
-                if (dbg_lvl() == 0) {
+                if (dbg_lvl() > 0) {
                     printf("Creating branches for v1 = %d, C = %d.\n", v1, completiontime[v1]);
                 }
 
@@ -3411,7 +3415,7 @@ int create_branches_wide(wctdata *pd, wctproblem *problem)
     CCcheck_val_2(val, "Failed in compute_lower_bound");
 
     for (i = 0; i < nb_wide; ++i) {
-        create_differ_wide(problem, pd, v1_wide[i], v2_wide[i]);
+        create_diff_wide(problem, pd, v1_wide[i], v2_wide[i], i);
         CCcheck_val_2(val, "Failed in create_differ");
         val = set_id_and_name(pd->diff_children_wide[i], problem->nwctdata++, pd->pname);
         CCcheck_val_2(val, "Failed in set_id_and_name");
@@ -3443,7 +3447,7 @@ int skip_wctdata(wctdata *pd, wctproblem *problem)
 {
     pmcheap *br_heap = problem->br_heap;
 
-    if (dbg_lvl()) {
+    if (dbg_lvl() > 0) {
         printf("Skipping with lb %d and ub %d at depth %d (id = %d, "
                "opt_track = %d, unprocessed nodes = %d).\n",
                pd->lower_bound, pd->upper_bound,
@@ -3688,7 +3692,6 @@ int sequential_branching_conflict(wctproblem *problem)
                parms->branching_cpu_limit);
     }
 
-    children_data_free(&problem->root_pd);
 CLEAN:
     return val;
 }
@@ -3878,12 +3881,12 @@ int build_lp(wctdata *pd, int construct)
     CCcheck_val_2(val, "wctlp_init failed");
 
     for (i = 0; i < pd->njobs; i++) {
-        val = wctlp_addrow(pd->LP, 0, (int *)NULL, (double *)NULL, wctlp_EQUAL, 1.0,
+        val = wctlp_addrow(pd->LP, 0, (int *)NULL, (double *)NULL, wctlp_GREATER_EQUAL, 1.0,
                            (char *)NULL);
         CCcheck_val_2(val, "Failed wctlp_addrow");
     }
 
-    wctlp_addrow(pd->LP, 0  , (int *)NULL, (double *) NULL, wctlp_EQUAL, (double)pd->nmachines , NULL);
+    wctlp_addrow(pd->LP, 0  , (int *)NULL, (double *) NULL, wctlp_LESS_EQUAL, (double)pd->nmachines , NULL);
     pd->coef = (double *)CCutil_reallocrus(pd->coef, (pd->njobs + 1) * sizeof(double));
     CCcheck_NULL_2(pd->coef, "out of memory for coef");
     fill_dbl(pd->coef, pd->njobs + 1, 1.0);
@@ -3893,7 +3896,7 @@ int build_lp(wctdata *pd, int construct)
         for (i = 0; i < pd->ccount; i++) {
             val = wctlp_addcol(pd->LP, pd->cclasses[i].count + 1,
                                pd->cclasses[i].members,
-                               pd->coef, pd->cclasses[i].totwct, 0.0, 1.0, wctlp_CONT, NULL);
+                               pd->coef, pd->cclasses[i].totwct, 0.0, GRB_INFINITY, wctlp_CONT, NULL);
 
             if (val) {
                 wctlp_printerrorcode(val);
@@ -3930,7 +3933,7 @@ int build_lp(wctdata *pd, int construct)
                 pd->newsets[0].C[0] = pd->duration[i];
                 g_hash_table_insert(pd->newsets[0].table, GINT_TO_POINTER(i), pd->newsets[0].C);
                 pd->newsets->age = 0;
-                val = wctlp_addcol(pd->LP, 2, pd->newsets[0].members, pd->coef, pd->newsets[0].totwct, 0.0, 1.0,
+                val = wctlp_addcol(pd->LP, 2, pd->newsets[0].members, pd->coef, pd->newsets[0].totwct, 0.0, GRB_INFINITY,
                                    wctlp_CONT, NULL);
                 CCcheck_val_2(val, "Failed in wctlp_addcol");
 
@@ -3969,6 +3972,7 @@ int build_lp(wctdata *pd, int construct)
     CCcheck_NULL_2(pd->rhs, "Failed to allocate memory");
     val = wctlp_get_rhs(pd->LP, pd->rhs);
     CCcheck_val_2(val, "Failed to get RHS");
+    wctlp_write(pd->LP, "testinf.lp");
 CLEAN:
 
     if (val) {
@@ -4076,7 +4080,8 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
 
         case GRB_INFEASIBLE:
             /** get the dual variables and make them feasible */
-            val = wctlp_pi(pd->LP, pd->pi);
+            val = wctlp_pi_inf(pd->LP, pd->pi);
+            for (int i = 0; i < pd->njobs + 1; ++i)
             CCcheck_val_2(val, "wctlp_pi failed");
             break;
     }
@@ -4174,14 +4179,15 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 /** grow ages of the different columns */
                 val = grow_ages(pd);
                 CCcheck_val_2(val, "Failed in grow_ages");
+
                 /** get the dual variables and make them feasible */
-                val = wctlp_pi(pd->LP, pd->pi);
-                CCcheck_val_2(val, "wctlp_pi failed");
                 /** Compute the objective function */
-                val = compute_objective(pd, parms);
-                CCcheck_val_2(val, "Failed in compute_objective");
 
                 if (pd->update) {
+                    val = wctlp_pi(pd->LP, pd->pi);
+                    CCcheck_val_2(val, "wctlp_pi failed");
+                    val = compute_objective(pd, parms);
+                    CCcheck_val_2(val, "Failed in compute_objective");
                     memcpy(pd->pi_out, pd->pi, sizeof(double) * (pd->njobs + 1));
                     pd->eta_out = pd->LP_lower_bound_dual;
                 }
@@ -4190,7 +4196,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
 
             case GRB_INFEASIBLE:
                 /** get the dual variables and make them feasible */
-                val = wctlp_pi(pd->LP, pd->pi);
+                val = wctlp_pi_inf(pd->LP, pd->pi);
                 CCcheck_val_2(val, "wctlp_pi failed");
                 break;
         }
@@ -4280,7 +4286,6 @@ MAYBE_UNUSED static int submiping(wctdata *cd)
     CCcheck_val_2(val, "ERROR: An incorrect coloring was created.");
     print_schedule(cd->bestcolors, cd->nbbest);
     printf("status = %d\n", status);
-    getchar();
 CLEAN:
     CC_IFFREE(colsol, double)
     CC_IFFREE(colored, int)
@@ -4413,6 +4418,7 @@ int compute_schedule(wctproblem *problem)
         printf("with total weighted completion time\n");
     }
 
+    children_data_free(&problem->root_pd);
 CLEAN:
     return val;
 }
