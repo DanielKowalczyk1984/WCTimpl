@@ -118,7 +118,6 @@ CLEAN:
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_farkas_double(pd->pi);
-        std::cout << s;
 
         if (s.obj < -0.0000001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);

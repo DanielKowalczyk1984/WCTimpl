@@ -234,7 +234,7 @@ static int print_size_to_csv(wctproblem *problem, wctdata *pd)
                 "v2");
     }
 
-    fprintf(file, "%s;%d;%lu;%d;%d;%d;%d\n", root_node->pname, pd->depth, get_datasize(pd->solver), pd->ecount_same, pd->ecount_differ,pd->v1,pd->v2);
+    fprintf(file, "%s;%d;%lu;%d;%d;%d;%d\n", root_node->pname, pd->depth, get_datasize(pd->solver), pd->ecount_same, pd->ecount_differ, pd->v1, pd->v2);
     fclose(file);
 CLEAN:
     return val;
@@ -421,26 +421,10 @@ void lpwctdata_free(wctdata *pd)
         wctlp_free(&(pd->LP));
     }
 
-    if (pd->coef) {
-        free(pd->coef);
-        pd->coef = (double *)NULL;
-    }
-
-    if (pd->pi) {
-        free(pd->pi);
-        pd->pi = (double *) NULL;
-    }
-
-    if (pd->x) {
-        free(pd->x);
-        pd->x = (double *)NULL;
-    }
-
-    if (pd->kpc_pi) {
-        free(pd->kpc_pi);
-        pd->kpc_pi = (int *)NULL;
-    }
-
+    CC_IFFREE(pd->coef, double);
+    CC_IFFREE(pd->pi, double);
+    CC_IFFREE(pd->x, double);
+    CC_IFFREE(pd->kpc_pi, int);
     CC_IFFREE(pd->pi_out, double);
     CC_IFFREE(pd->pi_in, double);
     CC_IFFREE(pd->pi_sep, double);
@@ -1448,6 +1432,12 @@ static int create_duetime_ahv(wctproblem *problem, wctdata *parent_cd, wctdata *
             case bdd_solver:
                 if ((size_t)pd->njobs != get_numberrows_bdd(pd->solver)) {
                     pd->status = infeasible;
+
+                    if (pd->solver) {
+                        freeSolver(pd->solver);
+                        pd->solver = (PricerSolver *) NULL;
+                    }
+
                     CCutil_suspend_timer(&(problem->tot_build_dd));
                     goto CLEAN;
                 } else {
@@ -1459,6 +1449,12 @@ static int create_duetime_ahv(wctproblem *problem, wctdata *parent_cd, wctdata *
             case zdd_solver:
                 if ((size_t)pd->njobs != get_numberrows_zdd(pd->solver)) {
                     pd->status = infeasible;
+
+                    if (pd->solver) {
+                        freeSolver(pd->solver);
+                        pd->solver = (PricerSolver *) NULL;
+                    }
+
                     CCutil_suspend_timer(&(problem->tot_build_dd));
                     goto CLEAN;
                 } else {
@@ -1886,6 +1882,12 @@ static int create_differ_conflict(wctproblem *problem, wctdata *parent_pd, wctda
             case bdd_solver:
                 if ((size_t)pd->njobs != get_numberrows_bdd(pd->solver)) {
                     pd->status = infeasible;
+
+                    if (pd->solver) {
+                        freeSolver(pd->solver);
+                        pd->solver = (PricerSolver *) NULL;
+                    }
+
                     CCutil_suspend_timer(&(problem->tot_build_dd));
                     goto CLEAN;
                 }
@@ -1895,6 +1897,12 @@ static int create_differ_conflict(wctproblem *problem, wctdata *parent_pd, wctda
             case zdd_solver:
                 if ((size_t)pd->njobs != get_numberrows_zdd(pd->solver)) {
                     pd->status = infeasible;
+
+                    if (pd->solver) {
+                        freeSolver(pd->solver);
+                        pd->solver = (PricerSolver *) NULL;
+                    }
+
                     CCutil_suspend_timer(&(problem->tot_build_dd));
                     goto CLEAN;
                 }
@@ -2328,6 +2336,12 @@ static int create_same_conflict(wctproblem *problem, wctdata *parent_pd, wctdata
             case bdd_solver:
                 if ((size_t)pd->njobs != get_numberrows_bdd(pd->solver)) {
                     pd->status = infeasible;
+
+                    if (pd->solver) {
+                        freeSolver(pd->solver);
+                        pd->solver = (PricerSolver *) NULL;
+                    }
+
                     CCutil_suspend_timer(&(problem->tot_build_dd));
                     goto CLEAN;
                 }
@@ -2337,6 +2351,12 @@ static int create_same_conflict(wctproblem *problem, wctdata *parent_pd, wctdata
             case zdd_solver:
                 if ((size_t)pd->njobs != get_numberrows_zdd(pd->solver)) {
                     pd->status = infeasible;
+
+                    if (pd->solver) {
+                        freeSolver(pd->solver);
+                        pd->solver = (PricerSolver *) NULL;
+                    }
+
                     CCutil_suspend_timer(&(problem->tot_build_dd));
                     goto CLEAN;
                 }
@@ -2492,6 +2512,12 @@ static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_cd, wctda
             case bdd_solver:
                 if ((size_t)pd->njobs != get_numberrows_bdd(pd->solver)) {
                     pd->status = infeasible;
+
+                    if (pd->solver) {
+                        freeSolver(pd->solver);
+                        pd->solver = (PricerSolver *) NULL;
+                    }
+
                     CCutil_suspend_timer(&(problem->tot_build_dd));
                     goto CLEAN;
                 } else {
@@ -2503,6 +2529,12 @@ static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_cd, wctda
             case zdd_solver:
                 if ((size_t)pd->njobs != get_numberrows_zdd(pd->solver)) {
                     pd->status = infeasible;
+
+                    if (pd->solver) {
+                        freeSolver(pd->solver);
+                        pd->solver = (PricerSolver *) NULL;
+                    }
+
                     CCutil_suspend_timer(&(problem->tot_build_dd));
                     goto CLEAN;
                 } else {
@@ -2647,12 +2679,20 @@ static int find_strongest_children_conflict(int *strongest_v1,
                 /* Create DIFFER and SAME */
                 val = create_same_conflict(problem, pd, &(same_children), v1, v2);
                 CCcheck_val_2(val, "Failed in create_same");
+
+                if (same_children->status != infeasible) {
+                    same_children->maxiterations = 5;
+                    compute_lower_bound(problem, same_children);
+                }
+
                 val = create_differ_conflict(problem, pd, &(diff_children), v1, v2);
                 CCcheck_val_2(val, "Failed in create_differ");
-                same_children->maxiterations = 5;
-                diff_children->maxiterations = 5;
-                compute_lower_bound(problem, same_children);
-                compute_lower_bound(problem, diff_children);
+
+                if (diff_children->status != infeasible) {
+                    diff_children->maxiterations = 5;
+                    compute_lower_bound(problem, diff_children);
+                }
+
                 dbl_child_lb = (same_children->LP_lower_bound <
                                 diff_children->LP_lower_bound) ?
                                same_children->LP_lower_bound :
@@ -2761,10 +2801,17 @@ static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd, wctproble
                 CCcheck_val_2(rval, "Failed in create_duetime");
                 rval = create_releasetime_ahv(problem, pd, &releasetime_child, v1, completiontime[v1]);
                 CCcheck_val_2(rval, "Failed in create_differ");
-                duetime_child->maxiterations = 5;
-                releasetime_child->maxiterations = 5;
-                compute_lower_bound(problem, duetime_child);
-                compute_lower_bound(problem, releasetime_child);
+
+                if (duetime_child->status != infeasible) {
+                    duetime_child->maxiterations = 5;
+                    compute_lower_bound(problem, duetime_child);
+                }
+
+                if (releasetime_child->status != infeasible) {
+                    releasetime_child->maxiterations = 5;
+                    compute_lower_bound(problem, releasetime_child);
+                }
+
                 dbl_child_lb = (duetime_child->LP_lower_bound_dual < releasetime_child->LP_lower_bound_dual) ?
                                duetime_child->LP_lower_bound_dual : releasetime_child->LP_lower_bound_dual;
 
@@ -2884,7 +2931,6 @@ int create_branches_ahv(wctdata *pd, wctproblem *problem)
 {
     int val = 0;
     int status;
-    double *x = (double *)NULL;
     int strongest_v1 = -1;
     GList *branchjobs = (GList *) NULL;
     int *min_completiontime = (int *) NULL;
@@ -2899,16 +2945,13 @@ int create_branches_ahv(wctdata *pd, wctproblem *problem)
     }
 
     assert(pd->ccount != 0);
-    x = CC_SAFE_MALLOC(pd->ccount, double);
-    CCcheck_NULL_2(x, "Failed to allocate memory to x");
-    val = wctlp_optimize(pd->LP, &status);
-    CCcheck_val_2(val, "Failed at wctlp_optimize");
-    val = wctlp_x(pd->LP, x, 0);
-    CCcheck_val_2(val, "Failed at wctlp_x");
     CC_IFFREE(pd->x, double);
     pd->x = CC_SAFE_MALLOC(pd->ccount, double);
     CCcheck_NULL_2(pd->x, "Failed to allocate memory to pd->x");
-    memcpy(pd->x, x, pd->ccount * sizeof(double));
+    val = wctlp_optimize(pd->LP, &status);
+    CCcheck_val_2(val, "Failed at wctlp_optimize");
+    val = wctlp_x(pd->LP, pd->x, 0);
+    CCcheck_val_2(val, "Failed at wctlp_x");
     val = test_theorem_ahv(pd, &branchjobs, &min_completiontime);
     CCcheck_val_2(val, "Failed in test ahv");
 
@@ -2938,7 +2981,6 @@ CLEAN:
     lpwctdata_free(pd);
     g_list_free(branchjobs);
     CC_IFFREE(min_completiontime, int);
-    CC_IFFREE(x, double);
     return val;
 }
 
@@ -3489,7 +3531,7 @@ int insert_into_branching_heap(wctdata *pd, wctproblem *problem)
 
     free_elist(pd, &(problem->parms));
 
-    if (lb < pd->upper_bound) {
+    if (lb < pd->upper_bound && pd->status != infeasible) {
         val = pmcheap_insert(problem->br_heap, heap_key, (void *)pd);
         CCcheck_val(val, "Failed at pmcheap_insert");
     } else {
@@ -3580,7 +3622,7 @@ int sequential_branching_ahv(wctproblem *problem)
         int i;
         pd->upper_bound = problem->global_upper_bound;
 
-        if (pd->lower_bound >= pd->upper_bound || pd->status == infeasible || pd->eta_in > pd->upper_bound - 1) {
+        if (pd->lower_bound >= pd->upper_bound || pd->eta_in > pd->upper_bound - 1) {
             skip_wctdata(pd, problem);
             remove_finished_subtree_ahv(pd);
         } else {
@@ -3646,7 +3688,7 @@ int sequential_branching_conflict(wctproblem *problem)
         int i;
         pd->upper_bound = problem->global_upper_bound;
 
-        if (pd->lower_bound >= pd->upper_bound || pd->status == infeasible || pd->eta_in > pd->upper_bound - 1) {
+        if (pd->lower_bound >= pd->upper_bound || pd->eta_in > pd->upper_bound - 1) {
             skip_wctdata(pd, problem);
             remove_finished_subtree_conflict(pd);
         } else {
@@ -3711,7 +3753,7 @@ int sequential_branching_wide(wctproblem *problem)
         int i;
         pd->upper_bound = problem->global_upper_bound;
 
-        if (pd->lower_bound >= pd->upper_bound || pd->status == infeasible || pd->eta_in > pd->upper_bound - 1) {
+        if (pd->lower_bound >= pd->upper_bound || pd->eta_in > pd->upper_bound - 1) {
             skip_wctdata(pd, problem);
             remove_finished_subtree_wide(pd);
         } else {
@@ -4081,8 +4123,11 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         case GRB_INFEASIBLE:
             /** get the dual variables and make them feasible */
             val = wctlp_pi_inf(pd->LP, pd->pi);
-            for (int i = 0; i < pd->njobs + 1; ++i)
-            CCcheck_val_2(val, "wctlp_pi failed");
+
+            for (int i = 0; i < pd->njobs + 1; ++i) {
+                CCcheck_val_2(val, "wctlp_pi failed");
+            }
+
             break;
     }
 
