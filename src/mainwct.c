@@ -105,18 +105,22 @@ static int parseargs(int ac, char **av, wctparms *parms)
                 val = wctparms_set_diving_heuristic(parms, atoi(optarg));
                 CCcheck_val(val, "Failed in diving_heuristic");
                 break;
+
             case 't':
                 val = wctparms_set_test_ahv(parms, atoi(optarg));
                 CCcheck_val(val, "Failed in use_test");
                 break;
+
             case 'p':
                 val = wctparms_set_print(parms, atoi(optarg));
                 CCcheck_val(val, "Failed in print");
                 break;
+
             case 'b':
                 val = wctparms_set_branching_strategy(parms, atoi(optarg));
                 CCcheck_val(val, "Failed in set branching strategy");
                 break;
+
             case 'Z':
                 val = wctparms_set_strong_branching(parms, atoi(optarg));
                 CCcheck_val(val, "Failed in set strong branching");
@@ -186,6 +190,7 @@ static int print_to_csv(wctproblem *problem)
 {
     int val = 0;
     wctdata *pd = &(problem->root_pd);
+    wctparms *parms = &(problem->parms);
     FILE *file = (FILE *)NULL;
     char filenm[128];
     int size;
@@ -193,7 +198,17 @@ static int print_to_csv(wctproblem *problem)
     g_date_set_time_t(&date, time(NULL));
     problem->real_time = getRealTime() - problem->real_time;
     CCutil_stop_timer(&(problem->tot_cputime), 0);
-    sprintf(filenm, "WCT_%d_%d_%d_%d_%d.csv", pd->nmachines, pd->njobs, date.day, date.month, date.year);
+
+    switch (parms->bb_branch_strategy) {
+        case conflict_strategy:
+            sprintf(filenm, "WCT_CONFLICT_%d_%d.csv", pd->nmachines, pd->njobs);
+            break;
+
+        case ahv_strategy:
+            sprintf(filenm, "WCT_AHV_%d_%d.csv", pd->nmachines, pd->njobs);
+            break;
+    }
+
     file = fopen(filenm, "a+");
 
     if (file == NULL) {
@@ -206,16 +221,17 @@ static int print_to_csv(wctproblem *problem)
     size = ftell(file);
 
     if (size == 0) {
-        fprintf(file, "%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n", "NameInstance", "tot_Real_time", "tot_cputime",
+        fprintf(file, "%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n", "NameInstance", "tot_real_time", "tot_cputime",
                 "tot_lb",
                 "tot_lb_root",
                 "tot_lb_lp",
                 "tot_branch_and_bound", "tot_scatter_search", "tot_build_dd", "tot_pricing",
                 "rel_error", "status", "global_lower_bound", "global_upper_bound",
-                "first_lower_bound", "first_upper_bound", "first_rel_error");
+                "first_lower_bound", "first_upper_bound", "first_rel_error", "solved_at_root",
+                "nb_explored_nodes", "nb_generated_col", "data");
     }
 
-    fprintf(file, "%s;%f;%f;%f;%f;%f;%f;%f;%f;%f;%f,%d;%d;%d;%d;%d;%f\n", pd->pname,
+    fprintf(file, "%s;%f;%f;%f;%f;%f;%f;%f;%f;%f;%f,%d;%d;%d;%d;%d;%f;%d;%d;%d;%d/%d/%d\n", pd->pname,
             problem->real_time,
             problem->tot_cputime.cum_zeit,
             problem->tot_lb.cum_zeit,
@@ -231,7 +247,11 @@ static int print_to_csv(wctproblem *problem)
             problem->global_upper_bound,
             problem->first_lower_bound,
             problem->first_upper_bound,
-            problem->first_rel_error);
+            problem->first_rel_error,
+            problem->found,
+            problem->nb_explored_nodes,
+            problem->nb_generated_col,
+            date.day, date.month, date.year);
     fclose(file);
 CLEAN:
     return val;
@@ -313,14 +333,14 @@ int main(int ac, char **av)
     }
 
     Preprocessdata(&problem, pd);
-    printf("Reading and preprocessing of the data took %f\n", CCutil_zeit() - start_time);
+    printf("Reading and preprocessing of the data took %f seconds\n", CCutil_zeit() - start_time);
     /** Computing initial lowerbound */
     CCutil_start_timer(&(problem.tot_lb));
     problem.global_lower_bound = lowerbound_eei(pd->jobarray, pd->njobs, pd->nmachines);
     problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cp(pd->jobarray, pd->njobs, pd->nmachines));
     problem.global_lower_bound = CC_MAX(problem.global_lower_bound, lowerbound_cw(pd->jobarray, pd->njobs, pd->nmachines));
     CCutil_stop_timer(&(problem.tot_lb), 0);
-    printf("Computing lowerbound EEI, CP and CW took %f\n", problem.tot_lb.cum_zeit);
+    printf("Computing lowerbound EEI, CP and CW took %f seconds\n", problem.tot_lb.cum_zeit);
     /** Construction Pricersolver at the root node */
     CCutil_start_resume_time(&(problem.tot_build_dd));
     pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
@@ -338,11 +358,13 @@ int main(int ac, char **av)
 
     /** Compute Schedule with Branch and Price */
     compute_schedule(&problem);
+
     /** Print all the information to screen and csv */
-    if(problem.parms.print) {
+    if (problem.parms.print) {
         print_to_csv(&problem);
+        print_to_screen(&problem);
     }
-    print_to_screen(&problem);
+
 CLEAN:
     wctproblem_free(&problem);
     return val;

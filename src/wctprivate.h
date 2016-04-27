@@ -266,6 +266,8 @@ struct wctproblem {
     pmcheap *br_heap;
     int mult_key;
     int found;
+    int nb_explored_nodes;
+    int nb_generated_col;
     /*Cpu time measurement*/
     CCutil_timer tot_build_dd;
     CCutil_timer tot_cputime;

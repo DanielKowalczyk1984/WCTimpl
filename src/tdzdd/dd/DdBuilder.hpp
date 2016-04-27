@@ -335,7 +335,7 @@ namespace tdzdd
                     //#endif
                 }
                 output[i].resize(m);
-                Node<AR, T> *q = output[i].data() + j0;
+                Node<AR> *q = output[i].data() + j0;
                 SpecNode *pp = snodeTable[i - 1].alloc_front(specNodeSize);
 
                 for (; !snodes.empty(); snodes.pop_front()) {
