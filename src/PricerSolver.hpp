@@ -2,8 +2,6 @@
 #include "PricerEvaluate.hpp"
 #include "tdzdd/DdStructure.hpp"
 #include "tdzdd/op/Lookahead.hpp"
-#include "tdzdd/op/BinaryOperation.hpp"
-#include "tdzdd/op/DdBuilderDF.hpp"
 #include <iostream>
 #include <vector>
 
@@ -208,6 +206,7 @@ public:
             elist_differ[0] = v1;
             elist_differ[1] = v2;
         }
+
         ConflictConstraints conflict(nbjobs, elist_same, ecount_same, elist_differ, ecount_diff);
         dd->zddSubset(conflict);
         *zdd = *dd;

@@ -231,7 +231,7 @@ static int print_to_csv(wctproblem *problem)
                 "nb_explored_nodes", "nb_generated_col", "data");
     }
 
-    fprintf(file, "%s;%f;%f;%f;%f;%f;%f;%f;%f;%f;%f,%d;%d;%d;%d;%d;%f;%d;%d;%d;%d/%d/%d\n", pd->pname,
+    fprintf(file, "%s;%f;%f;%f;%f;%f;%f;%f;%f;%f;%f;%d;%d;%d;%d;%d;%f;%d;%d;%d;%d/%d/%d\n", pd->pname,
             problem->real_time,
             problem->tot_cputime.cum_zeit,
             problem->tot_lb.cum_zeit,

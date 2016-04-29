@@ -299,5 +299,6 @@ CLEAN:
     g_rand_free(rand1);
     g_rand_free(rand2);
     CCutil_stop_timer(&(problem->tot_scatter_search), 0);
+    printf("Construction of feasible solutions took %19.16f seconds\n", problem->tot_scatter_search.cum_zeit);
     return val;
 }
