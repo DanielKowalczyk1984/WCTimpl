@@ -7,6 +7,7 @@
 
 int recover_elist(wctdata *pd);
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b);
+int compare_nodes_bfs(BinomialHeapValue a, BinomialHeapValue b);
 
 /** help functions for conflict branching */
 static int create_same_conflict(wctproblem *problem, wctdata *parent_pd, wctdata **child, int v1, int v2);
@@ -38,11 +39,24 @@ static int submiping(wctdata *cd);
 int debug = 0;
 
 static const double min_ndelrow_ratio = 0.5;
-int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b){
-    double lp_a = (((wctdata *)a)->eta_in - ((wctdata *)a)->depth*10000 - (((wctdata *)a)->id%2));
-    double lp_b = (((wctdata *)b)->eta_in - ((wctdata *)b)->depth*10000 - (((wctdata *)b)->id%2));
+int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b)
+{
+    double lp_a = (((wctdata *)a)->eta_in - ((wctdata *)a)->depth * 10000 - (((wctdata *)a)->id % 2));
+    double lp_b = (((wctdata *)b)->eta_in - ((wctdata *)b)->depth * 10000 - (((wctdata *)b)->id % 2));
 
-    if(lp_a < lp_b) {
+    if (lp_a < lp_b) {
+        return -1;
+    } else {
+        return 1;
+    }
+}
+
+int compare_nodes_bfs(BinomialHeapValue a, BinomialHeapValue b)
+{
+    double *lp_a = &(((wctdata *)a)->eta_in);
+    double *lp_b = &(((wctdata *)b)->eta_in);
+
+    if (*lp_a < *lp_b) {
         return -1;
     } else {
         return 1;
@@ -311,6 +325,9 @@ void wctproblem_init(wctproblem *problem)
     problem->br_heap = (pmcheap *) NULL;
     pmcheap_init(&(problem->br_heap), 1000);
     problem->br_heap_a = binomial_heap_new(BINOMIAL_HEAP_TYPE_MIN, compare_nodes_dfs);
+    problem->unexplored_states = g_ptr_array_new();
+    problem->non_empty_level_pqs = g_queue_new();
+    problem->last_explored = -1;
     problem->found = 0;
     problem->nb_explored_nodes = 0;
     problem->nb_generated_col = 0;
@@ -337,6 +354,14 @@ void wctproblem_free(wctproblem *problem)
     /*free the heap*/
     pmcheap_free(problem->br_heap);
     binomial_heap_free(problem->br_heap_a);
+    for (int i = 0; i < problem->unexplored_states->len; ++i)
+    {
+        if((problem->unexplored_states->pdata[i]) != (BinomialHeap *) NULL) {
+            binomial_heap_free( (BinomialHeap *) problem->unexplored_states->pdata[i]);
+        }
+    }
+    g_ptr_array_free(problem->unexplored_states, TRUE);
+    g_queue_free(problem->non_empty_level_pqs);
     problem->br_heap = (pmcheap *) NULL;
     Schedulesets_free(&(problem->initsets), &(problem->gallocated));
     Schedulesets_free(&(problem->bestschedule), &(problem->nbestschedule));
@@ -769,7 +794,7 @@ int compute_objective(wctdata *pd, wctparms *parms)
 
     /** compute lower bound with the dual variables */
     for (i = 0; i < pd->njobs + 1; i++) {
-        pd->LP_lower_bound_dual += (double) pd->pi[i] * pd->rhs[i];
+        pd->LP_lower_bound_dual += (double) pd->pi[i] * pd->rhs[i] ;
     }
 
     /** Get the LP lower bound and compute the lower bound of WCT */
@@ -2074,7 +2099,6 @@ static int transfer_same_cclasses_wide(wctdata *pd,
             /* else 'parent_cclasses[i].members[j] == v2' and we skip it*/
         }
 
-
         pd->cclasses[pd->ccount].members[pd->cclasses[pd->ccount].count] = pd->njobs;
         pd->ccount++;
 
@@ -3219,16 +3243,10 @@ static int insert_frac_pairs_into_heap(wctdata *pd, const double x[],
         if (v1 != v2 && nodepair_weights[ref_key] > 0.0) {
             int v1_key  = nodepair_ref_key(v1, v1);
             int v2_key  = nodepair_ref_key(v2, v2);
-            int same = 0;
             double denom        = (nodepair_weights[v1_key] + nodepair_weights[v2_key]) /
                                   2;
             double dbl_heap_key = nodepair_weights[ref_key] / denom;
-
-
-            if (dbl_heap_key == 1.0 ) {
-                same = 1;
-            }
-            int    int_heap_key =  dbl_heap_key >= 0.5 ? dbl_heap_key >= 1.0 ? INT_MAX - 1 : x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1) - pd->nmachines))*0.05) : x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1) -pd->nmachines)*0.05));
+            int    int_heap_key =  dbl_heap_key >= 0.5 ? dbl_heap_key >= 1.0 ? INT_MAX - 1 : x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1) - pd->nmachines)) * 0.05) : x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1) - pd->nmachines) * 0.05));
             val = pmcheap_insert(heap, int_heap_key + 1,
                                  (void *) & (nodepair_refs[ref_key]));
             CCcheck_val_2(val, "Failed in pmcheap_insert");
@@ -3329,7 +3347,9 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem)
     }
 
     if (pd->depth % 5 == 0 && parms->diving_heuristic) {
-        parms->stab_technique = no_stab;
+        //parms->stab_technique = no_stab;
+        printf("starting heur\n");
+        getchar();
         val = heur_exec(problem, pd, &result);
         CCcheck_val_2(val, "Failed at heur_exec");
 
@@ -3552,23 +3572,6 @@ int insert_into_branching_heap(wctdata *pd, wctproblem *problem)
     int heap_key = 0;
     wctparms *parms = &(problem->parms);
     problem->parms.bb_search_strategy = dfs_strategy;
-    BinomialHeapCompareFunc test;
-    test = compare_nodes_dfs;
-
-    switch (parms->bb_search_strategy) {
-    case dfs_strategy:
-        if (pd->parent) {
-            heap_key = (int)(pd->lower_bound) - pd->depth * 10000 - pd->id % 2 ;
-        }
-
-        break;
-
-    case min_lb_strategy:
-    default:
-        heap_key = (int)(pd->LP_lower_bound * problem->mult_key) /*-
-                       pd->id % 2*/;
-    }
-
     int lb = pd->lower_bound;
 
     if (dbg_lvl()) {
@@ -3579,7 +3582,6 @@ int insert_into_branching_heap(wctdata *pd, wctproblem *problem)
     free_elist(pd, &(problem->parms));
 
     if (lb < pd->upper_bound && pd->status != infeasible) {
-        //val = pmcheap_insert(problem->br_heap, heap_key, (void *)pd);
         binomial_heap_insert(problem->br_heap_a, pd);
         CCcheck_val(val, "Failed at pmcheap_insert");
     } else {
@@ -3602,9 +3604,89 @@ CLEAN:
     return val;
 }
 
+void insert_node_for_exploration(wctdata *pd, wctproblem *problem)
+{
+    int level = pd->ecount_same;
+    wctparms *parms = &(problem->parms);
+    int val = 0;
+
+    if (pd->lower_bound < pd->upper_bound && pd->status != infeasible) {
+        while (problem->unexplored_states->len  <= level ) {
+            g_ptr_array_add(problem->unexplored_states, (gpointer)  binomial_heap_new(BINOMIAL_HEAP_TYPE_MIN, compare_nodes_bfs));
+        }
+
+
+        unsigned int wasPrevEmpty = binomial_heap_num_entries((BinomialHeap *)  (problem->unexplored_states->pdata[level])) == 0;
+        binomial_heap_insert((BinomialHeap *)  (problem->unexplored_states->pdata[level]), pd);
+
+        if (wasPrevEmpty) {
+            if (level == problem->last_explored) {
+                g_queue_push_tail(problem->non_empty_level_pqs, (problem->unexplored_states->pdata[level]));
+                return;
+            }
+
+            unsigned int isPrevLevelEmpty = (level > 0) ? binomial_heap_num_entries((BinomialHeap *) problem->unexplored_states->pdata[level - 1]) == 0 : TRUE;
+
+            if (isPrevLevelEmpty) {
+                g_queue_push_head(problem->non_empty_level_pqs, (problem->unexplored_states->pdata[level]));
+            } else {
+                gpointer data = g_queue_pop_head(problem->non_empty_level_pqs);
+                g_queue_push_head(problem->non_empty_level_pqs, (problem->unexplored_states->pdata[level]));
+                g_queue_push_head(problem->non_empty_level_pqs, data);
+            }
+        }
+    } else {
+        skip_wctdata(pd, problem);
+    }
+
+
+    switch (parms->bb_branch_strategy) {
+    case conflict_strategy:
+    case cbfs_conflict_strategy:
+        trigger_lb_changes_conflict(pd);
+        break;
+
+    case ahv_strategy:
+        val = trigger_lb_changes_ahv(pd);
+        break;
+    }
+
+
+}
+
+wctdata *get_next_node(wctproblem *problem)
+{
+    wctdata *pd = (wctdata *) NULL;
+    GQueue  *non_empty_level_pqs = problem->non_empty_level_pqs;
+    BinomialHeap *next_level_pq = (BinomialHeap *) g_queue_pop_head(non_empty_level_pqs);
+    if (next_level_pq == (BinomialHeap *) NULL) {
+        return pd;
+    }
+    pd = (wctdata *) binomial_heap_pop(next_level_pq);
+
+    while (pd->lower_bound >= problem->global_upper_bound) {
+        if (binomial_heap_num_entries(next_level_pq) == 0)
+        {
+            if (non_empty_level_pqs->length == 0) {
+                problem->last_explored = pd->ecount_same;
+                return pd;
+            }
+            next_level_pq = g_queue_pop_head(non_empty_level_pqs);
+        }
+        pd = (wctdata *) binomial_heap_pop(next_level_pq);
+    }
+
+    if (binomial_heap_num_entries(next_level_pq) > 0) {
+        g_queue_push_tail(non_empty_level_pqs, next_level_pq);
+    }
+
+    problem->last_explored = pd->ecount_same;
+    return pd;
+}
+
 int branching_msg_wide(wctdata *pd, wctproblem *problem)
 {
-    pmcheap *br_heap = problem->br_heap;
+    BinomialHeap *heap = problem->br_heap_a;
 
     if (pd->lower_bound < pd->upper_bound) {
         CCutil_suspend_timer(&problem->tot_cputime);
@@ -3612,7 +3694,7 @@ int branching_msg_wide(wctdata *pd, wctproblem *problem)
                "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, v1 = %d, v2 = %d, nbdiff = %d, nbsame = %d ).\n",
                pd->lower_bound, pd->LP_lower_bound,
                pd->depth,
-               pd->id, problem->tot_cputime.cum_zeit, pmcheap_size(br_heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2, pd->ecount_differ, pd->ecount_same
+               pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2, pd->ecount_differ, pd->ecount_same
               );
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
@@ -3623,7 +3705,7 @@ int branching_msg_wide(wctdata *pd, wctproblem *problem)
 
 int branching_msg(wctdata *pd, wctproblem *problem)
 {
-    pmcheap *br_heap = problem->br_heap;
+    BinomialHeap *heap = problem->br_heap_a;
 
     if (pd->lower_bound < pd->upper_bound) {
         CCutil_suspend_timer(&problem->tot_cputime);
@@ -3631,7 +3713,7 @@ int branching_msg(wctdata *pd, wctproblem *problem)
                "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, v1 = %d, v2 = %d, nbdiff = %d, nbsame = %d ).\n",
                pd->lower_bound, pd->LP_lower_bound,
                pd->depth,
-               pd->id, problem->tot_cputime.cum_zeit,binomial_heap_num_entries(problem->br_heap_a), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2, pd->ecount_differ, pd->ecount_same
+               pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2, pd->ecount_differ, pd->ecount_same
               );
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
@@ -3642,7 +3724,7 @@ int branching_msg(wctdata *pd, wctproblem *problem)
 
 int branching_msg_ahv(wctdata *pd, wctproblem *problem)
 {
-    pmcheap *br_heap = problem->br_heap;
+    BinomialHeap *heap = problem->br_heap_a;
 
     if (pd->lower_bound < pd->upper_bound) {
         CCutil_suspend_timer(&problem->tot_cputime);
@@ -3650,7 +3732,32 @@ int branching_msg_ahv(wctdata *pd, wctproblem *problem)
                "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, branch_job = %d, completion_time= %d).\n",
                pd->lower_bound, pd->LP_lower_bound,
                pd->depth,
-               pd->id, problem->tot_cputime.cum_zeit, pmcheap_size(br_heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->branch_job, pd->completiontime);
+               pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->branch_job, pd->completiontime);
+        CCutil_resume_timer(&problem->tot_cputime);
+        problem->nb_explored_nodes++;
+    }
+
+    return 0;
+}
+
+
+int branching_msg_cbfs(wctdata *pd, wctproblem *problem)
+{
+    int nb_nodes = 0;
+
+    for (unsigned int i = 0; i < problem->unexplored_states->len; ++i) {
+        BinomialHeap *heap = (BinomialHeap *)  (problem->unexplored_states->pdata[i]);
+        nb_nodes += binomial_heap_num_entries(heap);
+    }
+
+    if (pd->lower_bound < pd->upper_bound) {
+        CCutil_suspend_timer(&problem->tot_cputime);
+        printf("Branching with lb %d (LP %f) at depth %d (id = %d, "
+               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, v1 = %d, v2 = %d, nbdiff = %d, nbsame = %d ).\n",
+               pd->lower_bound, pd->LP_lower_bound,
+               pd->depth,
+               pd->id, problem->tot_cputime.cum_zeit, nb_nodes, pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2, pd->ecount_differ, pd->ecount_same
+              );
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
     }
@@ -3662,12 +3769,12 @@ int sequential_branching_ahv(wctproblem *problem)
 {
     int val = 0;
     wctdata *pd;
-    pmcheap *br_heap = problem->br_heap;
+    BinomialHeap *br_heap = problem->br_heap_a;
     wctparms *parms = &(problem->parms);
     printf("ENTERED SEQUANTIAL BRANCHING AHV:\n");
     CCutil_suspend_timer(&problem->tot_branch_and_bound);
 
-    while ((pd = (wctdata *) pmcheap_min(br_heap))
+    while ((pd = (wctdata *) binomial_heap_pop(br_heap))
             && problem->tot_branch_and_bound.cum_zeit < parms->branching_cpu_limit) {
         CCutil_resume_timer(&problem->tot_branch_and_bound);
         int i;
@@ -3706,6 +3813,7 @@ int sequential_branching_ahv(wctproblem *problem)
                 if (pd->depth == 0) {
                     problem->found = 1;
                 }
+
                 remove_finished_subtree_ahv(pd);
             }
 
@@ -3731,12 +3839,12 @@ int sequential_branching_conflict(wctproblem *problem)
 {
     int val = 0;
     wctdata *pd;
-    pmcheap *br_heap = problem->br_heap;
+    BinomialHeap *br_heap = problem->br_heap_a;
     wctparms *parms = &(problem->parms);
     printf("ENTERED SEQUANTIAL BRANCHING CONFLICT:\n");
     CCutil_suspend_timer(&problem->tot_branch_and_bound);
 
-    while ((pd = (wctdata *) binomial_heap_pop(problem->br_heap_a))
+    while ((pd = (wctdata *) binomial_heap_pop(br_heap))
             && problem->tot_branch_and_bound.cum_zeit < parms->branching_cpu_limit) {
         CCutil_resume_timer(&problem->tot_branch_and_bound);
         int i;
@@ -3775,6 +3883,7 @@ int sequential_branching_conflict(wctproblem *problem)
                 if (pd->depth == 0) {
                     problem->found = 1;
                 }
+
                 remove_finished_subtree_conflict(pd);
             }
 
@@ -3794,6 +3903,72 @@ int sequential_branching_conflict(wctproblem *problem)
 CLEAN:
     return val;
 }
+
+int sequential_cbfs_branch_and_bound_conflict(wctproblem *problem)
+{
+    int val = 0;
+    wctdata *pd;
+    wctparms *parms = &(problem->parms);
+    printf("ENTERED SEQUANTIAL BRANCHING CONFLICT + CBFS SEARCHING:\n");
+    CCutil_suspend_timer(&problem->tot_branch_and_bound);
+
+    while ((pd = get_next_node(problem))
+            && problem->tot_branch_and_bound.cum_zeit < parms->branching_cpu_limit) {
+        CCutil_resume_timer(&problem->tot_branch_and_bound);
+        int i;
+        pd->upper_bound = problem->global_upper_bound;
+        if (pd->lower_bound >= pd->upper_bound || pd->eta_in > pd->upper_bound - 1) {
+            skip_wctdata(pd, problem);
+            remove_finished_subtree_conflict(pd);
+        } else {
+            branching_msg_cbfs(pd, problem);
+            /** Construct PricerSolver */
+            /*val = recover_elist(pd);
+            CCcheck_val_2(val, "Failed in recover_elist");*/
+
+            if (problem->maxdepth < pd->depth) {
+                problem->maxdepth = pd->depth;
+            }
+
+            val = create_branches_conflict(pd, problem);
+            CCcheck_val_2(val, "Failed at create_branches");
+
+            for (i = 0; i < pd->nsame; i++) {
+                insert_node_for_exploration(&(pd->same_children[i]), problem);
+            }
+
+            for (i = 0; i < pd->ndiff; i++) {
+                insert_node_for_exploration(pd->diff_children + i, problem);
+            }
+
+            assert(pd->lower_bound <= pd->upper_bound);
+            adapt_global_upper_bound(problem, pd->upper_bound);
+
+            if (pd->upper_bound == pd->lower_bound) {
+                if (pd->depth == 0) {
+                    problem->found = 1;
+                }
+
+                remove_finished_subtree_conflict(pd);
+            }
+
+            /** Check for integer solutions */
+        }
+
+        CCutil_suspend_timer(&problem->tot_branch_and_bound);
+    }
+
+    CCutil_resume_timer(&problem->tot_branch_and_bound);
+
+    if (pd) {
+        printf("Branching timeout of %f second reached\n",
+               parms->branching_cpu_limit);
+    }
+
+CLEAN:
+    return val;
+}
+
 
 int sequential_branching_wide(wctproblem *problem)
 {
@@ -4240,7 +4415,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
             switch (parms->stab_technique) {
             case stab_wentgnes:
             case stab_dynamic:
-                break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.0001);
+                break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.00001);
                 break;
 
             case no_stab:
@@ -4475,8 +4650,17 @@ int compute_schedule(wctproblem *problem)
         problem->parms.construct = 1;
         CCcheck_val_2(val, "Failed in compute_lower_bound");
         CCutil_stop_timer(&(problem->tot_lb_lp_root), 0);
-        val = insert_into_branching_heap(root_pd, problem);
-        CCcheck_val_2(val, "insert_into_branching_heap failed");
+        switch (parms->bb_branch_strategy) {
+        case conflict_strategy:
+
+        case ahv_strategy:
+            val = insert_into_branching_heap(root_pd, problem);
+            CCcheck_val_2(val, "insert_into_branching_heap failed");
+            break;
+        case cbfs_conflict_strategy:
+            insert_node_for_exploration(root_pd, problem);
+            break;
+        }
     }
 
     if (problem->global_lower_bound != problem->global_upper_bound) {
@@ -4492,6 +4676,12 @@ int compute_schedule(wctproblem *problem)
             val = sequential_branching_ahv(problem);
             CCcheck_val_2(val, "Failed in sequential_branching_ahv");
             break;
+
+        case cbfs_conflict_strategy:
+            val = sequential_cbfs_branch_and_bound_conflict(problem);
+            CCcheck_val_2(val, "Failed in CBFS conflict branching");
+            break;
+
         }
 
         CCutil_stop_timer(&(problem->tot_branch_and_bound), 0);

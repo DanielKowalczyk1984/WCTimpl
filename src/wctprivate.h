@@ -265,6 +265,9 @@ struct wctproblem {
     /*heap variables*/
     pmcheap *br_heap;
     BinomialHeap *br_heap_a;
+    GPtrArray *unexplored_states;
+    GQueue *non_empty_level_pqs;
+    unsigned int last_explored;
     int mult_key;
     int found;
     int nb_explored_nodes;

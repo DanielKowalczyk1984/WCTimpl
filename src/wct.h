@@ -242,6 +242,8 @@ int sequential_branching_conflict(wctproblem *problem);
 /** Conflict Branching functions */
 int create_branches_ahv(wctdata *pd, wctproblem *problem);
 int sequential_branching_ahv(wctproblem *problem);
+/** Conflict Branching CBFS exploration */
+int sequential_cbfs_branch_and_bound_conflict(wctproblem *problem);
 
 
 /*Help functions for branching*/
@@ -249,6 +251,7 @@ int insert_into_branching_heap(wctdata *pd, wctproblem *problem);
 int skip_wctdata(wctdata *pd, wctproblem *problem);
 int branching_msg(wctdata *pd, wctproblem *problem);
 int branching_msg_wide(wctdata *pd, wctproblem *problem);
+int branching_msg_cbfs(wctdata *pd, wctproblem *problem);
 int collect_same_children(wctdata *pd);
 int collect_diff_children(wctdata *pd);
 void temporary_data_free(wctdata *pd);
@@ -261,6 +264,9 @@ int add_to_init(wctproblem *problem, Scheduleset *sets, int nbsets);
 int delete_to_bigcclasses(wctdata *pd, int capacity);
 int add_some_maximal_stable_sets(wctdata *pd, int number);
 int insert_into_branching_heap(wctdata *pd, wctproblem *problem);
+/** help function for cbfs */
+void insert_node_for_exploration(wctdata *pd, wctproblem *problem);
+wctdata *get_next_node(wctproblem *problem);
 
 int remove_finished_subtreebis(wctdata *child);
 
