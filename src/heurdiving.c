@@ -121,7 +121,7 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
             }
         }
 
-        if (dbg_lvl() > 0) {
+        if (dbg_lvl() == 0) {
             printf("  dive %d/%d,  var <%d>, sol=%g\n",
                    divedepth, maxdivedepth, bestcand, bestcandsol);
         }
@@ -139,7 +139,6 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
             if (!cutoff || backtracked || farkaspricing) {
                 val = compute_lower_bound(problem, pd);
                 wctlp_write(pd->LP, "testheur.lp");
-                getchar();
                 pd->LP_lower_bound_heur = pd->LP_lower_bound_dual + pd->partial_sol;
 
                 if (val) {
@@ -701,6 +700,7 @@ int adjustLP_ceil(wctdata *pd, int bestcand, double bestcandsol)
 
     for (i = 0; i < pd->cclasses[bestcand].count + 1 ; i++) {
         pd->rhs[pd->cclasses[bestcand].members[i]] -= 1.0;
+        printf("test heur %d\n", pd->cclasses[bestcand].members[i]);
     }
 
     value = CC_SAFE_MALLOC(pd->cclasses[bestcand].count + 1, double);
@@ -710,18 +710,21 @@ int adjustLP_ceil(wctdata *pd, int bestcand, double bestcandsol)
     CCcheck_NULL_2(vind, "Failed to allocate memory");
 
     for (i = 0; i < pd->ccount; ++i) {
-        // if (i != bestcandsol) {
-        // fill_int(vind, pd->cclasses[bestcand].count + 1, i);
-        // val = GRBchgcoeffs(pd->LP->model, pd->cclasses[bestcand].count,
-        //                    pd->cclasses[bestcand].members, vind, value);
-        // CHECK_VAL_GRB(val, "Failed at GRBchgcoeffs", pd->LP->env);
-        // }
+        //if (i != bestcandsol) {
+        fill_int(vind, pd->cclasses[bestcand].count + 1, i);
+        val = GRBchgcoeffs(pd->LP->model, pd->cclasses[bestcand].count,
+                           pd->cclasses[bestcand].members, vind, value);
+        CHECK_VAL_GRB(val, "Failed at GRBchgcoeffs", pd->LP->env);
+        //}
     }
 
-    // val = GRBsetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs , pd->rhs);
-    // CHECK_VAL_GRB(val, "Failed at GRB_DBL_ATTR_RHS", pd->LP->env);
+    val = GRBsetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs , pd->rhs);
+    CHECK_VAL_GRB(val, "Failed at GRB_DBL_ATTR_RHS", pd->LP->env);
     val = GRBupdatemodel(pd->LP->model);
     CHECK_VAL_GRB(val, "Failed to update model", pd->LP->env);
+    wctlp_write(pd->LP, "testheur.lp");
+    printf("test %d %f\n", bestcand, pd->rhs[pd->njobs]);
+    getchar();
 CLEAN:
     CC_IFFREE(value, double);
     CC_IFFREE(vind, int);
