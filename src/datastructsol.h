@@ -139,6 +139,7 @@ typedef struct Scheduleset {
     GHashTable *table;
     int *members;
     int *C;
+    int id;
 } Scheduleset;
 
 void Scheduleset_SWAP(Scheduleset *c1, Scheduleset *c2, Scheduleset *t);

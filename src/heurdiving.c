@@ -61,9 +61,10 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
     startnlpcands = nlpcands;
     status = GRB_OPTIMAL;
     val =  wctlp_objval(pd->LP, &objval);
+    CCcheck_val_2(val, "Failed in wctlp_objval");
+    /** Adjusement here? */
     pd->LP_lower_bound_heur = pd->partial_sol + pd->LP_lower_bound_dual;
     objval = pd->LP_lower_bound_heur;
-    CCcheck_val_2(val, "Failed in wctlp_objval");
     searchbound = pd->lower_bound;
     maxdivedepth = problem->parms.nmachines + 1;
 
@@ -137,6 +138,7 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
                        || (nlpcands == 0 && objval > (double)pd->upper_bound + lp_int_tolerance())));
 
             if (!cutoff || backtracked || farkaspricing) {
+                /** adjustment here? */
                 val = compute_lower_bound(problem, pd);
                 wctlp_write(pd->LP, "testheur.lp");
                 pd->LP_lower_bound_heur = pd->LP_lower_bound_dual + pd->partial_sol;

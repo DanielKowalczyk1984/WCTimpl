@@ -82,6 +82,7 @@ void Scheduleset_init(Scheduleset *set)
         set->totweight = 0;
         set->totwct = 0;
         set->size = 0;
+        set->id = -1;
     }
 }
 
