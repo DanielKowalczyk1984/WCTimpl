@@ -77,23 +77,23 @@ int wctlp_optimize(wctlp *lp, int *status)
         printf("Failed to solve the model to optimality. status= ");
 
         switch (*status) {
-            case GRB_LOADED:
-                printf("GRB_LOADED");
-                val = 1;
-                break;
+        case GRB_LOADED:
+            printf("GRB_LOADED");
+            val = 1;
+            break;
 
-            case GRB_UNBOUNDED:
-                printf("GRB_UNBOUNDED");
-                val = 1;
-                break;
+        case GRB_UNBOUNDED:
+            printf("GRB_UNBOUNDED");
+            val = 1;
+            break;
 
-            case GRB_INF_OR_UNBD:
-                printf("GRB_INF_OR_UNBD");
-                val = 1;
-                break;
+        case GRB_INF_OR_UNBD:
+            printf("GRB_INF_OR_UNBD");
+            val = 1;
+            break;
 
-            default:
-                printf("%d", *status);
+        default:
+            printf("%d", *status);
         }
 
         printf("\n");
@@ -141,22 +141,22 @@ int wctlp_addrow(wctlp *lp, int nzcount, int *cind , double *cval,
     char isense;
 
     switch (sense) {
-        case wctlp_EQUAL:
-            isense = GRB_EQUAL;
-            break;
+    case wctlp_EQUAL:
+        isense = GRB_EQUAL;
+        break;
 
-        case wctlp_LESS_EQUAL:
-            isense = GRB_LESS_EQUAL;
-            break;
+    case wctlp_LESS_EQUAL:
+        isense = GRB_LESS_EQUAL;
+        break;
 
-        case wctlp_GREATER_EQUAL:
-            isense = GRB_GREATER_EQUAL;
-            break;
+    case wctlp_GREATER_EQUAL:
+        isense = GRB_GREATER_EQUAL;
+        break;
 
-        default:
-            fprintf(stderr, "Unknown variable sense: %c\n", sense);
-            val = 1;
-            return val;
+    default:
+        fprintf(stderr, "Unknown variable sense: %c\n", sense);
+        val = 1;
+        return val;
     }
 
     val = GRBaddconstr(lp->model, nzcount, cind, cval, isense, rhs, name);
@@ -172,22 +172,22 @@ int wctlp_addcol(wctlp *lp, int nzcount, int *cind , double *cval,
     char isense;
 
     switch (sense) {
-        case wctlp_CONT:
-            isense = GRB_CONTINUOUS;
-            break;
+    case wctlp_CONT:
+        isense = GRB_CONTINUOUS;
+        break;
 
-        case wctlp_BIN:
-            isense = GRB_BINARY;
-            break;
+    case wctlp_BIN:
+        isense = GRB_BINARY;
+        break;
 
-        case wctlp_INT:
-            isense = GRB_INTEGER;
-            break;
+    case wctlp_INT:
+        isense = GRB_INTEGER;
+        break;
 
-        default:
-            fprintf(stderr, "Unknown variable sense: %c\n", sense);
-            val = 1;
-            return val;
+    default:
+        fprintf(stderr, "Unknown variable sense: %c\n", sense);
+        val = 1;
+        return val;
     }
 
     val = GRBaddvar(lp->model, nzcount, cind, cval, obj, lb, ub, isense, name);
@@ -300,25 +300,25 @@ int wctlp_basis_cols(wctlp *lp, int *cstat, int first)
 
     for (i = 0; i < ncols - first; ++i) {
         switch (cstat[i]) {
-            case GRB_BASIC:
-                cstat[i] = wctlp_BASIC;
-                break;
+        case GRB_BASIC:
+            cstat[i] = wctlp_BASIC;
+            break;
 
-            case GRB_NONBASIC_LOWER:
-                cstat[i] = wctlp_LOWER;
-                break;
+        case GRB_NONBASIC_LOWER:
+            cstat[i] = wctlp_LOWER;
+            break;
 
-            case GRB_NONBASIC_UPPER:
-                cstat[i] = wctlp_UPPER;
-                break;
+        case GRB_NONBASIC_UPPER:
+            cstat[i] = wctlp_UPPER;
+            break;
 
-            case GRB_SUPERBASIC:
-                cstat[i] = wctlp_FREE;
-                break;
+        case GRB_SUPERBASIC:
+            cstat[i] = wctlp_FREE;
+            break;
 
-            default:
-                val = 1;
-                CHECK_VAL_GRB(val, "ERROR: Received unknwn cstat", lp->env);
+        default:
+            val = 1;
+            CHECK_VAL_GRB(val, "ERROR: Received unknwn cstat", lp->env);
         }
     }
 
@@ -331,22 +331,22 @@ int wctlp_set_coltypes(wctlp *lp, char sense)
     char isense;
 
     switch (sense) {
-        case wctlp_CONT:
-            isense = GRB_CONTINUOUS;
-            break;
+    case wctlp_CONT:
+        isense = GRB_CONTINUOUS;
+        break;
 
-        case wctlp_BIN:
-            isense = GRB_BINARY;
-            break;
+    case wctlp_BIN:
+        isense = GRB_BINARY;
+        break;
 
-        case wctlp_INT:
-            isense = GRB_INTEGER;
-            break;
+    case wctlp_INT:
+        isense = GRB_INTEGER;
+        break;
 
-        default:
-            fprintf(stderr, "Unknown variable sense: %c\n", sense);
-            val = 1;
-            return val;
+    default:
+        fprintf(stderr, "Unknown variable sense: %c\n", sense);
+        val = 1;
+        return val;
     }
 
     val = GRBgetintattr(lp->model, GRB_INT_ATTR_NUMVARS, &nvars);
@@ -424,80 +424,87 @@ void wctlp_warmstart_free(wctlp_warmstart **w)
     }
 }
 
+int wctlp_get_nb_rows(wctlp *lp, int *nb_rows) {
+    int val = 0;
+    val = GRBgetintattr(lp->model, GRB_INT_ATTR_NUMCONSTRS, nb_rows);
+    CHECK_VAL_GRB(val, "Failed to get the number of variables", lp->env);
+    return val;
+}
+
 
 
 void wctlp_printerrorcode(int c)
 {
     switch (c) {
-        case GRB_ERROR_OUT_OF_MEMORY:
-            printf("Available memory was exhausted\n");
-            break;
+    case GRB_ERROR_OUT_OF_MEMORY:
+        printf("Available memory was exhausted\n");
+        break;
 
-        case GRB_ERROR_NULL_ARGUMENT:
-            printf("NULL input valua provided for a required argument\n");
-            break;
+    case GRB_ERROR_NULL_ARGUMENT:
+        printf("NULL input valua provided for a required argument\n");
+        break;
 
-        case GRB_ERROR_INVALID_ARGUMENT:
-            printf("An invalid value was provided for a routine argument\n");
-            break;
+    case GRB_ERROR_INVALID_ARGUMENT:
+        printf("An invalid value was provided for a routine argument\n");
+        break;
 
-        case GRB_ERROR_UNKNOWN_ATTRIBUTE:
-            printf("Tried to query or set an unknown attribute\n");
-            break;
+    case GRB_ERROR_UNKNOWN_ATTRIBUTE:
+        printf("Tried to query or set an unknown attribute\n");
+        break;
 
-        case GRB_ERROR_DATA_NOT_AVAILABLE:
-            printf("Attempted to query or set an attribute that could\n");
-            printf("not be acessed at that time\n");
-            break;
+    case GRB_ERROR_DATA_NOT_AVAILABLE:
+        printf("Attempted to query or set an attribute that could\n");
+        printf("not be acessed at that time\n");
+        break;
 
-        case GRB_ERROR_UNKNOWN_PARAMETER:
-            printf("Tried to query or set an unknown parameter\n");
-            break;
+    case GRB_ERROR_UNKNOWN_PARAMETER:
+        printf("Tried to query or set an unknown parameter\n");
+        break;
 
-        case GRB_ERROR_VALUE_OUT_OF_RANGE:
-            printf("Tried to set a parameter to value that is outside\n");
-            printf("the parameter's range\n");
-            break;
+    case GRB_ERROR_VALUE_OUT_OF_RANGE:
+        printf("Tried to set a parameter to value that is outside\n");
+        printf("the parameter's range\n");
+        break;
 
-        case GRB_ERROR_NO_LICENSE:
-            printf("Failed to obtain a valid license\n");
-            break;
+    case GRB_ERROR_NO_LICENSE:
+        printf("Failed to obtain a valid license\n");
+        break;
 
-        case GRB_ERROR_SIZE_LIMIT_EXCEEDED:
-            printf("Attempted to solve a model that is larger than the\n");
-            printf("limit for a demo version\n");
-            break;
+    case GRB_ERROR_SIZE_LIMIT_EXCEEDED:
+        printf("Attempted to solve a model that is larger than the\n");
+        printf("limit for a demo version\n");
+        break;
 
-        case GRB_ERROR_CALLBACK:
-            printf("Problem with callback\n");
-            break;
+    case GRB_ERROR_CALLBACK:
+        printf("Problem with callback\n");
+        break;
 
-        case GRB_ERROR_FILE_READ:
-            printf("Failed to read the requested file\n");
-            break;
+    case GRB_ERROR_FILE_READ:
+        printf("Failed to read the requested file\n");
+        break;
 
-        case GRB_ERROR_FILE_WRITE:
-            printf("Failed to write the requested file\n");
-            break;
+    case GRB_ERROR_FILE_WRITE:
+        printf("Failed to write the requested file\n");
+        break;
 
-        case GRB_ERROR_NUMERIC:
-            printf("Numerical error during the requested operation\n");
-            break;
+    case GRB_ERROR_NUMERIC:
+        printf("Numerical error during the requested operation\n");
+        break;
 
-        case GRB_ERROR_IIS_NOT_INFEASIBLE:
-            printf("Attempted to perform infeasibility analysis on a feasible model\n");
-            break;
+    case GRB_ERROR_IIS_NOT_INFEASIBLE:
+        printf("Attempted to perform infeasibility analysis on a feasible model\n");
+        break;
 
-        case GRB_ERROR_NOT_FOR_MIP:
-            printf("Requested model not valid for a mip model\n");
-            break;
+    case GRB_ERROR_NOT_FOR_MIP:
+        printf("Requested model not valid for a mip model\n");
+        break;
 
-        case GRB_ERROR_OPTIMIZATION_IN_PROGRESS:
-            printf("Tried to query or modify a model while optimization was in progress\n");
-            break;
+    case GRB_ERROR_OPTIMIZATION_IN_PROGRESS:
+        printf("Tried to query or modify a model while optimization was in progress\n");
+        break;
 
-        default:
-            printf("Unknown error code: %d", c);
+    default:
+        printf("Unknown error code: %d", c);
     }
 }
 

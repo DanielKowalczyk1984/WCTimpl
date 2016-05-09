@@ -1,4 +1,5 @@
 #include "wct.h"
+#include "new_heurdiving.h"
 #include "wctparms.h"
 #include "PricerSolver.hpp"
 #include <iostream>
@@ -114,10 +115,44 @@ CLEAN:
         return val;
     }
 
+    int solve_dynamic_programming_ahv_CG_heur(LP_data_CG_heur *data)
+    {
+        int val = 0;
+        wctdata *pd = data->pd;
+        Optimal_Solution<double> s = pd->solver->dynamic_programming_ahv(data->pi);
+
+        if (s.obj < -0.000001) {
+            val = construct_sol<double, true>(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
+            CCcheck_val_2(val, "Failed in constructing sol");
+        } else {
+            pd->nnewsets = 0;
+        }
+
+CLEAN:
+        return val;
+    }
+
     int solve_farkas_dbl(wctdata *pd)
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_farkas_double(pd->pi);
+
+        if (s.obj < -0.0000001) {
+            val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
+            CCcheck_val_2(val, "Failed in constructing jobs");
+        } else {
+            pd->nnewsets = 0;
+        }
+
+CLEAN:
+        return val;
+    }
+
+    int solve_farkas_dbl_CG_heur(LP_data_CG_heur *data)
+    {
+        int val = 0;
+        wctdata *pd = data->pd;
+        Optimal_Solution<double> s = pd->solver->solve_farkas_double(data->pi);
 
         if (s.obj < -0.0000001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
@@ -146,10 +181,44 @@ CLEAN:
         return val;
     }
 
+    int solve_weight_dbl_bdd_CG_heur(LP_data_CG_heur *data)
+    {
+        int val = 0;
+        wctdata *pd = data->pd;
+        Optimal_Solution<double> s = pd->solver->solve_weight_bdd_double(data->pi);
+
+        if (s.obj > 0.0000001) {
+            val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
+            CCcheck_val_2(val, "Failed in construction")
+        } else {
+            pd->nnewsets = 0;
+        }
+
+CLEAN:
+        return val;
+    }
+
     int solve_weight_dbl_zdd(wctdata *pd)
     {
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_zdd_double(pd->pi);
+
+        if (s.obj > 0.0000001) {
+            val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
+            CCcheck_val_2(val, "Failed in construction")
+        } else {
+            pd->nnewsets = 0;
+        }
+
+CLEAN:
+        return val;
+    }
+
+    int solve_weight_dbl_zdd_CG_heur(LP_data_CG_heur *data)
+    {
+        int val = 0;
+        wctdata *pd = data->pd;
+        Optimal_Solution<double> s = pd->solver->solve_weight_zdd_double(data->pi);
 
         if (s.obj > 0.0000001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
@@ -358,6 +427,31 @@ CLEAN:
         return val;
     }
 
+    int solve_pricing_CG_heur(LP_data_CG_heur *data, wctparms *parms)
+    {
+        int val = 0;
+
+        switch (parms->solver) {
+        case bdd_solver:
+            val = solve_weight_dbl_bdd_CG_heur(data);
+            CCcheck_val_2(val, "Failed solve_weight_dbl_bdd");
+            break;
+
+        case zdd_solver:
+            val = solve_weight_dbl_zdd_CG_heur(data);
+            CCcheck_val_2(val, "Failed solve_weight_dbl_zdd")
+            break;
+
+        case DP_solver:
+            val = solve_dynamic_programming_ahv_CG_heur(data);
+            CCcheck_val_2(val, "Failed in solve_dynamic_programming_ahv")
+            break;
+        }
+
+CLEAN:
+        return val;
+    }
+
     double compute_lagrange(Optimal_Solution<double> &sol, double *rhs, double *pi, int nbjobs, int nbmachines)
     {
         double result = pi[nbjobs];
@@ -377,6 +471,36 @@ CLEAN:
         result = CC_MIN(0.0, sol.cost - result);
         result = rhs[nbjobs] * result;
         result += a;
+        return result;
+    }
+
+    void compute_lagrange_iterator(gpointer key, gpointer value, gpointer user_data) {
+        double *a = (double *) user_data;
+        Scheduleset *set = (Scheduleset *) key;
+
+        *a += set->totwct;
+    }
+
+    double compute_lagrange_CG_heur(double *pi, int njobs, GHashTable *part_sol, double *a, double K, Optimal_Solution<double> &sol)
+    {
+        double result = pi[njobs];
+        double temp = 0.0;
+        int i;
+        std::vector<int> *v = &(sol.jobs);
+
+        for (std::vector<int>::iterator it = v->begin(); it != v->end(); ++it) {
+            result += pi[*it];
+        }
+
+        for (i = 0; i < njobs; ++i) {
+            temp += a[i] * pi[i];
+        }
+
+        temp += K * pi[njobs];
+        g_hash_table_foreach(part_sol, compute_lagrange_iterator, &a);
+        result = CC_MIN(0.0, sol.cost - result);
+        result = K * result;
+        result += temp;
         return result;
     }
 
@@ -493,6 +617,75 @@ CLEAN:
         if (dbg_lvl() > 0) {
             printf("heading = %d, alpha = %f, result of primal bound and Lagragian bound: out =%f, in = %f\n", heading_in, pd->alpha, pd->eta_out, pd->eta_in);
         }
+
+CLEAN:
+        return val;
+    }
+
+    int solve_stab_CG_heur(wctproblem *problem, LP_data_CG_heur *data)
+    {
+        int val = 0;
+        int heading_in = 0;
+        wctparms *parms = &(problem->parms);
+        wctdata *pd = data->pd;
+        PricerSolver *solver = pd->solver;
+        Optimal_Solution<double> sol;
+        heading_in = (pd->eta_in == 0.0) ? 1 : !(CC_OURABS((pd->eta_out - pd->eta_in) / (pd->eta_in)) < 4.0);
+
+        if (heading_in) {
+            double result;
+            compute_sol_stab(solver, parms, data->pi, &sol);
+            result = compute_lagrange_CG_heur(data->pi, pd->njobs, data->partial_sol, data->a, data->K, sol);
+
+            if (result > data->eta_in) {
+                data->eta_in = result;
+                memcpy(data->pi_in, data->pi, sizeof(double) * (pd->njobs + 1));
+            }
+
+            val = construct_sol_stab(pd, parms, sol);
+            CCcheck_val_2(val, "Failed in construct solution");
+        } else {
+            double k = 0.0;
+            double alpha;
+            bool mispricing = false;
+            double  result_sep;
+            double result_out;
+
+            do {
+                k += 1.0;
+                alpha = CC_MAX(0, 1.0 - k * (1.0 - data->alpha));
+                compute_pi_eta_sep(pd->njobs, data->pi_sep, &(data->eta_sep), alpha, data->pi_in, &(data->eta_in), data->pi_out, &(data->eta_out));
+                compute_sol_stab(solver, parms, data->pi_sep, &sol);
+                result_sep = compute_lagrange_CG_heur(data->pi_sep, pd->njobs, data->partial_sol, data->a, data->K, sol);
+
+                if (result_sep < data->eta_sep) {
+                    val = construct_sol_stab(pd, parms, sol);
+                    CCcheck_val_2(val, "Failed in construct_sol_stab");
+                    pd->update = 1;
+                    mispricing = false;
+                } else {
+                    result_out = compute_lagrange_CG_heur(data->pi_out, pd->njobs, data->partial_sol, data->a, data->K, sol);
+
+                    if (result_out < data->eta_out) {
+                        val = construct_sol_stab(pd, parms, sol);
+                        CCcheck_val_2(val, "Failed in construct_sol_stab");
+                        mispricing = false;
+                        pd->update = 0;
+                    } else {
+                        mispricing = true;
+                    }
+                }
+            } while (mispricing && alpha > 0); /** mispricing check */
+
+            if (result_sep > data->eta_in) {
+                data->eta_in = result_sep;
+                memcpy(data->pi_in, data->pi_sep, sizeof(double) * (pd->njobs + 1));
+            }
+        }
+
+        //if (dbg_lvl() > 0) {
+        printf("heading = %d, alpha = %f, result of primal bound and Lagragian bound: out =%f, in = %f m = %f\n", heading_in, data->alpha, data->eta_out, data->eta_in, data->K);
+        //}
 
 CLEAN:
         return val;
