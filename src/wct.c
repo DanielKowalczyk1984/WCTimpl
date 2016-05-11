@@ -9,6 +9,7 @@
 int recover_elist(wctdata *pd);
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b);
 int compare_nodes_bfs(BinomialHeapValue a, BinomialHeapValue b);
+static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines);
 
 
 /** help functions for conflict branching */
@@ -24,7 +25,7 @@ static int create_diff_wide(wctproblem *problem, wctdata *parent_pd, int v1, int
 static int collect_diff_child_wide(wctdata *cd);
 static int collect_same_child_wide(wctdata *cd);
 static int remove_finished_subtree_wide(wctdata *child);
-static int trigger_lb_changes_wide(wctdata *child);
+//static int trigger_lb_changes_wide(wctdata *child);
 /** help functions for ahv branching */
 int branching_msg_ahv(wctdata *pd, wctproblem *problem);
 static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_pd, wctdata **child, int branch_job, int completion_time);
@@ -43,8 +44,8 @@ int debug = 0;
 static const double min_ndelrow_ratio = 0.5;
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b)
 {
-    double lp_a = (((wctdata *)a)->eta_in - ((wctdata *)a)->depth * 10000 - (((wctdata *)a)->id % 2));
-    double lp_b = (((wctdata *)b)->eta_in - ((wctdata *)b)->depth * 10000 - (((wctdata *)b)->id % 2));
+    double lp_a = (((wctdata *)a)->eta_in - ((wctdata *)a)->depth * 10000 - (((wctdata *)a)->id) % 2);
+    double lp_b = (((wctdata *)b)->eta_in - ((wctdata *)b)->depth * 10000 - (((wctdata *)b)->id) % 2);
 
     if (lp_a < lp_b) {
         return -1;
@@ -449,6 +450,7 @@ void wctdata_init(wctdata *pd)
     /*initialization of branches*/
     pd->branch_job = -1;
     pd->parent = (wctdata *) NULL;
+    pd->choose = 0;
     /** ahv branching */
     pd->duetime_child = (wctdata *) NULL;
     pd->nduetime = 0;
@@ -1493,10 +1495,11 @@ static int create_duetime_ahv(wctproblem *problem, wctdata *parent_cd, wctdata *
     pd->duetime[branch_job] = completiontime;
     /** Construct PricerSolver */
     CCutil_start_timer(&(problem->tot_build_dd));
-    pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
 
     switch (parms->solver) {
     case bdd_solver:
+        pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+
         if ((size_t)pd->njobs != get_numberrows_bdd(pd->solver)) {
             pd->status = infeasible;
 
@@ -1515,6 +1518,8 @@ static int create_duetime_ahv(wctproblem *problem, wctdata *parent_cd, wctdata *
         break;
 
     case zdd_solver:
+        pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+
         if ((size_t)pd->njobs != get_numberrows_zdd(pd->solver)) {
             pd->status = infeasible;
 
@@ -1533,6 +1538,7 @@ static int create_duetime_ahv(wctproblem *problem, wctdata *parent_cd, wctdata *
         break;
 
     case DP_solver:
+        pd->solver = newSolverDP(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
         break;
     }
 
@@ -1620,8 +1626,21 @@ static int is_releasetime_child(wctdata *cd)
 {
     int i;
 
-    for (i = 0; cd->parent && i < cd->parent->ndiff; ++i) {
+    for (i = 0; cd->parent && i < cd->parent->nreleasetime; ++i) {
         if (cd == cd->parent->releasetime_child + i) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static int is_duetime_child(wctdata *cd)
+{
+    int i;
+
+    for (i = 0; cd->parent && i < cd->parent->nduetime; ++i) {
+        if (cd == cd->parent->duetime_child + i) {
             return 1;
         }
     }
@@ -2557,10 +2576,11 @@ static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_cd, wctda
     pd->releasetime[branch_job] = completiontime + 1 - pd->duration[branch_job];
     /** Construct PricerSolver */
     CCutil_start_timer(&(problem->tot_build_dd));
-    pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
 
     switch (parms->solver) {
     case bdd_solver:
+        pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+
         if ((size_t)pd->njobs != get_numberrows_bdd(pd->solver)) {
             pd->status = infeasible;
 
@@ -2579,6 +2599,8 @@ static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_cd, wctda
         break;
 
     case zdd_solver:
+        pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+
         if ((size_t)pd->njobs != get_numberrows_zdd(pd->solver)) {
             pd->status = infeasible;
 
@@ -2597,6 +2619,7 @@ static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_cd, wctda
         break;
 
     case DP_solver:
+        pd->solver = newSolverDP(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
         break;
     }
 
@@ -2692,7 +2715,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
         double       *nodepair_weights)
 {
     int    val = 0;
-    int    max_non_improving_branches  = 8; /* pd->njobs / 100 + 1; */
+    int    max_non_improving_branches  = 3; /* pd->njobs / 100 + 1; */
     int    remaining_branches          = max_non_improving_branches;
     double strongest_dbl_lb = 0.0;
     int   *min_nodepair;
@@ -2817,7 +2840,7 @@ CLEAN:
 static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd, wctproblem *problem, GList *branchnodes, int *completiontime)
 {
     int    rval = 0;
-    int    max_non_improving_branches  = 8; /* cd->njobs / 100 + 1; */
+    int    max_non_improving_branches  = 3; /* cd->njobs / 100 + 1; */
     int    remaining_branches          = max_non_improving_branches;
     double strongest_dbl_lb = 0.0;
     wctparms *parms = &(problem->parms);
@@ -3006,8 +3029,7 @@ int create_branches_ahv(wctdata *pd, wctproblem *problem)
 
     val = find_strongest_children_ahv(&strongest_v1, pd, problem, branchjobs, min_completiontime);
     CCcheck_val_2(val, "Failed in find_strongest_children");
-    // val = create_duetime_ahv(problem, pd, strongest_v1, min_completiontime[strongest_v1]);
-    // CCcheck_val(val, "Failed in create_same");
+
     val = set_id_and_name(pd->duetime_child, problem->nwctdata++, pd->pname);
     CCcheck_val_2(val, "Failed in set_id_and_name");
 
@@ -3020,8 +3042,6 @@ int create_branches_ahv(wctdata *pd, wctproblem *problem)
         CCcheck_val_2(val, "Failed in compute_lower_bound");
     }
 
-    // val = create_releasetime_ahv(problem, pd, strongest_v1, min_completiontime[strongest_v1]);
-    // CCcheck_val_2(val, "Failed in create_differ");
     val = set_id_and_name(pd->releasetime_child, problem->nwctdata++, pd->pname);
     CCcheck_val_2(val, "Failed in set_id_and_name");
 
@@ -3206,6 +3226,18 @@ CLEAN:
     return val;
 }
 
+static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines) {
+    int val = INT_MAX - 1;
+    if (dbl_heap_key >= 0.5) {
+        if (dbl_heap_key >= 1.0) {
+            return val;
+        }
+        return x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1) - nmachines) * 0.01));
+    }
+
+    return x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1) - nmachines) * 0.01));
+}
+
 static int insert_frac_pairs_into_heap(wctdata *pd, const double x[],
                                        int          *nodepair_refs,
                                        double       *nodepair_weights,
@@ -3249,7 +3281,7 @@ static int insert_frac_pairs_into_heap(wctdata *pd, const double x[],
             double denom        = (nodepair_weights[v1_key] + nodepair_weights[v2_key]) /
                                   2;
             double dbl_heap_key = nodepair_weights[ref_key] / denom;
-            int    int_heap_key =  dbl_heap_key >= 0.5 ? dbl_heap_key >= 1.0 ? INT_MAX - 1 : x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1) - pd->nmachines)) * 0.05) : x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1) - pd->nmachines) * 0.05));
+            int    int_heap_key =  get_int_heap_key(dbl_heap_key, v1, v2, pd->nmachines);
             val = pmcheap_insert(heap, int_heap_key + 1,
                                  (void *) & (nodepair_refs[ref_key]));
             CCcheck_val_2(val, "Failed in pmcheap_insert");
@@ -3395,6 +3427,14 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem)
 
         val = compute_lower_bound(problem, pd->diff_children);
         CCcheck_val_2(val, "Failed in compute_lower_bound");
+    }
+
+    if (pd->same_children->status != infeasible && pd->diff_children->status != infeasible) {
+        if (pd->same_children->eta_in <= pd->diff_children->eta_in) {
+            pd->same_children->choose = 1;
+        } else {
+            pd->diff_children->choose = 1;
+        }
     }
 
     free_elist(pd->same_children, &(problem->parms));
@@ -3730,10 +3770,10 @@ int branching_msg_ahv(wctdata *pd, wctproblem *problem)
     if (pd->lower_bound < pd->upper_bound) {
         CCutil_suspend_timer(&problem->tot_cputime);
         printf("Branching with lb %d (LP %f) at depth %d (id = %d, "
-               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, branch_job = %d, completion_time= %d).\n",
+               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, branch_job = %d, completion_time= %d, duetime_child= %d, releasetime = %d).\n",
                pd->lower_bound, pd->LP_lower_bound,
                pd->depth,
-               pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->branch_job, pd->completiontime);
+               pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->branch_job, pd->completiontime, is_duetime_child(pd), is_releasetime_child(pd));
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
     }
@@ -3818,7 +3858,6 @@ int sequential_branching_ahv(wctproblem *problem)
                 remove_finished_subtree_ahv(pd);
             }
 
-            /** Check for integer solutions */
         }
 
         CCutil_suspend_timer(&problem->tot_branch_and_bound);
@@ -3887,8 +3926,6 @@ int sequential_branching_conflict(wctproblem *problem)
 
                 remove_finished_subtree_conflict(pd);
             }
-
-            /** Check for integer solutions */
         }
 
         CCutil_suspend_timer(&problem->tot_branch_and_bound);
@@ -3954,7 +3991,6 @@ int sequential_cbfs_branch_and_bound_conflict(wctproblem *problem)
                 remove_finished_subtree_conflict(pd);
             }
 
-            /** Check for integer solutions */
         }
 
         CCutil_suspend_timer(&problem->tot_branch_and_bound);
@@ -4403,8 +4439,18 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
             break;
 
         case GRB_INFEASIBLE:
-            val = solve_farkas_dbl(pd);
-            CCcheck_val_2(val, "Failed in solving farkas");
+            switch (parms->solver) {
+            case bdd_solver:
+            case zdd_solver:
+                val = solve_farkas_dbl(pd);
+                CCcheck_val_2(val, "Failed in solving farkas");
+                break;
+
+            case DP_solver:
+                val = solve_farkas_dbl_DP(pd);
+                CCcheck_val_2(val, "Failed in solving farkas DP");
+            }
+
             break;
         }
 
@@ -4546,7 +4592,6 @@ MAYBE_UNUSED static int submiping(wctdata *cd)
                   "wctlp_set_all_coltypes "
                   "(this warning can be ignored if you are using "
                   "CPLEX or QSopt as an LP-solver)");
-    /* wctlp_write (cd->LP, "lpheur.lp"); */
     val = wctlp_setnodelimit(cd->LP, 1);
     CCcheck_val_2(val, "wctlp_setnodelimit failed");
     val = wctlp_optimize(cd->LP, &status);
@@ -4668,8 +4713,6 @@ int compute_schedule(wctproblem *problem)
             break;
         }
     }
-
-    execute_CG_heur(problem, root_pd);
 
     if (problem->global_lower_bound != problem->global_upper_bound) {
         CCutil_start_resume_time(&(problem->tot_branch_and_bound));
