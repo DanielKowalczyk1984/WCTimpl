@@ -16,6 +16,7 @@ extern "C" {
 
 typedef struct PricerSolver PricerSolver;
 PricerSolver *newSolver(int *p, int *w, int *r, int *d, int nbjobs, int Hmin, int Hmax);
+PricerSolver *newSolverDP(int *p, int *w, int *r, int *d, int nbjobs, int Hmin, int Hmax);
 PricerSolver *copySolver(PricerSolver *src);
 void freeSolver(PricerSolver *src);
 int calculate_table(PricerSolver *solver, wctparms *parms);
@@ -186,6 +187,7 @@ struct wctdata {
 
 
     /** Branching strategies */
+    int choose;
     /** conflict */
     int *elist_same;
     int ecount_same;
