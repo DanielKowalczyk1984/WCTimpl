@@ -20,28 +20,24 @@ class PricerSolver
         tdzdd::DataTable<PricerWeightZDD<double> > zdd_table;
         tdzdd::DataTable<PricerWeightBDD<double> > dd_table;
         tdzdd::DataTable<PricerFarkasZDD<double> > farkas_table;
+        bool use_zdd;
 
-        PricerSolver(int *_p, int *_w,  int *_r, int *_d, int njobs, int Hmin, int Hmax, bool print = false, bool reduce = false): p(_p), w(_w), r(_r), d(_d), nbjobs(njobs), H_min(Hmin), H_max(Hmax)
+        PricerSolver(int *_p, int *_w,  int *_r, int *_d, int njobs, int Hmin, int Hmax, bool _use_zdd = true): p(_p), w(_w), r(_r), d(_d), nbjobs(njobs), H_min(Hmin), H_max(Hmax), use_zdd(_use_zdd)
         {
-            PricerSpec ps(p, r, d, nbjobs, Hmin, Hmax);
-
-            if (print) {
-                std::ofstream file;
-                file.open("PricerSpec.txt");
-                ps.dumpDot(file);
-                file.close();
-            }
-
-            dd = new tdzdd::DdStructure<2>(ps);
-            zdd = new tdzdd::DdStructure<2>;
-            *zdd = *dd;
-            zdd->zddReduce();
-            init_zdd_table();
-            init_bdd_table();
-            init_table_farkas();
-            delete [] ps.sum_p;
-            delete [] ps.min_p;
+            if(use_zdd) {
+                PricerSpec ps(p, r, d, nbjobs, Hmin, Hmax);
+                dd = new tdzdd::DdStructure<2>(ps);
+                zdd = new tdzdd::DdStructure<2>;
+                *zdd = *dd;
+                zdd->zddReduce();
+                init_zdd_table();
+                init_bdd_table();
+                init_table_farkas();
+                delete [] ps.sum_p;
+                delete [] ps.min_p;
+            } 
         };
+
 
         PricerSolver(const PricerSolver &other)
         {
@@ -70,8 +66,10 @@ class PricerSolver
 
         ~PricerSolver()
         {
-            delete dd;
-            delete zdd;
+            if(use_zdd) {
+                delete dd;
+                delete zdd;
+            }
         }
 
         void create_dot_zdd(const char *name)
@@ -336,6 +334,89 @@ class PricerSolver
                         if (t >= r[j] + p[j] && t <= d[j]) {
                             if (F[j][t - p[j]] + (double) w[j]*t - pi[j] < F[j][t]) {
                                 F[i][t] = F[j][t - p[j]] + (double) w[j] * t - pi[j];
+                                A[i][t] = true;
+                            } else {
+                                F[i][t] = F[j][t];
+                                A[i][t] = false;
+                            }
+                        } else {
+                            F[i][t] = F[j][t];
+                            A[i][t] = false;
+                        }
+                    }
+                }
+
+                /** Find optimal solution */
+                opt_sol.obj = F[nbjobs][0];
+
+                for (int i =  H_min; i < H_max + 1; i++) {
+                    if (F[nbjobs][i] < opt_sol.obj) {
+                        opt_sol.C_max = i;
+                        opt_sol.obj = F[nbjobs][i];
+                    }
+                }
+
+                t_min = opt_sol.C_max;
+
+                /** Construct the solution */
+                for (int i = nbjobs; i >= 1; --i) {
+                    if (A[i][t_min] && r[i - 1] + p[i - 1] <= t_min && t_min <= d[i - 1]) {
+                        opt_sol.jobs.push_back(i - 1);
+                        opt_sol.cost += w[i - 1] * t_min;
+                        t_min -= p[i - 1];
+                    }
+                }
+
+                /** Free the memory */
+                for (int i = 0; i < nbjobs + 1; ++i) {
+                    delete[] A[i];
+                    delete[] F[i];
+                }
+
+                delete[] A;
+                delete[] F;
+                return opt_sol;
+        }
+
+        class Optimal_Solution<double> dynamic_programming_ahv_farkas(double *pi)
+        {
+                Optimal_Solution<double> opt_sol;
+                opt_sol.cost = 0;
+                double **F;
+                bool **A;
+                int t_min = H_min;
+                F = new double* [nbjobs + 1];
+                A = new bool* [nbjobs + 1];
+
+                for (int i = 0; i < nbjobs + 1; i++) {
+                    F[i] = new double [H_max + 1];
+                    A[i] = new bool [H_max + 1];
+                }
+
+                /** Initialisation */
+                F[0][0] = pi[nbjobs];
+                A[0][0] = false;
+
+                for (int t = 1; t < H_max + 1; t++) {
+                    F[0][t] = DBL_MAX / 2;
+                    A[0][t] = false;
+                }
+
+                for (int i = 1; i < nbjobs + 1; i++) {
+                    for (int t = 0; t < H_max + 1; t++) {
+                        F[i][t] = DBL_MAX / 2;
+                        A[i][t] = false;
+                    }
+                }
+
+                /** Recursion */
+                for (int i = 1; i < nbjobs + 1; i++) {
+                    int j = i - 1;
+
+                    for (int t = 0; t < H_max; t++) {
+                        if (t >= r[j] + p[j] && t <= d[j]) {
+                            if (F[j][t - p[j]]  + pi[j] < F[j][t]) {
+                                F[i][t] = F[j][t - p[j]] + pi[j];
                                 A[i][t] = true;
                             } else {
                                 F[i][t] = F[j][t];
