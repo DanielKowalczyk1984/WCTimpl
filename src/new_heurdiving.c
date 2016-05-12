@@ -360,8 +360,6 @@ int compute_objective_CG_heur(LP_data_CG_heur *data)
     CCcheck_val_2(val, "wctlp_objval failed");
     data->lower_bound = ((int) ceil(data->LP_lower_bound_dual) < (int) ceil(data->LP_lower_bound)) ? (int) ceil(data->LP_lower_bound_dual) : (int) ceil(data->LP_lower_bound) ;
 
-    printf("test %f %f\n", data->LP_lower_bound, data->LP_lower_bound_dual);
-
 CLEAN:
     return val;
 }
@@ -490,7 +488,6 @@ int compute_lower_bound_CG_heur(wctproblem *problem, LP_data_CG_heur *data)
             case stab_wentgnes:
             case stab_dynamic:
                 break_while_loop = (CC_OURABS(data->eta_out - data->eta_in) < 0.00001);
-                //break_while_loop = 1;
                 break;
 
             case no_stab:
@@ -560,8 +557,8 @@ int compute_lower_bound_CG_heur(wctproblem *problem, LP_data_CG_heur *data)
             }
 
             data->x = CC_SAFE_MALLOC(pd->ccount, double);
-            CCcheck_NULL_2(pd->x, "Failed to allocate memory to pd->x");
-            val = wctlp_x(pd->LP, data->x, 0);
+            CCcheck_NULL_2(data->x, "Failed to allocate memory to pd->x");
+            val = wctlp_x(data->LP, data->x, 0);
             CCcheck_val_2(val, "Failed in wctlp_x");
             data->status = LP_bound_computed;
             break;

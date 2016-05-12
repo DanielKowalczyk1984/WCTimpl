@@ -201,9 +201,11 @@ static int print_to_csv(wctproblem *problem)
 
     switch (parms->bb_branch_strategy) {
         case conflict_strategy:
+        case cbfs_conflict_strategy:
             sprintf(filenm, "WCT_CONFLICT_%d_%d.csv", pd->nmachines, pd->njobs);
             break;
 
+        case cbfs_ahv_strategy:
         case ahv_strategy:
             sprintf(filenm, "WCT_AHV_%d_%d.csv", pd->nmachines, pd->njobs);
             break;
