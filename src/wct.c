@@ -603,13 +603,13 @@ int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, double H)
     sumleft[0] = 0;
 
     for (i = 1; i < njobs; ++i) {
-        sumleft[i] = sumleft[i - 1] + jobarray[i].processingime;
+        sumleft[i] = sumleft[i - 1] + jobarray[i - 1].processingime;
     }
 
     sumright[njobs - 1] = jobarray[njobs - 1].processingime;
 
     for (i = njobs - 2 ; i >= 0; --i) {
-        sumright[i] = sumleft[i + 1] + jobarray[i].processingime;
+        sumright[i] = sumright[i + 1] + jobarray[i].processingime;
     }
 
     for (i = 0  ; i < njobs; ++i) {
@@ -1490,6 +1490,8 @@ static int create_duetime_ahv(wctproblem *problem, wctdata *parent_cd, wctdata *
     CCcheck_NULL_2(pd->releasetime, "Failed to allocate memory");
     pd->duetime = CC_SAFE_MALLOC(pd->njobs, int);
     CCcheck_NULL_2(pd->duetime, "Failed to allocate memory");
+    pd->ecount_same = parent_cd->ecount_same + 1;
+    pd->ecount_differ = parent_cd->ecount_differ;
     memcpy(pd->releasetime, parent_cd->releasetime, sizeof(int)*pd->njobs);
     memcpy(pd->duetime, parent_cd->duetime, sizeof(int)*pd->njobs);
     pd->duetime[branch_job] = completiontime;
@@ -2568,6 +2570,8 @@ static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_cd, wctda
     pd->dbl_safe_lower_bound = parent_cd->dbl_safe_lower_bound;
     /** adjusted release_time */
     pd->releasetime = CC_SAFE_MALLOC(pd->njobs, int);
+    pd->ecount_differ = parent_cd->ecount_differ + 1;
+    pd->ecount_same = parent_cd->ecount_same;
     CCcheck_NULL_2(pd->releasetime, "Failed to allocate memory");
     pd->duetime = CC_SAFE_MALLOC(pd->njobs, int);
     CCcheck_NULL_2(pd->duetime, "Failed to allocate memory");
@@ -2715,7 +2719,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
         double       *nodepair_weights)
 {
     int    val = 0;
-    int    max_non_improving_branches  = 3; /* pd->njobs / 100 + 1; */
+    int    max_non_improving_branches  = 2; /* pd->njobs / 100 + 1; */
     int    remaining_branches          = max_non_improving_branches;
     double strongest_dbl_lb = 0.0;
     int   *min_nodepair;
@@ -3687,6 +3691,7 @@ void insert_node_for_exploration(wctdata *pd, wctproblem *problem)
         break;
 
     case ahv_strategy:
+    case cbfs_ahv_strategy:
         trigger_lb_changes_ahv(pd);
         break;
     }
@@ -3798,6 +3803,30 @@ int branching_msg_cbfs(wctdata *pd, wctproblem *problem)
                pd->lower_bound, pd->LP_lower_bound,
                pd->depth,
                pd->id, problem->tot_cputime.cum_zeit, nb_nodes, pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2, pd->ecount_differ, pd->ecount_same
+              );
+        CCutil_resume_timer(&problem->tot_cputime);
+        problem->nb_explored_nodes++;
+    }
+
+    return 0;
+}
+
+int branching_msg_cbfs_ahv(wctdata *pd, wctproblem *problem)
+{
+    int nb_nodes = 0;
+
+    for (unsigned int i = 0; i < problem->unexplored_states->len; ++i) {
+        BinomialHeap *heap = (BinomialHeap *)(problem->unexplored_states->pdata[i]);
+        nb_nodes += binomial_heap_num_entries(heap);
+    }
+
+    if (pd->lower_bound < pd->upper_bound) {
+        CCutil_suspend_timer(&problem->tot_cputime);
+        printf("Branching with lb %d (LP %f) at depth %d (id = %d, "
+               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, branchjob = %d, completiontime = %d, nbdiff = %d, nbsame = %d ).\n",
+               pd->lower_bound, pd->LP_lower_bound,
+               pd->depth,
+               pd->id, problem->tot_cputime.cum_zeit, nb_nodes, pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->branch_job, pd->completiontime, pd->ecount_differ, pd->ecount_same
               );
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
@@ -3989,6 +4018,68 @@ int sequential_cbfs_branch_and_bound_conflict(wctproblem *problem)
                 }
 
                 remove_finished_subtree_conflict(pd);
+            }
+
+        }
+
+        CCutil_suspend_timer(&problem->tot_branch_and_bound);
+    }
+
+    CCutil_resume_timer(&problem->tot_branch_and_bound);
+
+    if (pd) {
+        printf("Branching timeout of %f second reached\n",
+               parms->branching_cpu_limit);
+    }
+
+CLEAN:
+    return val;
+}
+
+int sequential_cbfs_branch_and_bound_ahv(wctproblem *problem)
+{
+    int val = 0;
+    wctdata *pd;
+    wctparms *parms = &(problem->parms);
+    printf("ENTERED SEQUANTIAL BRANCHING CONFLICT + CBFS SEARCHING:\n");
+    CCutil_suspend_timer(&problem->tot_branch_and_bound);
+
+    while ((pd = get_next_node(problem))
+            && problem->tot_branch_and_bound.cum_zeit < parms->branching_cpu_limit) {
+        CCutil_resume_timer(&problem->tot_branch_and_bound);
+        int i;
+        pd->upper_bound = problem->global_upper_bound;
+
+        if (pd->lower_bound >= pd->upper_bound || pd->eta_in > pd->upper_bound - 1) {
+            skip_wctdata(pd, problem);
+            remove_finished_subtree_ahv(pd);
+        } else {
+            branching_msg_cbfs_ahv(pd, problem);
+
+            if (problem->maxdepth < pd->depth) {
+                problem->maxdepth = pd->depth;
+            }
+
+            val = create_branches_ahv(pd, problem);
+            CCcheck_val_2(val, "Failed at create_branches");
+
+            for (i = 0; i < pd->nduetime; i++) {
+                insert_node_for_exploration(pd->duetime_child + i, problem);
+            }
+
+            for (i = 0; i < pd->nreleasetime; i++) {
+                insert_node_for_exploration(pd->releasetime_child + i, problem);
+            }
+
+            assert(pd->lower_bound <= pd->upper_bound);
+            adapt_global_upper_bound(problem, pd->upper_bound);
+
+            if (pd->upper_bound == pd->lower_bound) {
+                if (pd->depth == 0) {
+                    problem->found = 1;
+                }
+
+                remove_finished_subtree_ahv(pd);
             }
 
         }
@@ -4709,6 +4800,7 @@ int compute_schedule(wctproblem *problem)
             break;
 
         case cbfs_conflict_strategy:
+        case cbfs_ahv_strategy:
             insert_node_for_exploration(root_pd, problem);
             break;
         }
@@ -4732,6 +4824,10 @@ int compute_schedule(wctproblem *problem)
             val = sequential_cbfs_branch_and_bound_conflict(problem);
             CCcheck_val_2(val, "Failed in CBFS conflict branching");
             break;
+
+        case cbfs_ahv_strategy:
+            val = sequential_cbfs_branch_and_bound_ahv(problem);
+            CCcheck_val_2(val, "Failed in CBFS AHV branching");
         }
 
         CCutil_stop_timer(&(problem->tot_branch_and_bound), 0);

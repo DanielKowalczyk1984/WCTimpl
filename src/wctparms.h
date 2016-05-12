@@ -78,6 +78,7 @@ enum BranchandBoundStrat{
     conflict_strategy = min_bb_strategy,
     ahv_strategy = 1,
     cbfs_conflict_strategy = 2,
+    cbfs_ahv_strategy =3,
 };
 
 enum Strong_Branching{

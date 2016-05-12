@@ -244,6 +244,8 @@ int create_branches_ahv(wctdata *pd, wctproblem *problem);
 int sequential_branching_ahv(wctproblem *problem);
 /** Conflict Branching CBFS exploration */
 int sequential_cbfs_branch_and_bound_conflict(wctproblem *problem);
+/** AHV branching CBFS exploration */
+int sequential_cbfs_branch_and_bound_ahv(wctproblem *problem);
 
 
 /*Help functions for branching*/
@@ -252,6 +254,7 @@ int skip_wctdata(wctdata *pd, wctproblem *problem);
 int branching_msg(wctdata *pd, wctproblem *problem);
 int branching_msg_wide(wctdata *pd, wctproblem *problem);
 int branching_msg_cbfs(wctdata *pd, wctproblem *problem);
+int branching_msg_cbfs_ahv(wctdata *pd, wctproblem *problem);
 int collect_same_children(wctdata *pd);
 int collect_diff_children(wctdata *pd);
 void temporary_data_free(wctdata *pd);
