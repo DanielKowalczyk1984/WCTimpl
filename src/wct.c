@@ -44,8 +44,8 @@ int debug = 0;
 static const double min_ndelrow_ratio = 0.5;
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b)
 {
-    double lp_a = (((wctdata *)a)->eta_in - ((wctdata *)a)->depth * 10000 - (((wctdata *)a)->id) % 2);
-    double lp_b = (((wctdata *)b)->eta_in - ((wctdata *)b)->depth * 10000 - (((wctdata *)b)->id) % 2);
+    double lp_a = (((wctdata *)a)->eta_in - ((wctdata *)a)->depth * 10000 - ((wctdata*)a)->id%2);
+    double lp_b = (((wctdata *)b)->eta_in - ((wctdata *)b)->depth * 10000 - ((wctdata*)b)->id%2);
 
     if (lp_a < lp_b) {
         return -1;
@@ -621,7 +621,7 @@ int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, double H)
         int nb = 0;
 
         for (j = 0; j < i; ++j) {
-            if ((jobarray[j].processingime <= temp_duration && jobarray[i].weight >= temp_weight)
+            if ((jobarray[j].processingime <= temp_duration && jobarray[j].weight > temp_weight) || (jobarray[j].processingime < temp_duration && jobarray[j].weight >= temp_weight)
                     || ((double)sumleft[j] <= H - (double) sumright[i])) {
                 temp_list = g_list_append(temp_list, jobarray + j);
                 nb++;
@@ -634,7 +634,7 @@ int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, double H)
             //int len = g_list_length(temp_list);
             int counter = 0;
 
-            for (it = temp_list; it && counter < nb - nmachines ; it = it->next) {
+            for (it = temp_list; it && counter < nb - nmachines + 1 ; it = it->next) {
                 jobarray[i].releasetime += ((Job *)it->data)->processingime;
                 counter++;
             }
@@ -652,7 +652,7 @@ int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, double H)
         GList *templist = (GList *) NULL;
 
         for (j = i + 1; j < njobs; ++j) {
-            if ((jobarray[j].processingime >= temp_duration && jobarray[i].weight <= temp_weight)
+            if ((jobarray[j].processingime >= temp_duration && jobarray[i].weight < temp_weight) || (jobarray[j].processingime > temp_duration && jobarray[i].weight <= temp_weight)
                     || (sumleft[j] >= H - sumright[i])) {
                 sum += jobarray[j].processingime;
                 templist = g_list_append(templist, jobarray + j);
@@ -2847,7 +2847,7 @@ CLEAN:
 static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd, wctproblem *problem, GList *branchnodes, int *completiontime)
 {
     int    rval = 0;
-    int    max_non_improving_branches  = 8; /* cd->njobs / 100 + 1; */
+    int    max_non_improving_branches  = 3; /* cd->njobs / 100 + 1; */
     int    remaining_branches          = max_non_improving_branches;
     double strongest_dbl_lb = 0.0;
     wctparms *parms = &(problem->parms);
@@ -3868,7 +3868,7 @@ int sequential_branching_ahv(wctproblem *problem)
 
             for (i = 0; i < pd->nduetime; i++) {
                 val = insert_into_branching_heap(pd->duetime_child + i, problem);
-                CCcheck_val_2(val, "Faield at insert_into_branching_heap");
+                CCcheck_val_2(val, "Failed at insert_into_branching_heap");
             }
 
             for (i = 0; i < pd->nreleasetime; i++) {
@@ -4481,11 +4481,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
     case GRB_INFEASIBLE:
         /** get the dual variables and make them feasible */
         val = wctlp_pi_inf(pd->LP, pd->pi);
-
-        for (int i = 0; i < pd->njobs + 1; ++i) {
-            CCcheck_val_2(val, "wctlp_pi failed");
-        }
-
+        CCcheck_val_2(val, "Failed at wctlp_pi_inf");
         break;
     }
 
@@ -4507,6 +4503,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         switch (status) {
         case GRB_OPTIMAL:
             iterations++;
+            pd->status = infeasible;
 
             if (iterations < pd->maxiterations) {
                 switch (parms->stab_technique) {
@@ -4645,7 +4642,14 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
             pd->status = infeasible;
         }
     } else  {
-        pd->status = LP_bound_estimated;
+        switch(status){
+            case GRB_OPTIMAL:
+            pd->status = LP_bound_estimated;
+            break;
+            case GRB_INFEASIBLE:
+            pd->status = infeasible;
+            break;
+        }
     }
 
     if (dbg_lvl() > 1) {
