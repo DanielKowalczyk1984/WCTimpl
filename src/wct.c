@@ -10,6 +10,7 @@ int recover_elist(wctdata *pd);
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b);
 int compare_nodes_bfs(BinomialHeapValue a, BinomialHeapValue b);
 static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines);
+static int get_int_heap_key_0(double dbl_heap_key, int v1, int v2);
 
 
 /** help functions for conflict branching */
@@ -2722,7 +2723,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
         double       *nodepair_weights)
 {
     int    val = 0;
-    int    max_non_improving_branches  = 8; /* pd->njobs / 100 + 1; */
+    int    max_non_improving_branches  = 3; /* pd->njobs / 100 + 1; */
     int    remaining_branches          = max_non_improving_branches;
     double strongest_dbl_lb = 0.0;
     int   *min_nodepair;
@@ -3233,6 +3234,7 @@ CLEAN:
     return val;
 }
 
+MAYBE_UNUSED
 static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines) {
     int val = INT_MAX - 1;
     if (dbl_heap_key >= 0.5) {
@@ -3243,6 +3245,19 @@ static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines) 
     }
 
     return x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1) - nmachines) * 0.01));
+}
+
+MAYBE_UNUSED
+static int get_int_heap_key_0(double dbl_heap_key, int v1, int v2) {
+    int val = INT_MAX - 1;
+    if (dbl_heap_key >= 0.5) {
+        if (dbl_heap_key >= 1.0) {
+            return val;
+        }
+        return x_frac( dbl_heap_key/ABS((v2 - v1)));
+    }
+
+    return x_frac(dbl_heap_key/ABS((v2 - v1)));
 }
 
 static int insert_frac_pairs_into_heap(wctdata *pd, const double x[],
