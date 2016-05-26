@@ -45,8 +45,8 @@ int debug = 0;
 static const double min_ndelrow_ratio = 0.5;
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b)
 {
-    double lp_a = (((wctdata *)a)->eta_in - ((wctdata *)a)->depth * 10000 - ((wctdata*)a)->id%2);
-    double lp_b = (((wctdata *)b)->eta_in - ((wctdata *)b)->depth * 10000 - ((wctdata*)b)->id%2);
+    double lp_a = (((wctdata *)a)->eta_in - ((wctdata *)a)->depth * 10000 );
+    double lp_b = (((wctdata *)b)->eta_in - ((wctdata *)b)->depth * 10000 );
 
     if (lp_a < lp_b) {
         return -1;
@@ -724,6 +724,7 @@ int Preprocessdata(wctproblem *problem, wctdata *pd)
     int *release_time = (int *) NULL;
     int *due_time = (int *) NULL;
     double H;
+    int sum = 0;
     jobarray = CC_SAFE_MALLOC(pd->njobs, Job);
     CCcheck_NULL_2(jobarray, "Failed to allocate memory");
     perm = CC_SAFE_MALLOC(njobs, int);
@@ -737,6 +738,7 @@ int Preprocessdata(wctproblem *problem, wctdata *pd)
     for (i = 0; i < njobs; ++i) {
         jobarray[i].weight = problem->weight[i];
         jobarray[i].processingime = problem->duration[i];
+        sum += jobarray[i].processingime;
         jobarray[i].releasetime = 0;
         jobarray[i].duetime = 0;
         jobarray[i].job = i;
@@ -753,10 +755,11 @@ int Preprocessdata(wctproblem *problem, wctdata *pd)
         jobarray[i].duetime = pd->H_max;
     }
 
-    printf("H_max = %d\n", pd->H_max);
+    printf("H_max = %d, ", pd->H_max);
     /** Calculate H_min */
     pd->H_min = calculate_Hmin(problem->duration, pd->nmachines, njobs, perm, &H);
-    printf("H_min = %d\n", pd->H_min);
+    printf("H_min = %d, ", pd->H_min);
+    printf("sum = %d\n", sum);
     /** Calculate ready times and due times */
     calculate_ready_due_times(jobarray, njobs, nmachines, H);
     problem->jobarray = jobarray;
@@ -808,7 +811,7 @@ int compute_objective(wctdata *pd, wctparms *parms)
     /** Get the LP lower bound and compute the lower bound of WCT */
     val = wctlp_objval(pd->LP, &(pd->LP_lower_bound));
     CCcheck_val_2(val, "wctlp_objval failed");
-    pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual) < (int) ceil(pd->LP_lower_bound)) ? (int) ceil(pd->LP_lower_bound_dual) : (int) ceil(pd->LP_lower_bound) ;
+    pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual - 0.00001) < (int) ceil(pd->LP_lower_bound - 0.00001)) ? (int) ceil(pd->LP_lower_bound_dual - 0.00001) : (int) ceil(pd->LP_lower_bound - 0.00001) ;
 
     if (parms->stab_technique == stab_wentgnes || parms->stab_technique == stab_dynamic) {
         pd->lower_bound = (int) ceil(pd->eta_in);
@@ -4390,8 +4393,6 @@ int build_lp(wctdata *pd, int construct)
     CCcheck_NULL_2(pd->rhs, "Failed to allocate memory");
     val = wctlp_get_rhs(pd->LP, pd->rhs);
     CCcheck_val_2(val, "Failed to get RHS");
-    val = wctlp_write(pd->LP, "test.lp");
-    CCcheck_val_2(val, "Failed in write");
 CLEAN:
 
     if (val) {
