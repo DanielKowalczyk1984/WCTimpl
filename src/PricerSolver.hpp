@@ -30,12 +30,13 @@ class PricerSolver
                 zdd = new tdzdd::DdStructure<2>;
                 *zdd = *dd;
                 zdd->zddReduce();
+                printf("size BDD = %lu, size ZDD= %lu\n", dd->size(), zdd->size());
                 init_zdd_table();
                 init_bdd_table();
                 init_table_farkas();
                 delete [] ps.sum_p;
                 delete [] ps.min_p;
-            } 
+            }
         };
 
 
@@ -167,13 +168,12 @@ class PricerSolver
                 int cur_job = nbjobs - i;
 
                 for (size_t j = 0; j < m; j++) {
-                    std::vector<int>::iterator it =  zdd_table[i][j].weight.begin();
                     tdzdd::NodeId cur_node_0 = handler.privateEntity().child(i, j, 0);
                     tdzdd::NodeId cur_node_1 = handler.privateEntity().child(i, j, 1);
 
-                    for (; it != zdd_table[i][j].weight.end(); it++) {
-                        zdd_table[cur_node_0.row()][cur_node_0.col()].add_weight(*it);
-                        zdd_table[cur_node_1.row()][cur_node_1.col()].add_weight(*it + p[cur_job]);
+                    for (auto &it: zdd_table[i][j].info_node) {
+                        zdd_table[cur_node_0.row()][cur_node_0.col()].add_weight(it.first);
+                        zdd_table[cur_node_1.row()][cur_node_1.col()].add_weight(it.first+ p[cur_job]);
                     }
                 }
             }

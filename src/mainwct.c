@@ -349,13 +349,8 @@ int main(int ac, char **av)
     CCutil_suspend_timer(&(problem.tot_build_dd));
 
     /** Construct Feasible solutions */
-    switch (parms->construct) {
-        case yes_construct:
+    if (parms->nb_feas_sol > 0) {
             construct_feasible_solutions(&problem);
-            break;
-
-        case no_construct:
-            break;
     }
 
     /** Compute Schedule with Branch and Price */

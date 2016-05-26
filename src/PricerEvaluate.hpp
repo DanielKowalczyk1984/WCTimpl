@@ -9,6 +9,13 @@
 #include <boost/dynamic_bitset.hpp>
 #include <boost/unordered_map.hpp>
 
+template<typename T>
+struct node
+{
+    T obj;
+    bool take;
+};
+
 /**
  * ZDD
  */
@@ -148,9 +155,7 @@ template<typename T>
 class PricerWeightZDD
 {
     public:
-        std::unordered_map<int, T> obj;
-        std::unordered_map<int, bool> take;
-        std::vector<int> weight;
+        std::unordered_map<int, node<T> > info_node;
 
         PricerWeightZDD()
         {
@@ -160,42 +165,18 @@ class PricerWeightZDD
         {
         }
 
-        /*void alloc_node(const std::vector<int> *v)
-        {
-            int max = *std::max_element(v->begin(), v->end());
-            obj = new T[max + 1];
-            take = new bool[max + 1];
-            weight = v;
-
-            for (auto &i : *v) {
-                take[i] = false;
-            }
-        }*/
-
-        /*void alloc_terminal_node(int H_min, int H_max, int H, int one)
-        {
-            int end = one ? H_max + 1 : H;
-            obj = new T[end];
-            take = new bool[end];
-
-            for (int i = one ? H_min : 0; i < H_max + 1 ; i++) {
-                obj[i] = one ? 0 : -1871286761.0;
-            }
-        }*/
-
         void add_weight(int _weight){
-            if(obj.find(_weight) == obj.end()) {
-                weight.push_back(_weight);
-                obj[_weight] = 0.0;
-                take[_weight] = false;
+            if(info_node.find(_weight) == info_node.end()) {
+                info_node[_weight].obj = 0.0;
+                info_node[_weight].take = false;
             }
         }
 
         void init_terminal_node(int j, int H_max){
             int end = j ? H_max + 1 : 2*H_max;
             for(size_t i = 0; i < end;i++){
-                obj[i] = j ? 0.0 : -1871286761.0;
-                take[i] = false;
+                info_node[i].obj = j ? 0.0 : -1871286761.0;
+                info_node[i].take = false;
             }
         }
 
@@ -526,8 +507,8 @@ class WeightZDD: public tdzdd::DdEval<E, PricerWeightZDD<T>, Optimal_Solution<T>
 
         void evalTerminal(PricerWeightZDD<T> &n)
         {
-            for (int i = 0 ; i < 2000; i++) {
-                n.obj[i] = pi[nbjobs];
+            for(auto &it: n.info_node){
+                it.second.obj = pi[nbjobs];
             }
         }
 
@@ -538,22 +519,28 @@ class WeightZDD: public tdzdd::DdEval<E, PricerWeightZDD<T>, Optimal_Solution<T>
             PricerWeightZDD<T> *n0 = values.get_ptr(0);
             PricerWeightZDD<T> *n1 = values.get_ptr(1);
 
-            for (auto &it : (n->weight)) {
-                if (n0->obj[it] >= n1->obj[it + p[j]] - (T) w[j] * (it + p[j]) + pi[j]) {
-                    n->obj[it] = n0->obj[it];
-                    n->take[it] = false;
+
+            for(auto &it:n->info_node){
+                int weight = (it.first);
+                T obj0 = n0->info_node[weight].obj;
+                T obj1 = n1->info_node[weight + p[j]].obj;
+
+                if(obj0 >= obj1 - w[j]*(weight + p[j]) + pi[j]) {
+                    it.second.obj = obj0;
+                    it.second.take = false;
                 } else {
-                    n->obj[it] = n1->obj[it + p[j]] - (T) w[j] * (it + p[j]) + pi[j];
-                    n->take[it] = true;
+                    it.second.obj = obj1 - w[j]*(weight + p[j]) + pi[j];
+                    it.second.take = true;
                 }
             }
         }
 
         void initializenode(PricerWeightZDD<T> &n)
         {
-            for (auto &i : (n.weight)) {
-                n.take[i] = false;
-                n.obj[i] = 0.0;
+
+            for (auto &it:n.info_node){
+                it.second.obj = 0.0;
+                it.second.take = false;
             }
         }
 
@@ -561,13 +548,13 @@ class WeightZDD: public tdzdd::DdEval<E, PricerWeightZDD<T>, Optimal_Solution<T>
         {
             Optimal_Solution<T> sol;
             sol.C_max = 0;
-            sol.obj = (*data_table)[f->row()][f->col()].obj[sol.C_max];
+            sol.obj = (*data_table)[f->row()][f->col()].info_node[sol.C_max].obj;
             sol.cost = 0;
             tdzdd::NodeId cur_node = *f;
             int j = nbjobs - cur_node.row();
 
             while (cur_node.row() != 0) {
-                if ((*data_table)[cur_node.row()][cur_node.col()].take[sol.C_max] &&  r[j] <= sol.C_max && sol.C_max + p[j] <= d[j]) {
+                if ((*data_table)[cur_node.row()][cur_node.col()].info_node[sol.C_max].take &&  r[j] <= sol.C_max && sol.C_max + p[j] <= d[j]) {
                     sol.jobs.push_back(j);
                     cur_node = diagram.privateEntity().child(cur_node, 1);
                     sol.C_max += p[j];

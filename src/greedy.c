@@ -203,10 +203,10 @@ static int add_feasible_solution(wctproblem *problem, solution *new_sol)
         update_bestschedule(problem, new_sol);
         scatter_search->p->PSize++;
 
-        if (root_pd->ccount == 0) {
+        if (root_pd->ccount == 0 && problem->parms.construct != 0) {
             update_Schedulesets(&root_pd->cclasses, &root_pd->ccount, problem->bestschedule, problem->nbestschedule);
             root_pd->gallocated = root_pd->ccount;
-        } else {
+        } else if (problem->parms.construct != 0) {
             partlist_to_Scheduleset(new_sol->part, new_sol->nmachines, new_sol->njobs, &(root_pd->newsets), &(root_pd->nnewsets));
             add_newsets(root_pd);
         }
