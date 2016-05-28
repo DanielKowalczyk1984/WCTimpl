@@ -811,7 +811,7 @@ int compute_objective(wctdata *pd, wctparms *parms)
     /** Get the LP lower bound and compute the lower bound of WCT */
     val = wctlp_objval(pd->LP, &(pd->LP_lower_bound));
     CCcheck_val_2(val, "wctlp_objval failed");
-    pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual - 0.00001) < (int) ceil(pd->LP_lower_bound - 0.00001)) ? (int) ceil(pd->LP_lower_bound_dual - 0.00001) : (int) ceil(pd->LP_lower_bound - 0.00001) ;
+    pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual) < (int) ceil(pd->LP_lower_bound)) ? (int) ceil(pd->LP_lower_bound_dual) : (int) ceil(pd->LP_lower_bound) ;
 
     if (parms->stab_technique == stab_wentgnes || parms->stab_technique == stab_dynamic) {
         pd->lower_bound = (int) ceil(pd->eta_in);

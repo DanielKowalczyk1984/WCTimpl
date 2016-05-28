@@ -125,7 +125,7 @@ CLEAN:
         wctdata *pd = data->pd;
         Optimal_Solution<double> s = pd->solver->dynamic_programming_ahv(data->pi);
 
-        if (s.obj < -0.000001) {
+        if (s.obj < -0.00001) {
             val = construct_sol<double, true>(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
             CCcheck_val_2(val, "Failed in constructing sol");
         } else {
@@ -141,7 +141,7 @@ CLEAN:
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_farkas_double(pd->pi);
 
-        if (s.obj < -0.000001) {
+        if (s.obj < -0.00001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
             CCcheck_val_2(val, "Failed in constructing jobs");
         } else {
@@ -157,7 +157,7 @@ CLEAN:
         int val = 0;
         Optimal_Solution<double> s = pd->solver->dynamic_programming_ahv_farkas(pd->pi);
 
-        if (s.obj < -0.000001) {
+        if (s.obj < -0.00001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
             CCcheck_val_2(val, "Failed in constructing jobs");
         } else {
@@ -174,7 +174,7 @@ CLEAN:
         wctdata *pd = data->pd;
         Optimal_Solution<double> s = pd->solver->solve_farkas_double(data->pi);
 
-        if (s.obj < -0.000001) {
+        if (s.obj < -0.00001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
             CCcheck_val_2(val, "Failed in constructing jobs");
         } else {
@@ -190,7 +190,7 @@ CLEAN:
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_bdd_double(pd->pi);
 
-        if (s.obj > 0.000001) {
+        if (s.obj > 0.00001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
             CCcheck_val_2(val, "Failed in construction")
         } else {
@@ -207,7 +207,7 @@ CLEAN:
         wctdata *pd = data->pd;
         Optimal_Solution<double> s = pd->solver->solve_weight_bdd_double(data->pi);
 
-        if (s.obj > 0.000001) {
+        if (s.obj > 0.00001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
             CCcheck_val_2(val, "Failed in construction")
         } else {
@@ -223,7 +223,7 @@ CLEAN:
         int val = 0;
         Optimal_Solution<double> s = pd->solver->solve_weight_zdd_double(pd->pi);
 
-        if (s.obj > 0.000001) {
+        if (s.obj > 0.00001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
             CCcheck_val_2(val, "Failed in construction")
         } else {
@@ -240,7 +240,7 @@ CLEAN:
         wctdata *pd = data->pd;
         Optimal_Solution<double> s = pd->solver->solve_weight_zdd_double(data->pi);
 
-        if (s.obj > 0.0000001) {
+        if (s.obj > 0.00001) {
             val = construct_sol(&(pd->newsets), &(pd->nnewsets), pd->duration, s, pd->njobs);
             CCcheck_val_2(val, "Failed in construction")
         } else {
