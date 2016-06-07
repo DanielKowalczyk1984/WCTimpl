@@ -139,8 +139,8 @@ class PricerSpec: public tdzdd::DdSpec<PricerSpec, int, 2>
 class ConflictConstraints: public tdzdd::DdSpec<ConflictConstraints, conflict_state, 2>
 {
         int nbjobs;
-        std::vector<boost::dynamic_bitset<>> differsets;
-        std::vector<boost::dynamic_bitset<>> samesets;
+        std::vector<boost::dynamic_bitset<> > differsets;
+        std::vector<boost::dynamic_bitset<> > samesets;
 
         bool takeable(int job, conflict_state &state)
         {
@@ -166,16 +166,16 @@ class ConflictConstraints: public tdzdd::DdSpec<ConflictConstraints, conflict_st
             differsets.resize(_nbjobs);
             samesets.resize(_nbjobs);
 
-            for (size_t i = 0; i < _nbjobs; i++) {
+            for (int i = 0; i < _nbjobs; i++) {
                 differsets[i].resize(_nbjobs);
                 samesets[i].resize(_nbjobs);
             }
 
-            for (size_t i = 0; i < ecount_same; ++i) {
+            for (int i = 0; i < ecount_same; ++i) {
                 samesets[elist_same[2 * i]][elist_same[2 * i + 1]] = 1;
             }
 
-            for (size_t i = 0; i < ecount_differ; ++i) {
+            for (int i = 0; i < ecount_differ; ++i) {
                 differsets[elist_differ[2 * i]][elist_differ[2 * i + 1]] = 1;
             }
         };

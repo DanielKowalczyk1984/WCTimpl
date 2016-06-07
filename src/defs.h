@@ -28,7 +28,7 @@
 extern "C" {
 #endif
 
-#define NDEBUG
+//#define NDEBUG
 
 #ifdef __GNUC__
 #define MAYBE_UNUSED __attribute__((used))

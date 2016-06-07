@@ -49,12 +49,12 @@ class PricerInfoZDD
             }
         }
 
-        size_t get_max(const int &L)
+        int get_max(const int &L)
         {
             T max = obj[0];
-            size_t it_max = 0;
+            int it_max = 0;
 
-            for (size_t i = 0; i < L; ++i) {
+            for (int i = 0; i < L; ++i) {
                 if (max < obj[i]) {
                     max = obj[i];
                     it_max = i;
@@ -174,7 +174,7 @@ class PricerWeightZDD
 
         void init_terminal_node(int j, int H_max){
             int end = j ? H_max + 1 : 2*H_max;
-            for(size_t i = 0; i < end;i++){
+            for(int i = 0; i < end;i++){
                 info_node[i].obj = j ? 0.0 : -1871286761.0;
                 info_node[i].take = false;
             }
@@ -327,7 +327,7 @@ class DurationZDD: public tdzdd::DdEval<E, PricerInfoZDD<T>, Optimal_Solution<T>
             n.cost = new int [L + 1];
             n.A = new boost::dynamic_bitset<> [L + 1];
 
-            for (unsigned i = 0; i < L + 1; ++i) {
+            for (int i = 0; i < L + 1; ++i) {
                 n.obj[i] = -10983290.0;
                 n.A[i].resize(nbjobs);
                 n.cost[i] = 0;
@@ -340,7 +340,7 @@ class DurationZDD: public tdzdd::DdEval<E, PricerInfoZDD<T>, Optimal_Solution<T>
             n.cost = new int [L + 1];
             n.A = new boost::dynamic_bitset<> [L + 1];
 
-            for (unsigned i = 0; i < L + 1; ++i) {
+            for (int i = 0; i < L + 1; ++i) {
                 n.obj[i] = pi[nbjobs];
                 n.A[i].resize(nbjobs);
                 n.cost[i] = 0;
@@ -671,7 +671,7 @@ class FarkasZDD: public tdzdd::DdEval<E, PricerFarkasZDD<T>, Optimal_Solution<T>
             n.take = false;
         }
 
-        Optimal_Solution<T> get_objective(tdzdd::NodeTableHandler<2> diagram, tdzdd::DataTable<PricerFarkasZDD<T>> *data_table, const tdzdd::NodeId *f)
+        Optimal_Solution<T> get_objective(tdzdd::NodeTableHandler<2> diagram, tdzdd::DataTable<PricerFarkasZDD<T> > *data_table, const tdzdd::NodeId *f)
         {
             Optimal_Solution<T> sol;
             sol.obj = (*data_table)[f->row()][f->col()].obj;
