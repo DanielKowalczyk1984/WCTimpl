@@ -16,9 +16,13 @@ include_directories(${GUROBI_INCLUDE_DIR} ${GLIB_INCLUDE_DIRS} ${Boost_INCLUDE_D
 
 SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-SET(CMAKE_C_FLAGS " -std=c99 -O5 -D_XOPEN_SOURCE=500 -pedantic -Wall -Wshadow -W -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wpointer-arith -Wnested-externs -Wundef -Wcast-qual -Wcast-align -Wwrite-strings")
+SET(CMAKE_CXX_FLAGS_RELEASE "-O5 -Wall -D_XOPEN_SOURCE=500 -std=c++11")
 
-SET(CMAKE_CXX_FLAGS " -std=c++11 -O5")
+SET(CMAKE_C_FLAGS_RELEASE "-O5 -Wall -D_XOPEN_SOURCE=500 -pedantic -std=c99")
+
+SET(CMAKE_CXX_FLAGS_DEBUG "-O5 -Wall -D_XOPEN_SOURCE=500 -std=c++11")
+
+SET(CMAKE_C_FLAGS_DEBUG "-O5 -Wall -D_XOPEN_SOURCE=500 -pedantic -std=c99")
 
 FILE(GLOB SOURCE  "src/*.c" "src/*.cc")
 
