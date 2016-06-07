@@ -69,5 +69,10 @@ src/.DS_Store
 buildmac/*
 buildlinux/*
 
+macrelease/*
+macdebug/*
+linuxrelease/*
+linuxdebug/*
+
 scripts/*
 
