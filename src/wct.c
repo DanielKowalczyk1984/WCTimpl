@@ -45,8 +45,20 @@ int debug = 0;
 static const double min_ndelrow_ratio = 0.5;
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b)
 {
-    double lp_a = (((wctdata *)a)->eta_in - ((wctdata *)a)->depth * 10000 );
-    double lp_b = (((wctdata *)b)->eta_in - ((wctdata *)b)->depth * 10000 );
+    double lp_a = (((wctdata *)a)->LP_lower_bound - ((wctdata *)a)->depth * 10000 - ((wctdata *)a)->id%2);
+    double lp_b = (((wctdata *)b)->LP_lower_bound - ((wctdata *)b)->depth * 10000 - ((wctdata *)b)->id%2);
+
+    if (lp_a < lp_b) {
+        return -1;
+    } else {
+        return 1;
+    }
+}
+
+int compare_nodes_dfs_ahv(BinomialHeapValue a, BinomialHeapValue b)
+{
+    double lp_a = (((wctdata *)a)->LP_lower_bound - ((wctdata *)a)->depth * 10000 );
+    double lp_b = (((wctdata *)b)->LP_lower_bound - ((wctdata *)b)->depth * 10000 );
 
     if (lp_a < lp_b) {
         return -1;
@@ -330,7 +342,19 @@ void wctproblem_init(wctproblem *problem)
     /*heap initialization*/
     problem->br_heap = (pmcheap *) NULL;
     pmcheap_init(&(problem->br_heap), 1000);
-    problem->br_heap_a = binomial_heap_new(BINOMIAL_HEAP_TYPE_MIN, compare_nodes_dfs);
+    switch(problem->parms.bb_branch_strategy){
+        case conflict_strategy:
+            problem->br_heap_a = binomial_heap_new(BINOMIAL_HEAP_TYPE_MIN, compare_nodes_dfs);
+        break;
+        case ahv_strategy:
+            problem->br_heap_a = binomial_heap_new(BINOMIAL_HEAP_TYPE_MIN, compare_nodes_dfs_ahv);
+        break;
+        case cbfs_conflict_strategy:
+        case cbfs_ahv_strategy:
+            problem->br_heap_a = (BinomialHeap *) NULL;
+        break;
+
+    }
     problem->unexplored_states = g_ptr_array_new();
     problem->non_empty_level_pqs = g_queue_new();
     problem->last_explored = -1;
@@ -359,7 +383,9 @@ void wctproblem_free(wctproblem *problem)
     wctdata_free(&(problem->root_pd));
     /*free the heap*/
     pmcheap_free(problem->br_heap);
-    binomial_heap_free(problem->br_heap_a);
+    if(problem->br_heap_a != (BinomialHeap *) NULL) {
+        binomial_heap_free(problem->br_heap_a);
+    }
 
     for (unsigned int i = 0; i < problem->unexplored_states->len; ++i) {
         if ((problem->unexplored_states->pdata[i]) != (BinomialHeap *) NULL) {
@@ -3221,7 +3247,7 @@ static int grab_int_sol(wctdata *pd, double *x, double tolerance)
     print_schedule(pd->bestcolors, pd->nbbest);
     printf("with total weight %d\n", tot_weighted);
     assert(fabs((double)tot_weighted -  incumbent) <=
-           integral_incumbent_tolerance);
+           0.00001);
 
     if (tot_weighted < pd->upper_bound) {
         pd->upper_bound = tot_weighted;
@@ -3257,10 +3283,10 @@ static int get_int_heap_key_0(double dbl_heap_key, int v1, int v2) {
         if (dbl_heap_key >= 1.0) {
             return val;
         }
-        return x_frac( dbl_heap_key/ABS((v2 - v1)));
+        return x_frac( dbl_heap_key / ABS((v2 - v1)));
     }
 
-    return x_frac(dbl_heap_key/ABS((v2 - v1)));
+    return x_frac(dbl_heap_key / ABS((v2 - v1)));
 }
 
 static int insert_frac_pairs_into_heap(wctdata *pd, const double x[],
@@ -4509,9 +4535,9 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
             && !break_while_loop
             && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit) {
         /** delete old columns */
-        if (pd->dzcount > pd->njobs * min_ndelrow_ratio && status == GRB_OPTIMAL) {
-            val = delete_old_cclasses(pd);
-        }
+        // if (pd->dzcount > pd->njobs * min_ndelrow_ratio && status == GRB_OPTIMAL) {
+        //     val = delete_old_cclasses(pd);
+        // }
 
         /** Solve the pricing problem*/
         CCutil_start_resume_time(&problem->tot_pricing);
@@ -4658,11 +4684,11 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
             pd->status = infeasible;
         }
     } else  {
-        switch(status){
-            case GRB_OPTIMAL:
+        switch (status) {
+        case GRB_OPTIMAL:
             pd->status = LP_bound_estimated;
             break;
-            case GRB_INFEASIBLE:
+        case GRB_INFEASIBLE:
             pd->status = infeasible;
             break;
         }
