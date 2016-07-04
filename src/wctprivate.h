@@ -265,7 +265,6 @@ struct wctproblem {
     Scheduleset *bestschedule;
     int nbestschedule;
     /*heap variables*/
-    pmcheap *br_heap;
     BinomialHeap *br_heap_a;
     GPtrArray *unexplored_states;
     GQueue *non_empty_level_pqs;
