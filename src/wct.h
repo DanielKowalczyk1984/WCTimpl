@@ -246,6 +246,8 @@ int sequential_branching_ahv(wctproblem *problem);
 int sequential_cbfs_branch_and_bound_conflict(wctproblem *problem);
 /** AHV branching CBFS exploration */
 int sequential_cbfs_branch_and_bound_ahv(wctproblem *problem);
+/** Initialize BB tree */
+void init_BB_tree(wctproblem *problem);
 
 
 /*Help functions for branching*/
