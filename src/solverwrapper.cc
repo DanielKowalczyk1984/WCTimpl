@@ -474,7 +474,7 @@ CLEAN:
 
     double compute_lagrange(Optimal_Solution<double> &sol, double *rhs, double *pi, int nbjobs, int nbmachines)
     {
-        double result = pi[nbjobs];
+        double result = 0;
         double a = 0.0;
         int i;
         std::vector<int> *v = &(sol.jobs);
@@ -487,7 +487,7 @@ CLEAN:
             a += rhs[i] * pi[i];
         }
 
-        a += rhs[nbjobs] * pi[nbjobs];
+        //a += rhs[nbjobs] * pi[nbjobs];
         result = CC_MIN(0.0, sol.cost - result);
         result = rhs[nbjobs] * result;
         result += a;
