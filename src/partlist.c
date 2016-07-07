@@ -98,6 +98,7 @@ int partlist_insert(partlist *part, joblist *jlist, Job *job)
     jlist[job->job].part = part;
     g_queue_push_tail(part->list, job);
     part->completiontime += job->processingime;
+    part->totcompweight += part->completiontime*job->weight;
 CLEAN:
     return val;
 }
