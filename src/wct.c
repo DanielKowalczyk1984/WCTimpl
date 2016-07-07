@@ -6,10 +6,12 @@
 #include "heurdiving.h"
 #include "new_heurdiving.h"
 
+#define MEAN_ERROR 0.55
+
 int recover_elist(wctdata *pd);
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b);
 int compare_nodes_bfs(BinomialHeapValue a, BinomialHeapValue b);
-static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines);
+static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines, double error);
 static int get_int_heap_key_0(double dbl_heap_key, int v1, int v2);
 int build_lp_part(wctdata *pd);
 
@@ -46,10 +48,12 @@ int debug = 0;
 static const double min_ndelrow_ratio = 0.5;
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b)
 {
-    double lp_a = (((wctdata *)a)->LP_lower_bound - ((wctdata *)a)->depth * 10000 - ((wctdata *)a)->id%2);
-    double lp_b = (((wctdata *)b)->LP_lower_bound - ((wctdata *)b)->depth * 10000 - ((wctdata *)b)->id%2);
+    wctdata *x = (wctdata *)a;
+    wctdata *y = (wctdata *)b;
+    double lp_a = (x->LP_lower_bound - x->depth * 10000 - (x->id%2));
+    double lp_b = (y->LP_lower_bound - y->depth * 10000 - (y->id%2));
 
-    if (lp_a < lp_b) {
+    if (lp_a < lp_b) {  
         return -1;
     } else {
         return 1;
@@ -604,7 +608,7 @@ static void inodepair_ref_key(int *v1, int *v2, int index)
 MAYBE_UNUSED
 static int x_frac(const double x)
 {
-    double mean = 0.55;
+    double mean = MEAN_ERROR;
     double frac = fabs(x - mean);
     assert(frac <= 1.0);
     return (int)(frac * (double) INT_MAX);
@@ -2753,7 +2757,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
         double       *nodepair_weights)
 {
     int    val = 0;
-    int    max_non_improving_branches  = 8; /* pd->njobs / 100 + 1; */
+    int    max_non_improving_branches  = 4; /* pd->njobs / 100 + 1; */
     int    remaining_branches          = max_non_improving_branches;
     double strongest_dbl_lb = -115648465146;
     int   *min_nodepair;
@@ -2783,7 +2787,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
             CCcheck_val_2(val, "Failed in create_same");
 
             if (same_children->status != infeasible) {
-                same_children->maxiterations = 5;
+                same_children->maxiterations = 20;
                 compute_lower_bound(problem, same_children);
             }
 
@@ -2791,7 +2795,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
             CCcheck_val_2(val, "Failed in create_differ");
 
             if (diff_children->status != infeasible) {
-                diff_children->maxiterations = 5;
+                diff_children->maxiterations = 20;
                 compute_lower_bound(problem, diff_children);
             }
 
@@ -3265,16 +3269,17 @@ CLEAN:
 }
 
 MAYBE_UNUSED
-static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines) {
+static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines, double error) {
     int val = INT_MAX - 1;
-    if (dbl_heap_key >= 0.55) {
+    double error2 = ABS(MEAN_ERROR - dbl_heap_key)/(dbl_heap_key);
+    if (dbl_heap_key >= MEAN_ERROR) {
         if (dbl_heap_key >= 1.0) {
             return val;
         }
-        return x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1) - nmachines) * 0.01));
+        return x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1) -nmachines) * error2));
     }
 
-    return x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1) - nmachines) * 0.05));
+    return x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1) - nmachines) * error2));
 }
 
 MAYBE_UNUSED
@@ -3299,6 +3304,7 @@ static int insert_frac_pairs_into_heap(wctdata *pd, const double x[],
     int val = 0;
     int i;
     int ref_key;
+    double error = 1.0/pd->gallocated;
 
     for (i = 0; i < pd->ccount; ++i) {
         int j;
@@ -3333,13 +3339,12 @@ static int insert_frac_pairs_into_heap(wctdata *pd, const double x[],
             double denom        = (nodepair_weights[v1_key] + nodepair_weights[v2_key]) /
                                   2;
             double dbl_heap_key = nodepair_weights[ref_key] / denom;
-            int    int_heap_key =  get_int_heap_key(dbl_heap_key, v1, v2, pd->nmachines);
+            int    int_heap_key =  get_int_heap_key(dbl_heap_key, v1, v2, pd->nmachines, error);
             val = pmcheap_insert(heap, int_heap_key + 1,
                                  (void *) & (nodepair_refs[ref_key]));
             CCcheck_val_2(val, "Failed in pmcheap_insert");
         }
     }
-
     if (dbg_lvl()) {
         printf("Size of frac heap is %d\n", pmcheap_size(heap));
     }
@@ -3804,10 +3809,10 @@ int branching_msg(wctdata *pd, wctproblem *problem)
     if (pd->lower_bound < pd->upper_bound) {
         CCutil_suspend_timer(&problem->tot_cputime);
         printf("Branching with lb %d (LP %f) at depth %d (id = %d, "
-               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, v1 = %d, v2 = %d, nbdiff = %d, nbsame = %d, ZDD size= %lu ).\n",
+               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, v1 = %d, v2 = %d, nbdiff = %d, nbsame = %d, ZDD size= %lu, nb_cols = %d ).\n",
                pd->lower_bound, pd->LP_lower_bound,
                pd->depth,
-               pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2, pd->ecount_differ, pd->ecount_same, get_datasize(pd->solver));
+               pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2, pd->ecount_differ, pd->ecount_same, get_datasize(pd->solver),pd->ccount);
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
     }
@@ -4798,9 +4803,9 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         }
     }
 
-    //if (dbg_lvl() > 1) {
+    if (dbg_lvl() > 1) {
         printf("iterations = %d\n", iterations);
-    //}
+    }
 
     fflush(stdout);
     problem->nb_generated_col += iterations;
