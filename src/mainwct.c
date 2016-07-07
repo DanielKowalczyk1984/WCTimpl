@@ -205,8 +205,8 @@ static int print_to_csv(wctproblem *problem)
             sprintf(filenm, "WCT_CONFLICT_%d_%d.csv", pd->nmachines, pd->njobs);
             break;
 
-        case cbfs_ahv_strategy:
         case ahv_strategy:
+        case cbfs_ahv_strategy:
             sprintf(filenm, "WCT_AHV_%d_%d.csv", pd->nmachines, pd->njobs);
             break;
     }
@@ -223,17 +223,17 @@ static int print_to_csv(wctproblem *problem)
     size = ftell(file);
 
     if (size == 0) {
-        fprintf(file, "%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n", "NameInstance", "tot_real_time", "tot_cputime",
+        fprintf(file, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", "NameInstance", "tot_real_time", "tot_cputime",
                 "tot_lb",
                 "tot_lb_root",
                 "tot_lb_lp",
                 "tot_branch_and_bound", "tot_scatter_search", "tot_build_dd", "tot_pricing",
                 "rel_error", "status", "global_lower_bound", "global_upper_bound",
                 "first_lower_bound", "first_upper_bound", "first_rel_error", "solved_at_root",
-                "nb_explored_nodes", "nb_generated_col", "data");
+                "nb_explored_nodes", "nb_generated_col", "date");
     }
 
-    fprintf(file, "%s;%f;%f;%f;%f;%f;%f;%f;%f;%f;%f;%d;%d;%d;%d;%d;%f;%d;%d;%d;%d/%d/%d\n", pd->pname,
+    fprintf(file, "%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%d,%d,%d,%d,%f,%d,%d,%d,%d/%d/%d\n", pd->pname,
             problem->real_time,
             problem->tot_cputime.cum_zeit,
             problem->tot_lb.cum_zeit,
@@ -350,7 +350,7 @@ int main(int ac, char **av)
 
     /** Construct Feasible solutions */
     if (parms->nb_feas_sol > 0) {
-            construct_feasible_solutions(&problem);
+        construct_feasible_solutions(&problem);
     }
 
     /** Compute Schedule with Branch and Price */
@@ -359,8 +359,8 @@ int main(int ac, char **av)
     /** Print all the information to screen and csv */
     if (problem.parms.print) {
         print_to_csv(&problem);
-        print_to_screen(&problem);
     }
+    print_to_screen(&problem);
 
 CLEAN:
     wctproblem_free(&problem);
