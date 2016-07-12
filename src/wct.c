@@ -6,7 +6,7 @@
 #include "heurdiving.h"
 #include "new_heurdiving.h"
 
-#define MEAN_ERROR 0.55
+#define MEAN_ERROR 0.6
 
 int recover_elist(wctdata *pd);
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b);
@@ -50,8 +50,8 @@ int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b)
 {
     wctdata *x = (wctdata *)a;
     wctdata *y = (wctdata *)b;
-    double lp_a = (x->LP_lower_bound - x->depth * 10000 - (x->id%2));
-    double lp_b = (y->LP_lower_bound - y->depth * 10000 - (y->id%2));
+    double lp_a = (x->LP_lower_bound - x->depth * 10000 - 0.5*(x->id%2));
+    double lp_b = (y->LP_lower_bound - y->depth * 10000 - 0.5*(y->id%2));
 
     if (lp_a < lp_b) {  
         return -1;
@@ -684,7 +684,7 @@ int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, double H)
 
         for (j = i + 1; j < njobs; ++j) {
             if ((jobarray[j].processingime >= temp_duration && jobarray[i].weight < temp_weight) || (jobarray[j].processingime > temp_duration && jobarray[i].weight <= temp_weight)
-                    || (sumleft[j] >= H - sumright[i])) {
+                    || (sumleft[i] <= H - (double)sumright[j])) {
                 sum += jobarray[j].processingime;
                 templist = g_list_append(templist, jobarray + j);
             }
@@ -740,7 +740,7 @@ int calculate_Hmin(int *durations, int nmachines, int njobs, int *perm, double *
 
     temp = (double) val;
     *H = temp / (double)nmachines;
-    val = (int) ceil(*H);
+    val = (int) floor(*H);
     return val;
 }
 
@@ -3276,7 +3276,7 @@ static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines, 
         if (dbl_heap_key >= 1.0) {
             return val;
         }
-        return x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1) -nmachines) * error2));
+        return x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1) - nmachines) * error2));
     }
 
     return x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1) - nmachines) * error2));
