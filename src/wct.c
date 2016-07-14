@@ -6,7 +6,7 @@
 #include "heurdiving.h"
 #include "new_heurdiving.h"
 
-#define MEAN_ERROR 0.6
+#define MEAN_ERROR 0.55
 
 int recover_elist(wctdata *pd);
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b);
@@ -3276,10 +3276,10 @@ static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines, 
         if (dbl_heap_key >= 1.0) {
             return val;
         }
-        return x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1) - nmachines) * error2));
+        return x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1) - nmachines) * 0.01));
     }
 
-    return x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1) - nmachines) * error2));
+    return x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1) - nmachines) * 0.05));
 }
 
 MAYBE_UNUSED
