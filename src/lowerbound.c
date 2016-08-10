@@ -5,8 +5,7 @@ int gcd(int x, int y);
 int gcd_weight(int n, Job *a);
 int gcd_duration(int n, Job *a);
 
-int gcd(int x, int y)
-{
+int gcd(int x, int y) {
     int wk;
 
     if (x < y) {
@@ -25,8 +24,7 @@ int gcd(int x, int y)
 }
 
 
-int gcd_weight(int n, Job *a)
-{
+int gcd_weight(int n, Job *a) {
     if (n == 1) {
         return a[0].weight;
     }
@@ -39,8 +37,7 @@ int gcd_weight(int n, Job *a)
     return gcd(gcd_weight(h, a + (h - 1)), gcd_weight(n - h, a + h));
 }
 
-int gcd_duration(int n, Job *a)
-{
+int gcd_duration(int n, Job *a) {
     if (n == 1) {
         return a[0].processingime;
     }
@@ -53,8 +50,7 @@ int gcd_duration(int n, Job *a)
     return gcd(gcd_duration(h, a + (h - 1)), gcd_duration(n - h, a + h));
 }
 
-int compare_cw(BinomialHeapValue a, BinomialHeapValue b)
-{
+int compare_cw(BinomialHeapValue a, BinomialHeapValue b) {
     double *aw = &(((MACHINE *)a)->totcompletion);
     double *bw = &(((MACHINE *)b)->totcompletion);
 
@@ -65,8 +61,7 @@ int compare_cw(BinomialHeapValue a, BinomialHeapValue b)
     }
 }
 
-int lowerbound_cw(Job *array, int njobs, int nmachines)
-{
+int lowerbound_cw(Job *array, int njobs, int nmachines) {
     int val = 0;
     int i, j;
     double temp;
@@ -130,8 +125,7 @@ int lowerbound_cw(Job *array, int njobs, int nmachines)
     return val;
 }
 
-int lowerbound_cp(Job *array, int njobs, int nmachines)
-{
+int lowerbound_cp(Job *array, int njobs, int nmachines) {
     int val = 0;
     int i, j;
     double temp;
@@ -193,8 +187,7 @@ int lowerbound_cp(Job *array, int njobs, int nmachines)
     return val;
 }
 
-int lowerbound_eei(Job *array, int njobs, int nmachines)
-{
+int lowerbound_eei(Job *array, int njobs, int nmachines) {
     int val = 0;
     int i;
     int C1 = 0;
@@ -211,13 +204,13 @@ int lowerbound_eei(Job *array, int njobs, int nmachines)
         C1 += array[i].weight * C;
     }
 
-    lowerbound = (double) C1 / (double) nmachines + (double)(nmachines - 1) / (2.0 * (double)nmachines) * (double)Cn;
+    lowerbound = (double) C1 / (double) nmachines + (double)(nmachines - 1) /
+                 (2.0 * (double)nmachines) * (double)Cn;
     val = (int) ceil(lowerbound);
     return val;
 }
 
-int lowerbound_ak(Job *array, int njobs, int nmachines)
-{
+int lowerbound_ak(Job *array, int njobs, int nmachines) {
     int i, val = 0;
     int *perm_p = (int *) NULL;
     int *perm_w = (int *) NULL;

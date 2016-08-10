@@ -6,34 +6,42 @@
 #include "heurdiving.h"
 #include "new_heurdiving.h"
 
-#define MEAN_ERROR 0.55
+#define MEAN_ERROR 0.5
 
 int recover_elist(wctdata *pd);
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b);
 int compare_nodes_bfs(BinomialHeapValue a, BinomialHeapValue b);
-static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines, double error);
+static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines,
+                            int njobs,
+                            double error);
 static int get_int_heap_key_0(double dbl_heap_key, int v1, int v2);
 int build_lp_part(wctdata *pd);
 
 
 /** help functions for conflict branching */
-static int create_same_conflict(wctproblem *problem, wctdata *parent_pd, wctdata **child, int v1, int v2);
-static int create_differ_conflict(wctproblem *problem, wctdata *parent_pd, wctdata **child, int v1, int v2);
+static int create_same_conflict(wctproblem *problem, wctdata *parent_pd,
+                                wctdata **child, int v1, int v2);
+static int create_differ_conflict(wctproblem *problem, wctdata *parent_pd,
+                                  wctdata **child, int v1, int v2);
 static int collect_same_child_conflict(wctdata *cd);
 static int collect_diff_child_conflict(wctdata *cd);
 static int remove_finished_subtree_conflict(wctdata *child);
 static int trigger_lb_changes_conflict(wctdata *child);
 /** help functions for wide branching */
-static int create_same_wide(wctproblem *problem, wctdata *parent_pd, int *wide_v1, int *wide_v2, int nbwide);
-static int create_diff_wide(wctproblem *problem, wctdata *parent_pd, int v1, int v2);
+static int create_same_wide(wctproblem *problem, wctdata *parent_pd,
+                            int *wide_v1, int *wide_v2, int nbwide);
+static int create_diff_wide(wctproblem *problem, wctdata *parent_pd, int v1,
+                            int v2);
 static int collect_diff_child_wide(wctdata *cd);
 static int collect_same_child_wide(wctdata *cd);
 static int remove_finished_subtree_wide(wctdata *child);
 //static int trigger_lb_changes_wide(wctdata *child);
 /** help functions for ahv branching */
 int branching_msg_ahv(wctdata *pd, wctproblem *problem);
-static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_pd, wctdata **child, int branch_job, int completion_time);
-static int create_duetime_ahv(wctproblem *problem, wctdata *parent_pd, wctdata **child, int branch_job, int completiontime);
+static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_pd,
+                                  wctdata **child, int branch_job, int completion_time);
+static int create_duetime_ahv(wctproblem *problem, wctdata *parent_pd,
+                              wctdata **child, int branch_job, int completiontime);
 static int collect_duetime_child_ahv(wctdata *pd);
 static int collect_releasetime_child_ahv(wctdata *pd);
 static int remove_finished_subtree_ahv(wctdata *pd);
@@ -46,24 +54,11 @@ static int submiping(wctdata *cd);
 int debug = 0;
 
 static const double min_ndelrow_ratio = 0.5;
-int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b)
-{
+int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b) {
     wctdata *x = (wctdata *)a;
     wctdata *y = (wctdata *)b;
-    double lp_a = (x->LP_lower_bound - x->depth * 10000 - 0.5*(x->id%2));
-    double lp_b = (y->LP_lower_bound - y->depth * 10000 - 0.5*(y->id%2));
-
-    if (lp_a < lp_b) {  
-        return -1;
-    } else {
-        return 1;
-    }
-}
-
-int compare_nodes_dfs_ahv(BinomialHeapValue a, BinomialHeapValue b)
-{
-    double lp_a = (((wctdata *)a)->LP_lower_bound - ((wctdata *)a)->depth * 10000 );
-    double lp_b = (((wctdata *)b)->LP_lower_bound - ((wctdata *)b)->depth * 10000 );
+    double lp_a = (x->LP_lower_bound_BB - x->depth * 10000 - 0.5 * (x->id % 2));
+    double lp_b = (y->LP_lower_bound_BB - y->depth * 10000 - 0.5 * (y->id % 2));
 
     if (lp_a < lp_b) {
         return -1;
@@ -72,8 +67,18 @@ int compare_nodes_dfs_ahv(BinomialHeapValue a, BinomialHeapValue b)
     }
 }
 
-int compare_nodes_bfs(BinomialHeapValue a, BinomialHeapValue b)
-{
+int compare_nodes_dfs_ahv(BinomialHeapValue a, BinomialHeapValue b) {
+    double lp_a = (((wctdata *)a)->LP_lower_bound - ((wctdata *)a)->depth * 10000);
+    double lp_b = (((wctdata *)b)->LP_lower_bound - ((wctdata *)b)->depth * 10000);
+
+    if (lp_a < lp_b) {
+        return -1;
+    } else {
+        return 1;
+    }
+}
+
+int compare_nodes_bfs(BinomialHeapValue a, BinomialHeapValue b) {
     double *lp_a = &(((wctdata *)a)->eta_in);
     double *lp_b = &(((wctdata *)b)->eta_in);
 
@@ -85,12 +90,10 @@ int compare_nodes_bfs(BinomialHeapValue a, BinomialHeapValue b)
 }
 
 /*Information about debug*/
-int dbg_lvl()
-{
+int dbg_lvl() {
     return debug;
 }
-void set_dbg_lvl(int dbglvl)
-{
+void set_dbg_lvl(int dbglvl) {
     debug = dbglvl;
 }
 
@@ -99,8 +102,7 @@ void set_dbg_lvl(int dbglvl)
  */
 static int permute_nodes(int *invorder, int njobs, int *duration,
                          int *weight, int **durationlist, int **weightlist);
-int read_problem(char *f, int *njobs, int **durationlist, int **weightlist)
-{
+int read_problem(char *f, int *njobs, int **durationlist, int **weightlist) {
     int i, val = 0;
     int nbjobs = 0,  prob = 0;
     int curduration, curweight, curjob = 0;
@@ -224,8 +226,7 @@ CLEAN:
 }
 
 static int permute_nodes(int *invorder, int njobs,  int *duration,
-                         int *weights, int **durationlist, int **weightlist)
-{
+                         int *weights, int **durationlist, int **weightlist) {
     int i, val = 0;
     int *idurationlist = (int *) NULL, *iweightlist = (int *) NULL;
     iweightlist = CC_SAFE_MALLOC(njobs, int);
@@ -252,8 +253,7 @@ CLEAN:
 
 /** Printing sizes of ZDD */
 MAYBE_UNUSED
-static int print_size_to_csv(wctproblem *problem, wctdata *pd)
-{
+static int print_size_to_csv(wctproblem *problem, wctdata *pd) {
     int val = 0;
     int size;
     wctdata *root_node = &(problem->root_pd);
@@ -294,10 +294,12 @@ static int print_size_to_csv(wctproblem *problem, wctdata *pd)
                     "nb_diff",
                     "v1",
                     "v2",
-                    "data");
+                    "date");
         }
 
-        fprintf(file, "%s;%d;%lu;%d;%d;%d;%d;%d/%d/%d\n", root_node->pname, pd->depth, get_datasize(pd->solver), pd->ecount_same, pd->ecount_differ, pd->v1, pd->v2, date.day, date.month, date.year);
+        fprintf(file, "%s;%d;%lu;%d;%d;%d;%d;%d/%d/%d\n", root_node->pname, pd->depth,
+                get_datasize(pd->solver), pd->ecount_same, pd->ecount_differ, pd->v1, pd->v2,
+                date.day, date.month, date.year);
         break;
 
     case ahv_strategy:
@@ -308,7 +310,9 @@ static int print_size_to_csv(wctproblem *problem, wctdata *pd)
                     "data");
         }
 
-        fprintf(file, "%s;%d;%lu;%d;%d;%d/%d/%d\n", root_node->pname, pd->depth, get_datasize(pd->solver), pd->branch_job, pd->completiontime, date.day, date.month, date.year);
+        fprintf(file, "%s;%d;%lu;%d;%d;%d/%d/%d\n", root_node->pname, pd->depth,
+                get_datasize(pd->solver), pd->branch_job, pd->completiontime, date.day,
+                date.month, date.year);
         break;
     }
 
@@ -318,8 +322,7 @@ CLEAN:
 }
 
 /*Functions for initialization of the problem and freeing the problem*/
-void wctproblem_init(wctproblem *problem)
-{
+void wctproblem_init(wctproblem *problem) {
     /** Job data */
     problem->duration = (int *) NULL;
     problem->weight = (int *) NULL;
@@ -365,30 +368,34 @@ void wctproblem_init(wctproblem *problem)
     SS_init(&problem->scatter_search, 15, 10, 0.1);
 }
 
-void init_BB_tree(wctproblem *problem){
-    switch(problem->parms.bb_branch_strategy){
-        case conflict_strategy:
-            problem->br_heap_a = binomial_heap_new(BINOMIAL_HEAP_TYPE_MIN, compare_nodes_dfs);
+void init_BB_tree(wctproblem *problem) {
+    switch (problem->parms.bb_branch_strategy) {
+    case conflict_strategy:
+        problem->br_heap_a = binomial_heap_new(BINOMIAL_HEAP_TYPE_MIN,
+                                               compare_nodes_dfs);
         break;
-        case ahv_strategy:
-            problem->br_heap_a = binomial_heap_new(BINOMIAL_HEAP_TYPE_MIN, compare_nodes_dfs_ahv);
+
+    case ahv_strategy:
+        problem->br_heap_a = binomial_heap_new(BINOMIAL_HEAP_TYPE_MIN,
+                                               compare_nodes_dfs_ahv);
         break;
-        case cbfs_conflict_strategy:
-        case cbfs_ahv_strategy:
-            problem->br_heap_a = (BinomialHeap *) NULL;
+
+    case cbfs_conflict_strategy:
+    case cbfs_ahv_strategy:
+        problem->br_heap_a = (BinomialHeap *) NULL;
         break;
 
     }
 }
 
-void wctproblem_free(wctproblem *problem)
-{
+void wctproblem_free(wctproblem *problem) {
     int n = problem->root_pd.njobs;
     /*free the parameters*/
     wctparms_free(&(problem->parms));
     wctdata_free(&(problem->root_pd));
+
     /*free the heap*/
-    if(problem->br_heap_a != (BinomialHeap *) NULL) {
+    if (problem->br_heap_a != (BinomialHeap *) NULL) {
         binomial_heap_free(problem->br_heap_a);
     }
 
@@ -422,8 +429,7 @@ void wctproblem_free(wctproblem *problem)
 }
 
 /*Functions for initialization and free the data*/
-void wctdata_init(wctdata *pd)
-{
+void wctdata_init(wctdata *pd) {
     /*Initialization B&B data*/
     pd->id = -1;
     pd->depth = 0;
@@ -511,8 +517,7 @@ void wctdata_init(wctdata *pd)
     heur_init(pd);
 }
 
-static void free_elist(wctdata *cd, wctparms *parms)
-{
+static void free_elist(wctdata *cd, wctparms *parms) {
     if (cd->parent && parms->delete_elists) {
         CC_IFFREE(cd->elist_same, int);
         CC_IFFREE(cd->elist_differ, int);
@@ -522,8 +527,7 @@ static void free_elist(wctdata *cd, wctparms *parms)
     }
 }
 
-void lpwctdata_free(wctdata *pd)
-{
+void lpwctdata_free(wctdata *pd) {
     if (pd->LP) {
         wctlp_free(&(pd->LP));
     }
@@ -552,8 +556,7 @@ void lpwctdata_free(wctdata *pd)
     pd->ccount = 0;
 }
 
-void children_data_free(wctdata *pd)
-{
+void children_data_free(wctdata *pd) {
     int i;
 
     for (i = 0; i < pd->nsame; ++i) {
@@ -570,14 +573,12 @@ void children_data_free(wctdata *pd)
     pd->nsame = pd->ndiff = 0;
 }
 
-void temporary_data_free(wctdata *pd)
-{
+void temporary_data_free(wctdata *pd) {
     children_data_free(pd);
     lpwctdata_free(pd);
 }
 
-void wctdata_free(wctdata *pd)
-{
+void wctdata_free(wctdata *pd) {
     Schedulesets_free(&(pd->bestcolors), &(pd->nbbest));
     temporary_data_free(pd);
     CC_IFFREE(pd->elist_same, int);
@@ -590,8 +591,7 @@ void wctdata_free(wctdata *pd)
 }
 
 /** help functions for heap srong branching */
-static int nodepair_ref_key(int v1, int v2)
-{
+static int nodepair_ref_key(int v1, int v2) {
     /* We store only the elements of the upper right triangle within the
      vcount x vcount matrix. */
     assert(v1 <= v2);
@@ -599,16 +599,14 @@ static int nodepair_ref_key(int v1, int v2)
 }
 
 /** compute row-index v1 and column-index v2 from array-index.*/
-static void inodepair_ref_key(int *v1, int *v2, int index)
-{
+static void inodepair_ref_key(int *v1, int *v2, int index) {
     *v2 = (int) floor(sqrt(2 * ((double)index) + 0.25) - 0.5);
     *v1 = index - (*v2 * (*v2 + 1) / 2);
 }
 
 MAYBE_UNUSED
-static int x_frac(const double x)
-{
-    double mean = MEAN_ERROR;
+static int x_frac(const double x, double error) {
+    double mean = error;
     double frac = fabs(x - mean);
     assert(frac <= 1.0);
     return (int)(frac * (double) INT_MAX);
@@ -616,19 +614,499 @@ static int x_frac(const double x)
 
 
 /** Preprocess data*/
-gint compare_readytime(gconstpointer a, gconstpointer b)
-{
+gint compare_readytime(gconstpointer a, gconstpointer b) {
     const int *x = &(((const Job *)a)->processingime);
     const int *y = &(((const Job *)b)->processingime);
     return (*x - *y);
 }
 
-int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, double H)
-{
+int lowerbound_0(GList *list, int nb, int nmachines) {
+    int val = 0;
+    int counter = 0;
+    GList *it = list;
+
+    for (; it && counter < nb - nmachines + 1 ; it = it->next) {
+        val += ((Job *)it->data)->processingime;
+        counter++;
+    }
+
+    val = (int) ceil((double)val / (double)nmachines);
+
+    return val;
+}
+
+int lowerbound_0_duetime(GList *list, int p, int nb, int nmachines) {
+    int val = p;
+    int counter = 0;
+    GList *it = list;
+
+    for (; it ; it = it->next) {
+        val += ((Job *)it->data)->processingime;
+        counter++;
+    }
+
+    val = (int) ceil((double)val / (double)nmachines);
+
+    return val;
+}
+
+int lowerbound_1(GList *list, int nb, int nmachines) {
+    int val = 0;
+    int counter = 0;
+    GList *it = list;
+
+    for (; it && counter < nb - nmachines + 1 ; it = it->next) {
+        int p = ((Job *)it->data)->processingime;
+        val = (p > val) ? p : val;
+        counter++;
+    }
+
+    return val;
+}
+
+int lowerbound_1_duetime(GList *list, int p, int nb, int nmachines) {
+    int val = p;
+    int counter = 0;
+    GList *it = list;
+
+    for (; it ; it = it->next) {
+        int tmp_p = ((Job *)it->data)->processingime;
+        val = (tmp_p > val) ? tmp_p : val;
+        counter++;
+    }
+
+    return val;
+}
+
+int lowerbound_2(GList *list, int nb, int nmachines) {
+    int val = 0;
+    int counter = 0;
+    int *tmpweights = CC_SAFE_MALLOC(nb - nmachines + 1 , int);
+    GList *it = list;
+
+    for (; it && counter < nb - nmachines + 1 ; it = it->next) {
+        int p = ((Job *)it->data)->processingime;
+        tmpweights[counter] = p;
+        counter++;
+    }
+
+    val = tmpweights[quickselect(tmpweights, nb - nmachines + 1, nmachines - 1)];
+    val += tmpweights[quickselect(tmpweights, nb - nmachines + 1, nmachines)];
+
+    CC_IFFREE(tmpweights, int)
+    return val;
+}
+
+int lowerbound_2_duetime(GList *list, int p, int nb, int nmachines) {
+    int val = 0;
+    int counter = 0;
+    int *tmpweights = CC_SAFE_MALLOC(nb + 1 , int);
+    GList *it = list;
+    tmpweights[counter++] = p;
+
+    for (; it ; it = it->next) {
+        int tmp_p = ((Job *)it->data)->processingime;
+        tmpweights[counter] = tmp_p;
+        counter++;
+    }
+
+    val = tmpweights[quickselect(tmpweights, nb  + 1, nmachines - 1)];
+    val += tmpweights[quickselect(tmpweights, nb  + 1, nmachines)];
+
+    CC_IFFREE(tmpweights, int)
+    return val;
+}
+
+int lowerbound_FS(int n, int *weights, int capacity, int k) {
+    int i, j, l, val = 0;
+    double *dbl_weights = (double *) NULL;
+    double *epsilon = (double *) NULL;
+    double **u = (double **) NULL;
+    double *inv_k = (double *) NULL;
+    double *SJ1 = (double *)NULL;
+    double *SJ2 = (double *)NULL;
+    dbl_weights = CC_SAFE_MALLOC(n + 1, double);
+    CCcheck_NULL(dbl_weights, "Failed to allocate memory");
+    epsilon = CC_SAFE_MALLOC(n + 1 , double);
+    CCcheck_NULL(epsilon, "Failed to allocate memory");
+    u = CC_SAFE_MALLOC(k, double *);
+    CCcheck_NULL(u, "Failed to allocate memory");
+    inv_k = CC_SAFE_MALLOC(k, double);
+    CCcheck_NULL(inv_k, "Failed to allocate memory");
+    SJ1 = CC_SAFE_MALLOC(k, double);
+    CCcheck_NULL(SJ1, "Failed to allocate memory");
+    SJ2 = CC_SAFE_MALLOC(k, double);
+    CCcheck_NULL(SJ2, "Failed to allocate memory");
+
+    for (i = 0; i < k; i++) {
+        u[i] = CC_SAFE_MALLOC(n + 1, double);
+        u[i][n] = .0;
+        inv_k[i] = (double)1 / (i + 2);
+    }
+
+    dbl_weights[n] = .0;
+    epsilon[n] = .0;
+
+    for (i = 0; i < n; i++) {
+        dbl_weights[i] = nextafter((double) weights[i] / capacity, 0.0);
+    }
+
+    i = 0;
+
+    while (dbl_weights[i] > 0.5 && i != n) {
+        i++;
+    }
+
+    if (i == 0) {
+        double tmp_dbl = .0;
+
+        for (j = 0; j < n; j++) {
+            tmp_dbl += dbl_weights[j];
+        }
+
+        val = (int)ceil(tmp_dbl);
+    } else {
+        int j1 = 0;
+        fill_dbl(SJ1, k, .0);
+
+        while (dbl_weights[j1] > 1.0 - dbl_weights[i]) {
+            epsilon[j1] = 1.0;
+
+            for (j = 0 ; j < k; j++) {
+                u[j][j1] = 1.0;
+                SJ1[j] += u[j][j1];
+            }
+
+            j1++;
+
+            if (j1 == i) {
+                break;
+            }
+        }
+
+        fill_dbl(SJ2, k, .0);
+
+        for (j = j1; j < i; j++) {
+            epsilon[j] = dbl_weights[j];
+
+            for (l = 0; l < k; l++) {
+                if (trunc(epsilon[j] * (l + 3)) == epsilon[j] * (l + 3)) {
+                    u[l][j] = epsilon[j];
+                } else {
+                    u[l][j] = floor((l + 3) * epsilon[j]) * inv_k[l];
+                }
+
+                SJ2[l] += u[l][j];
+            }
+        }
+
+        int j2 = i;
+
+        while (dbl_weights[j2 + 1] == dbl_weights[j2]) {
+            epsilon[j2 + 1] = epsilon[j2];
+
+            for (l = 0; l < k; l++) {
+                u[l][j2 + 1] = u[l][j2];
+                SJ2[l] += u[l][j2];
+            }
+
+            j2++;
+        }
+
+        do {
+            for (l = 0; l < k; l++) {
+                val = CC_MAX(val, (int)ceil(SJ1[l] + SJ2[l]));
+            }
+
+            j2++;
+
+            if (j2 < n) {
+                double tmp_epsilon = dbl_weights[j2];
+                epsilon[j2] = dbl_weights[j2];
+
+                for (l = 0; l < k; l++) {
+                    if (trunc(epsilon[j2] * (l + 3)) == epsilon[j2] * (l + 3)) {
+                        u[l][j2] = epsilon[j2];
+                    } else {
+                        u[l][j2] = floor((l + 3) * epsilon[j2]) * inv_k[l];
+                    }
+                }
+
+                while (dbl_weights[j2 + 1] == dbl_weights[j2]) {
+                    epsilon[j2 + 1] = epsilon[j2];
+
+                    for (l = 0; l < k; l++) {
+                        u[l][j2 + 1] = u[l][j2];
+                        SJ2[l] += u[l][j2];
+                    }
+
+                    j2++;
+                }
+
+                while (j1 > 0 && dbl_weights[j1 - 1] <= 1.0 - tmp_epsilon) {
+                    j1--;
+                    epsilon[j1] = dbl_weights[j1];
+
+                    for (l = 0; l < k; l++) {
+                        SJ1[l] -= u[l][j1];
+
+                        if (trunc(epsilon[j1] * (l + 3)) == epsilon[j1] * (l + 3)) {
+                            u[l][j1] = epsilon[j1];
+                        } else {
+                            u[l][j1] = floor((l + 3) * epsilon[j1]) * inv_k[l];
+                        }
+
+                        SJ2[l] += u[l][j1];
+                    }
+                }
+            }
+        } while (j2 <= n);
+    }
+
+    CC_IFFREE(dbl_weights, double);
+    CC_IFFREE(epsilon, double);
+
+    for (l = 0; l < k; l++) {
+        CC_IFFREE(u[l], double);
+    }
+
+    CC_IFFREE(u, double *);
+    CC_IFFREE(inv_k, double);
+    CC_IFFREE(SJ1, double);
+    CC_IFFREE(SJ2, double);
+    return val;
+}
+
+int FS_lowerbound_readytime(GList *list, int nb, int nmachines, int H_max) {
+    int val = 0;
+    int counter = 0;
+    int L = 0;
+    int U = H_max;
+    int *tmpweights = CC_SAFE_MALLOC(nb - nmachines + 1, int);
+    GList *it = list;
+
+    for (; it && counter < nb - nmachines + 1 ; it = it->next) {
+        int p = ((Job *)it->data)->processingime;
+        tmpweights[counter] = p;
+        counter++;
+    }
+
+    while (L < U) {
+        int c  = (int) floor((double)(L + U) / 2);
+        int n = lowerbound_FS(nb - nmachines + 1, tmpweights, c, 100);
+
+        if (n > nmachines) {
+            L = c + 1;
+            val = L;
+        } else {
+            U = c;
+        }
+    }
+
+    CC_IFFREE(tmpweights, int);
+    return val;
+}
+
+int FS_lowerbound_duetime(GList *list, int p, int nb, int nmachines,
+                          int H_max) {
+    int val = 0;
+    int counter = 0;
+    int L = 0;
+    int U = H_max;
+    int *tmpweights = CC_SAFE_MALLOC(nb + 1 , int);
+    tmpweights[counter++] = p;
+    GList *it = list;
+
+    for (; it ; it = it->next) {
+        int tmp_p = ((Job *)it->data)->processingime;
+        tmpweights[counter] = tmp_p;
+        counter++;
+    }
+
+    while (L < U) {
+        int c  = (int) floor((double)(L + U) / 2);
+        int n = lowerbound_FS(nb + 1, tmpweights, c, 100);
+
+        if (n > nmachines) {
+            L = c + 1;
+            val = L;
+        } else {
+            U = c;
+        }
+    }
+
+    CC_IFFREE(tmpweights, int)
+    return val;
+}
+
+
+int lowerbound_MT(int n, int *weights, int capacity) {
+    int val = 0;
+    int i = 0;
+    int *temp_weights = (int *)NULL;
+    temp_weights = CC_SAFE_MALLOC(n + 1, int);
+    CCcheck_NULL(temp_weights, "Failed to allocate memory to temp_weights");
+    memcpy(temp_weights, weights, n * sizeof(int));
+    temp_weights[n] = 0;
+
+    while (temp_weights[i] > capacity / 2 && i != n) {
+        i++;
+    }
+
+    if (i == 0) {
+        for (int j = 0; j < n; j++) {
+            val += weights[j];
+        }
+
+        val = (int)ceil((double)val / capacity);
+    } else {
+        int CJ12 = i;
+        int SJ = 0;
+
+        for (int  j = i; j < n; j++) {
+            SJ += temp_weights[j];
+        }
+
+        int j1 = 0;
+
+        while (temp_weights[j1] > capacity - temp_weights[i]) {
+            j1++;
+
+            if (j1 == i) {
+                break;
+            }
+        }
+
+        int CJ2 = i - j1;
+        int SJ2 = 0;
+        int SJ2beta = 0;
+
+        for (int j = j1; j < i; j++) {
+            SJ2 += temp_weights[j];
+            SJ2beta += floor((double)((capacity - temp_weights[j]) / (temp_weights[j])));
+        }
+
+        int j2 = i;
+        int SJ3 = temp_weights[j2];
+        int CJ3 = 1;
+
+        while (temp_weights[j2 + 1] == temp_weights[j2]) {
+            j2++;
+            SJ3 += temp_weights[j2];
+            CJ3++;
+        }
+
+        val = CJ12;
+
+        do {
+            int p = temp_weights[j2 - 1];
+            int term1 = CC_MAX((int)ceil((double)(SJ3 + SJ2) / capacity - CJ2), 0);
+            val = CC_MAX(val, CJ12 + term1);
+            int term2 = CC_MAX((int)ceil((double)(CJ3 - SJ2beta) / (floor((
+                                             double)capacity / p))), 0);
+            val = CC_MAX(val, CJ12 + term2);
+            j2++;
+
+            if (j2 <= n - 1) {
+                SJ3 += temp_weights[j2];
+                CJ3++;
+                p = temp_weights[j2];
+
+                while (temp_weights[j2 + 1] == temp_weights[j2]) {
+                    j2++;
+                    SJ3 += temp_weights[j2];
+                    CJ3++;
+                }
+
+                while (j1 > 0 && temp_weights[j1 - 1] <= capacity - p) {
+                    j1--;
+                    CJ2++;
+                    SJ2 += temp_weights[j1];
+                }
+
+                SJ2beta = 0;
+
+                for (int j = j1; j < i; ++j) {
+                    SJ2beta += floor((double)((capacity - temp_weights[j]) / (p)));
+                }
+            }
+        } while (j2 <= n);
+    }
+
+    CC_IFFREE(temp_weights, int);
+    return val;
+}
+
+int MT_lowerbound_readytime(GList *list, int nb, int nmachines, int H_max) {
+    int val = 0;
+    int counter = 0;
+    int L = 0;
+    int U = H_max;
+    int *tmpweights = CC_SAFE_MALLOC(nb - nmachines + 1, int);
+    GList *it = list;
+
+    for (; it && counter < nb - nmachines + 1 ; it = it->next) {
+        int p = ((Job *)it->data)->processingime;
+        tmpweights[counter] = p;
+        counter++;
+    }
+
+    while (L < U) {
+        int c  = (int) floor((double)(L + U) / 2);
+        int n = lowerbound_MT(nb - nmachines + 1, tmpweights, c);
+
+        if (n > nmachines) {
+            L = c + 1;
+            val = L;
+        } else {
+            U = c;
+        }
+    }
+
+    CC_IFFREE(tmpweights, int);
+    return val;
+}
+
+
+int MT_lowerbound_duetime(GList *list, int p, int nb, int nmachines,
+                          int H_max) {
+    int val = 0;
+    int counter = 0;
+    int L = 0;
+    int U = H_max;
+    int *tmpweights = CC_SAFE_MALLOC(nb + 1 , int);
+    tmpweights[counter++] = p;
+    GList *it = list;
+
+    for (; it ; it = it->next) {
+        int tmp_p = ((Job *)it->data)->processingime;
+        tmpweights[counter] = tmp_p;
+        counter++;
+    }
+
+    while (L < U) {
+        int c  = (int) floor((double)(L + U) / 2);
+        int n = lowerbound_MT(nb + 1, tmpweights, c);
+
+        if (n > nmachines) {
+            L = c + 1;
+            val = L;
+        } else {
+            U = c;
+        }
+    }
+
+    CC_IFFREE(tmpweights, int)
+    return val;
+}
+
+int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines,
+                              double H) {
     int i, j, val = 0;
     int *sumleft = (int *) NULL;
     int *sumright = (int *) NULL;
     int temp_duration, temp_weight;
+    //int H_max = jobarray[0].duetime;
     sumleft = CC_SAFE_MALLOC(njobs, int);
     CCcheck_NULL_2(sumleft, "Failed to, allocate memory");
     sumright = CC_SAFE_MALLOC(njobs, int);
@@ -652,7 +1130,9 @@ int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, double H)
         int nb = 0;
 
         for (j = 0; j < i; ++j) {
-            if ((jobarray[j].processingime <= temp_duration && jobarray[j].weight > temp_weight) || (jobarray[j].processingime < temp_duration && jobarray[j].weight >= temp_weight)
+            if ((jobarray[j].processingime <= temp_duration &&
+                    jobarray[j].weight > temp_weight) ||
+                    (jobarray[j].processingime < temp_duration && jobarray[j].weight >= temp_weight)
                     || ((double)sumleft[j] <= H - (double) sumright[i])) {
                 temp_list = g_list_append(temp_list, jobarray + j);
                 nb++;
@@ -660,17 +1140,17 @@ int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, double H)
         }
 
         if (nb > nmachines - 1) {
-            //temp_list = g_list_sort(temp_list, compare_readytime);
-            GList *it;
-            //int len = g_list_length(temp_list);
-            int counter = 0;
+            temp_list = g_list_sort(temp_list, compare_readytime);
 
-            for (it = temp_list; it && counter < nb - nmachines + 1 ; it = it->next) {
-                jobarray[i].releasetime += ((Job *)it->data)->processingime;
-                counter++;
+            jobarray[i].releasetime = CC_MAX(lowerbound_0(temp_list, nb, nmachines),
+                                             lowerbound_1(temp_list, nb, nmachines));
+
+            if (nb  - nmachines + 1 > nmachines) {
+                int tmp = lowerbound_2(temp_list,  nb,  nmachines);
+                //tmp = CC_MAX(tmp, MT_lowerbound_readytime(temp_list, nb, nmachines, H_max));
+                jobarray[i].releasetime = tmp > jobarray[i].releasetime ? tmp :
+                                          jobarray[i].releasetime ;
             }
-
-            jobarray[i].releasetime = ceil((double) jobarray[i].releasetime / (double) nmachines);
         }
 
         jobarray[i].due_list = temp_list;
@@ -679,18 +1159,29 @@ int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, double H)
     for (i = 0; i < njobs; ++i) {
         temp_duration = jobarray[i].processingime;
         temp_weight = jobarray[i].weight;
-        int sum = jobarray[i].processingime;
+        int nb = 0;
         GList *templist = (GList *) NULL;
 
         for (j = i + 1; j < njobs; ++j) {
-            if ((jobarray[j].processingime >= temp_duration && jobarray[i].weight < temp_weight) || (jobarray[j].processingime > temp_duration && jobarray[i].weight <= temp_weight)
+            if ((jobarray[j].processingime >= temp_duration &&
+                    jobarray[i].weight < temp_weight) ||
+                    (jobarray[j].processingime > temp_duration && jobarray[i].weight <= temp_weight)
                     || (sumleft[i] <= H - (double)sumright[j])) {
-                sum += jobarray[j].processingime;
                 templist = g_list_append(templist, jobarray + j);
+                nb++;
             }
         }
 
-        int delta = (int)((double)jobarray[i].duetime - ceil((double)sum / (double) nmachines)) + jobarray[i].processingime;
+        int tmp = CC_MAX(lowerbound_0_duetime(templist, temp_duration, nb, nmachines),
+                         lowerbound_1_duetime(templist, temp_duration, nb, nmachines));
+
+        if (nb > nmachines - 1) {
+            tmp = CC_MAX(tmp, lowerbound_2_duetime(templist, temp_duration, nb, nmachines));
+            //tmp = CC_MAX(tmp, FS_lowerbound_duetime(templist, temp_duration, nb, nmachines, H_max));
+            //tmp = CC_MAX(tmp, MT_lowerbound_duetime(templist, temp_duration, nb, nmachines, H_max));
+        }
+
+        int delta = jobarray[i].duetime - tmp + jobarray[i].processingime;
 
         if (delta < jobarray[i].duetime) {
             jobarray[i].duetime = delta;
@@ -705,8 +1196,7 @@ CLEAN:
     return val;
 }
 
-int calculate_Hmax(int *durations, int nmachines, int njobs)
-{
+int calculate_Hmax(int *durations, int nmachines, int njobs) {
     int i, max = 0, val = 0;
     double temp;
 
@@ -725,8 +1215,8 @@ int calculate_Hmax(int *durations, int nmachines, int njobs)
     return val;
 }
 
-int calculate_Hmin(int *durations, int nmachines, int njobs, int *perm, double *H)
-{
+int calculate_Hmin(int *durations, int nmachines, int njobs, int *perm,
+                   double *H) {
     int i, val = 0;
     double temp;
 
@@ -744,8 +1234,7 @@ int calculate_Hmin(int *durations, int nmachines, int njobs, int *perm, double *
     return val;
 }
 
-int Preprocessdata(wctproblem *problem, wctdata *pd)
-{
+int Preprocessdata(wctproblem *problem, wctdata *pd) {
     int i, val = 0;
     int njobs = pd->njobs;
     int nmachines = pd->nmachines;
@@ -815,8 +1304,7 @@ CLEAN:
 }
 
 /** Help function for column generation */
-static void print_ages(wctdata *pd)
-{
+static void print_ages(wctdata *pd) {
     int i;
     printf("AGES:");
 
@@ -827,8 +1315,7 @@ static void print_ages(wctdata *pd)
     printf("\n");
 }
 
-int compute_objective(wctdata *pd, wctparms *parms)
-{
+int compute_objective(wctdata *pd, wctparms *parms) {
     int val = 0;
     int i;
     pd->LP_lower_bound_dual = .0;
@@ -841,15 +1328,21 @@ int compute_objective(wctdata *pd, wctparms *parms)
     /** Get the LP lower bound and compute the lower bound of WCT */
     val = wctlp_objval(pd->LP, &(pd->LP_lower_bound));
     CCcheck_val_2(val, "wctlp_objval failed");
-    pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual) < (int) ceil(pd->LP_lower_bound)) ? (int) ceil(pd->LP_lower_bound_dual) : (int) ceil(pd->LP_lower_bound) ;
+    pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual) < (int) ceil(
+                           pd->LP_lower_bound)) ? (int) ceil(pd->LP_lower_bound_dual) : (int) ceil(
+                          pd->LP_lower_bound) ;
+    pd->LP_lower_bound_BB = CC_MIN(pd->LP_lower_bound, pd->LP_lower_bound);
 
-    if (parms->stab_technique == stab_wentgnes || parms->stab_technique == stab_dynamic) {
-        pd->lower_bound = (int) ceil(pd->eta_in - 0.00001);
-        pd->LP_lower_bound = pd->eta_in;
+    if (parms->stab_technique == stab_wentgnes ||
+            parms->stab_technique == stab_dynamic) {
+        pd->lower_bound = (int) ceil(pd->eta_in - 0.001);
+        pd->LP_lower_bound_BB = CC_MIN(pd->LP_lower_bound_BB, pd->eta_in);
+
     }
 
     if (dbg_lvl() > 0) {
-        printf("Current primal LP objective: %19.16f  (LP_dual-bound %19.16f, lowerbound = %d).\n", pd->LP_lower_bound, pd->LP_lower_bound_dual, pd->lower_bound);
+        printf("Current primal LP objective: %19.16f  (LP_dual-bound %19.16f, lowerbound = %d).\n",
+               pd->LP_lower_bound, pd->LP_lower_bound_dual, pd->lower_bound);
     }
 
 CLEAN:
@@ -857,8 +1350,7 @@ CLEAN:
 }
 
 MAYBE_UNUSED
-void make_pi_feasible(wctdata *pd)
-{
+void make_pi_feasible(wctdata *pd) {
     int c;
 
     for (c = 0; c < pd->ccount; ++c) {
@@ -902,8 +1394,7 @@ void make_pi_feasible(wctdata *pd)
 }
 
 MAYBE_UNUSED
-void make_pi_feasible_farkas_pricing(wctdata *pd)
-{
+void make_pi_feasible_farkas_pricing(wctdata *pd) {
     int c;
 
     for (c = 0; c < pd->ccount; ++c) {
@@ -941,8 +1432,7 @@ void make_pi_feasible_farkas_pricing(wctdata *pd)
     }
 }
 
-static void reset_ages(Scheduleset *cclasses, int cccount)
-{
+static void reset_ages(Scheduleset *cclasses, int cccount) {
     int i;
 
     for (i = 0; i < cccount; i++) {
@@ -950,8 +1440,7 @@ static void reset_ages(Scheduleset *cclasses, int cccount)
     }
 }
 
-int add_newsets(wctdata *pd)
-{
+int add_newsets(wctdata *pd) {
     int val = 0;
     Scheduleset *tmpsets = (Scheduleset *) NULL;
     int i;
@@ -992,8 +1481,7 @@ CLEAN:
 }
 
 MAYBE_UNUSED
-int double2int(int *kpc_pi, int *scalef, const double *pi, int njobs)
-{
+int double2int(int *kpc_pi, int *scalef, const double *pi, int njobs) {
     int    i;
     double max_dbl_nweight = -DBL_MAX;
     double max_prec_dbl = exp2(DBL_MANT_DIG - 1);
@@ -1021,8 +1509,8 @@ int double2int(int *kpc_pi, int *scalef, const double *pi, int njobs)
 
 /** Branch and Price Algorithm */
 
-static int test_theorem_ahv(wctdata *pd, GList **branchjobs, int **min_completiontime)
-{
+static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
+                            int **min_completiontime) {
     int val = 0;
     int i, j;
     int *temp_completiontime = (int *) NULL;
@@ -1077,8 +1565,7 @@ CLEAN:
     return val;
 }
 
-static int grab_integral_solution_ahv(wctdata *pd, int *completion_time)
-{
+static int grab_integral_solution_ahv(wctdata *pd, int *completion_time) {
     int val = 0;
     int i;
     int totweight = 0;
@@ -1117,7 +1604,8 @@ static int grab_integral_solution_ahv(wctdata *pd, int *completion_time)
                      pd->nmachines * sizeof(Scheduleset));
     CCcheck_NULL_2(pd->bestcolors, "Failed to realloc pd->bestcolors");
     /** Construct solution with the help of theorem of AHV */
-    val = partlist_to_Scheduleset(sol->part, sol->nmachines, pd->njobs, &(pd->bestcolors), &(pd->nbbest));
+    val = partlist_to_Scheduleset(sol->part, sol->nmachines, pd->njobs,
+                                  &(pd->bestcolors), &(pd->nbbest));
     CCcheck_val_2(val, "Failed in conversion");
     val = Scheduleset_check(pd->bestcolors, pd->nbbest, pd->njobs);
     CCcheck_val_2(val, "Failed in Check scheduleset");
@@ -1143,20 +1631,19 @@ CLEAN:
     return val;
 }
 
-static void adapt_global_upper_bound(wctproblem *problem, int new_upper_bound)
-{
+static void adapt_global_upper_bound(wctproblem *problem, int new_upper_bound) {
     if (problem->global_upper_bound > new_upper_bound) {
         problem->global_upper_bound = new_upper_bound;
     }
 }
 
-static int collect_releasetime_child_ahv(wctdata *cd)
-{
+static int collect_releasetime_child_ahv(wctdata *cd) {
     int val = 0;
     int c;
 
     for (c = 0; c < cd->nreleasetime; ++c) {
-        if (cd->releasetime_child[c].nbbest && (!cd->nbbest || cd->releasetime_child[c].upper_bound < cd->upper_bound)) {
+        if (cd->releasetime_child[c].nbbest && (!cd->nbbest ||
+                                                cd->releasetime_child[c].upper_bound < cd->upper_bound)) {
             if (cd->nbbest) {
                 Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
             }
@@ -1173,13 +1660,13 @@ static int collect_releasetime_child_ahv(wctdata *cd)
     return val;
 }
 
-static int collect_duetime_child_ahv(wctdata *cd)
-{
+static int collect_duetime_child_ahv(wctdata *cd) {
     int rval = 0;
     int c;
 
     for (c = 0; c < cd->nduetime; ++c) {
-        if (cd->duetime_child[c].nbbest && (!cd->nbbest || cd->duetime_child[c].upper_bound <= cd->upper_bound)) {
+        if (cd->duetime_child[c].nbbest && (!cd->nbbest ||
+                                            cd->duetime_child[c].upper_bound <= cd->upper_bound)) {
             if (cd->nbbest) {
                 Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
             }
@@ -1196,13 +1683,13 @@ static int collect_duetime_child_ahv(wctdata *cd)
     return rval;
 }
 
-static int collect_same_child_wide(wctdata *cd)
-{
+static int collect_same_child_wide(wctdata *cd) {
     int rval = 0;
     int c;
 
     for (c = 0; c < cd->nsame; ++c) {
-        if (cd->same_children_wide[c]->nbbest && (!cd->nbbest || cd->same_children_wide[c]->upper_bound <= cd->upper_bound)) {
+        if (cd->same_children_wide[c]->nbbest && (!cd->nbbest ||
+                cd->same_children_wide[c]->upper_bound <= cd->upper_bound)) {
             if (cd->nbbest) {
                 Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
             }
@@ -1219,13 +1706,13 @@ static int collect_same_child_wide(wctdata *cd)
     return rval;
 }
 
-static int collect_same_child_conflict(wctdata *cd)
-{
+static int collect_same_child_conflict(wctdata *cd) {
     int rval = 0;
     int c;
 
     for (c = 0; c < cd->nsame; ++c) {
-        if (cd->same_children[c].nbbest && (!cd->nbbest || cd->same_children[c].besttotwct < cd->upper_bound)) {
+        if (cd->same_children[c].nbbest && (!cd->nbbest ||
+                                            cd->same_children[c].besttotwct < cd->upper_bound)) {
             if (cd->nbbest) {
                 Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
             }
@@ -1242,13 +1729,13 @@ static int collect_same_child_conflict(wctdata *cd)
     return rval;
 }
 
-static int collect_diff_child_wide(wctdata *cd)
-{
+static int collect_diff_child_wide(wctdata *cd) {
     int rval = 0;
     int c;
 
     for (c = 0; c < cd->ndiff; ++c) {
-        if (cd->diff_children_wide[c]->nbbest && (!cd->nbbest || cd->diff_children_wide[c]->upper_bound < cd->upper_bound)) {
+        if (cd->diff_children_wide[c]->nbbest && (!cd->nbbest ||
+                cd->diff_children_wide[c]->upper_bound < cd->upper_bound)) {
             if (cd->nbbest) {
                 Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
             }
@@ -1265,13 +1752,13 @@ static int collect_diff_child_wide(wctdata *cd)
     return rval;
 }
 
-static int collect_diff_child_conflict(wctdata *cd)
-{
+static int collect_diff_child_conflict(wctdata *cd) {
     int rval = 0;
     int c;
 
     for (c = 0; c < cd->ndiff; ++c) {
-        if (cd->diff_children[c].nbbest && (!cd->nbbest || cd->diff_children[c].besttotwct < cd->upper_bound)) {
+        if (cd->diff_children[c].nbbest && (!cd->nbbest ||
+                                            cd->diff_children[c].besttotwct < cd->upper_bound)) {
             if (cd->nbbest) {
                 Schedulesets_free(&(cd->bestcolors), &(cd->nbbest));
             }
@@ -1288,8 +1775,7 @@ static int collect_diff_child_conflict(wctdata *cd)
     return rval;
 }
 
-static int remove_finished_subtree_wide(wctdata *child)
-{
+static int remove_finished_subtree_wide(wctdata *child) {
     int val = 0;
     int i;
     wctdata *cd = (wctdata *) child;
@@ -1352,8 +1838,7 @@ CLEAN:
 }
 
 
-static int remove_finished_subtree_conflict(wctdata *child)
-{
+static int remove_finished_subtree_conflict(wctdata *child) {
     int val = 0;
     int i;
     wctdata *cd = (wctdata *) child;
@@ -1415,8 +1900,7 @@ CLEAN:
 }
 
 MAYBE_UNUSED
-static int remove_finished_subtree_ahv(wctdata *child)
-{
+static int remove_finished_subtree_ahv(wctdata *child) {
     int rval = 0;
     int i;
     wctdata *cd = (wctdata *) child;
@@ -1476,8 +1960,7 @@ CLEAN:
     return rval;
 }
 
-int set_id_and_name(wctdata *pd, int id, const char *fname)
-{
+int set_id_and_name(wctdata *pd, int id, const char *fname) {
     int val = 0;
     int sval = 0;
     CCcheck_NULL_2(pd, "np memory was allocated to pd");
@@ -1493,8 +1976,8 @@ CLEAN:
     return val;
 }
 
-static int create_duetime_ahv(wctproblem *problem, wctdata *parent_cd, wctdata **child, int branch_job, int completiontime)
-{
+static int create_duetime_ahv(wctproblem *problem, wctdata *parent_cd,
+                              wctdata **child, int branch_job, int completiontime) {
     int val = 0;
     wctparms *parms = &(problem->parms);
     wctdata    *pd = (wctdata *) NULL;
@@ -1537,7 +2020,8 @@ static int create_duetime_ahv(wctproblem *problem, wctdata *parent_cd, wctdata *
 
     switch (parms->solver) {
     case bdd_solver:
-        pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+        pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime,
+                               pd->njobs, pd->H_min, pd->H_max);
 
         if ((size_t)pd->njobs != get_numberrows_bdd(pd->solver)) {
             pd->status = infeasible;
@@ -1557,7 +2041,8 @@ static int create_duetime_ahv(wctproblem *problem, wctdata *parent_cd, wctdata *
         break;
 
     case zdd_solver:
-        pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+        pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime,
+                               pd->njobs, pd->H_min, pd->H_max);
 
         if ((size_t)pd->njobs != get_numberrows_zdd(pd->solver)) {
             pd->status = infeasible;
@@ -1577,7 +2062,8 @@ static int create_duetime_ahv(wctproblem *problem, wctdata *parent_cd, wctdata *
         break;
 
     case DP_solver:
-        pd->solver = newSolverDP(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+        pd->solver = newSolverDP(pd->duration, pd->weights, pd->releasetime,
+                                 pd->duetime, pd->njobs, pd->H_min, pd->H_max);
         break;
     }
 
@@ -1592,7 +2078,8 @@ static int create_duetime_ahv(wctproblem *problem, wctdata *parent_cd, wctdata *
         gboolean construct = 1;
         int *C = (int *) NULL;
 
-        if ((C = (int *) g_hash_table_lookup(parent_cd->cclasses[i].table, GINT_TO_POINTER(branch_job)))) {
+        if ((C = (int *) g_hash_table_lookup(parent_cd->cclasses[i].table,
+                                             GINT_TO_POINTER(branch_job)))) {
             if (pd->duetime[branch_job] < *C) {
                 construct = 0;
             }
@@ -1601,20 +2088,30 @@ static int create_duetime_ahv(wctproblem *problem, wctdata *parent_cd, wctdata *
         if (construct) {
             int j;
             Scheduleset_init(pd->cclasses + pd->ccount);
-            pd->cclasses[pd->ccount].members =  CC_SAFE_MALLOC(parent_cd->cclasses[i].count + 1, int);
+            pd->cclasses[pd->ccount].members =  CC_SAFE_MALLOC(parent_cd->cclasses[i].count
+                                                + 1, int);
             pd->cclasses[pd->ccount].C = CC_SAFE_MALLOC(parent_cd->cclasses[i].count, int);
-            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash, g_direct_equal);
+            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash,
+                                             g_direct_equal);
             pd->cclasses[pd->ccount].count = 0;
             pd->cclasses[pd->ccount].age = 0;
             pd->cclasses[pd->ccount].totweight = 0;
             pd->cclasses[pd->ccount].totwct = 0;
 
             for (j = 0; j < parent_cd->cclasses[i].count && construct; ++j) {
-                pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)] = parent_cd->cclasses[i].members[j];
-                pd->cclasses[pd->ccount].totweight += pd->duration[parent_cd->cclasses[i].members[j]];
-                pd->cclasses[pd->ccount].C[(pd->cclasses[pd->ccount].count)] = pd->cclasses[pd->ccount].totweight;
-                g_hash_table_insert(pd->cclasses[pd->ccount].table, GINT_TO_POINTER(pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)]), pd->cclasses[pd->ccount].C + (pd->cclasses[pd->ccount].count));
-                pd->cclasses[pd->ccount].totwct += pd->weights[parent_cd->cclasses[i].members[j]] * pd->cclasses[pd->ccount].totweight;
+                pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)] =
+                    parent_cd->cclasses[i].members[j];
+                pd->cclasses[pd->ccount].totweight +=
+                    pd->duration[parent_cd->cclasses[i].members[j]];
+                pd->cclasses[pd->ccount].C[(pd->cclasses[pd->ccount].count)] =
+                    pd->cclasses[pd->ccount].totweight;
+                g_hash_table_insert(pd->cclasses[pd->ccount].table,
+                                    GINT_TO_POINTER(
+                                        pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)]),
+                                    pd->cclasses[pd->ccount].C + (pd->cclasses[pd->ccount].count));
+                pd->cclasses[pd->ccount].totwct +=
+                    pd->weights[parent_cd->cclasses[i].members[j]] *
+                    pd->cclasses[pd->ccount].totweight;
                 pd->cclasses[pd->ccount].count++;
             }
 
@@ -1661,8 +2158,7 @@ CLEAN:
     return val;
 }
 MAYBE_UNUSED
-static int is_releasetime_child(wctdata *cd)
-{
+static int is_releasetime_child(wctdata *cd) {
     int i;
 
     for (i = 0; cd->parent && i < cd->parent->nreleasetime; ++i) {
@@ -1675,8 +2171,7 @@ static int is_releasetime_child(wctdata *cd)
 }
 
 MAYBE_UNUSED
-static int is_duetime_child(wctdata *cd)
-{
+static int is_duetime_child(wctdata *cd) {
     int i;
 
     for (i = 0; cd->parent && i < cd->parent->nduetime; ++i) {
@@ -1689,8 +2184,7 @@ static int is_duetime_child(wctdata *cd)
 }
 
 MAYBE_UNUSED
-static int recover_pricersolver(wctdata *cd)
-{
+static int recover_pricersolver(wctdata *cd) {
     int val = 0;
     wctdata    **path  = (wctdata **) NULL;
     int            npath = 0;
@@ -1753,8 +2247,7 @@ CLEAN:
     return val;
 }
 
-static int is_diff_child(wctdata *pd)
-{
+static int is_diff_child(wctdata *pd) {
     int i;
 
     for (i = 0; pd->parent && i < pd->parent->ndiff; ++i) {
@@ -1766,8 +2259,7 @@ static int is_diff_child(wctdata *pd)
     return 0;
 }
 
-static int is_same_child(wctdata *pd)
-{
+static int is_same_child(wctdata *pd) {
     int i;
 
     for (i = 0; pd->parent && i < pd->parent->nsame; ++i) {
@@ -1779,8 +2271,8 @@ static int is_same_child(wctdata *pd)
     return 0;
 }
 
-static int create_diff_wide(wctproblem *problem, wctdata *parent_pd, int v1, int v2)
-{
+static int create_diff_wide(wctproblem *problem, wctdata *parent_pd, int v1,
+                            int v2) {
     int val = 0;
     int i;
     wctdata    *pd =  CC_SAFE_MALLOC(1, wctdata);
@@ -1831,7 +2323,8 @@ static int create_diff_wide(wctproblem *problem, wctdata *parent_pd, int v1, int
     // }
 
     /* Construction of solver*/
-    if (pd->parent && (parms->solver == bdd_solver || parms->solver == zdd_solver)) {
+    if (pd->parent && (parms->solver == bdd_solver ||
+                       parms->solver == zdd_solver)) {
         CCutil_start_resume_time(&(problem->tot_build_dd));
         pd->solver = copySolver(pd->parent->solver);
         add_one_conflict(pd->solver, parms, pd->v1, pd->v2, 0);
@@ -1889,18 +2382,29 @@ static int create_diff_wide(wctproblem *problem, wctdata *parent_pd, int v1, int
 
         if (construct) {
             Scheduleset_init(pd->cclasses + pd->ccount);
-            pd->cclasses[pd->ccount].members = CC_SAFE_MALLOC(parent_pd->cclasses[i].count + 1, int);
-            CCcheck_NULL_2(pd->cclasses[pd->ccount].members, "Failed to allocate pd->cclasses[i].members");
+            pd->cclasses[pd->ccount].members = CC_SAFE_MALLOC(parent_pd->cclasses[i].count +
+                                               1, int);
+            CCcheck_NULL_2(pd->cclasses[pd->ccount].members,
+                           "Failed to allocate pd->cclasses[i].members");
             pd->cclasses[pd->ccount].C = CC_SAFE_MALLOC(parent_pd->cclasses[i].count, int);
             CCcheck_NULL_2(pd->cclasses[pd->ccount].members, "Failed to allocate memory");
-            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash, g_direct_equal);
+            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash,
+                                             g_direct_equal);
 
             for (j = 0;  j < parent_pd->cclasses[i].count; j++) {
-                pd->cclasses[pd->ccount].members[pd->cclasses[pd->ccount].count] = parent_pd->cclasses[i].members[j];
-                pd->cclasses[pd->ccount].totweight += parent_pd->duration[parent_pd->cclasses[i].members[j]];
-                pd->cclasses[pd->ccount].C[pd->cclasses[pd->ccount].count] = pd->cclasses[pd->ccount].totweight;
-                g_hash_table_insert(pd->cclasses[pd->ccount].table, GINT_TO_POINTER(pd->cclasses[pd->ccount].members[pd->cclasses[pd->ccount].count]), pd->cclasses[pd->ccount].C + pd->cclasses[pd->ccount].count);
-                pd->cclasses[pd->ccount].totwct += parent_pd->weights[parent_pd->cclasses[i].members[j]] * pd->cclasses[pd->ccount].totweight;
+                pd->cclasses[pd->ccount].members[pd->cclasses[pd->ccount].count] =
+                    parent_pd->cclasses[i].members[j];
+                pd->cclasses[pd->ccount].totweight +=
+                    parent_pd->duration[parent_pd->cclasses[i].members[j]];
+                pd->cclasses[pd->ccount].C[pd->cclasses[pd->ccount].count] =
+                    pd->cclasses[pd->ccount].totweight;
+                g_hash_table_insert(pd->cclasses[pd->ccount].table,
+                                    GINT_TO_POINTER(
+                                        pd->cclasses[pd->ccount].members[pd->cclasses[pd->ccount].count]),
+                                    pd->cclasses[pd->ccount].C + pd->cclasses[pd->ccount].count);
+                pd->cclasses[pd->ccount].totwct +=
+                    parent_pd->weights[parent_pd->cclasses[i].members[j]] *
+                    pd->cclasses[pd->ccount].totweight;
                 (pd->cclasses[pd->ccount].count)++;
             }
 
@@ -1949,8 +2453,8 @@ CLEAN:
 }
 
 
-static int create_differ_conflict(wctproblem *problem, wctdata *parent_pd, wctdata **child, int v1, int v2)
-{
+static int create_differ_conflict(wctproblem *problem, wctdata *parent_pd,
+                                  wctdata **child, int v1, int v2) {
     int val = 0;
     int i;
     wctdata    *pd =  CC_SAFE_MALLOC(1, wctdata);
@@ -2044,24 +2548,37 @@ static int create_differ_conflict(wctproblem *problem, wctdata *parent_pd, wctda
         int construct = 1;
         gboolean v1_in;
         gboolean v2_in;
-        v1_in = g_hash_table_contains(parent_pd->cclasses[i].table, GINT_TO_POINTER(v1));
-        v2_in = g_hash_table_contains(parent_pd->cclasses[i].table, GINT_TO_POINTER(v2));
+        v1_in = g_hash_table_contains(parent_pd->cclasses[i].table,
+                                      GINT_TO_POINTER(v1));
+        v2_in = g_hash_table_contains(parent_pd->cclasses[i].table,
+                                      GINT_TO_POINTER(v2));
         construct = (v1_in && v2_in) ? 0 : 1;
 
         if (construct) {
             Scheduleset_init(pd->cclasses + pd->ccount);
-            pd->cclasses[pd->ccount].members = CC_SAFE_MALLOC(parent_pd->cclasses[i].count + 1, int);
-            CCcheck_NULL_2(pd->cclasses[pd->ccount].members, "Failed to allocate pd->cclasses[i].members");
+            pd->cclasses[pd->ccount].members = CC_SAFE_MALLOC(parent_pd->cclasses[i].count +
+                                               1, int);
+            CCcheck_NULL_2(pd->cclasses[pd->ccount].members,
+                           "Failed to allocate pd->cclasses[i].members");
             pd->cclasses[pd->ccount].C = CC_SAFE_MALLOC(parent_pd->cclasses[i].count, int);
             CCcheck_NULL_2(pd->cclasses[pd->ccount].members, "Failed to allocate memory");
-            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash, g_direct_equal);
+            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash,
+                                             g_direct_equal);
 
             for (j = 0;  j < parent_pd->cclasses[i].count; j++) {
-                pd->cclasses[pd->ccount].members[pd->cclasses[pd->ccount].count] = parent_pd->cclasses[i].members[j];
-                pd->cclasses[pd->ccount].totweight += parent_pd->duration[parent_pd->cclasses[i].members[j]];
-                pd->cclasses[pd->ccount].C[pd->cclasses[pd->ccount].count] = pd->cclasses[pd->ccount].totweight;
-                g_hash_table_insert(pd->cclasses[pd->ccount].table, GINT_TO_POINTER(pd->cclasses[pd->ccount].members[pd->cclasses[pd->ccount].count]), pd->cclasses[pd->ccount].C + pd->cclasses[pd->ccount].count);
-                pd->cclasses[pd->ccount].totwct += parent_pd->weights[parent_pd->cclasses[i].members[j]] * pd->cclasses[pd->ccount].totweight;
+                pd->cclasses[pd->ccount].members[pd->cclasses[pd->ccount].count] =
+                    parent_pd->cclasses[i].members[j];
+                pd->cclasses[pd->ccount].totweight +=
+                    parent_pd->duration[parent_pd->cclasses[i].members[j]];
+                pd->cclasses[pd->ccount].C[pd->cclasses[pd->ccount].count] =
+                    pd->cclasses[pd->ccount].totweight;
+                g_hash_table_insert(pd->cclasses[pd->ccount].table,
+                                    GINT_TO_POINTER(
+                                        pd->cclasses[pd->ccount].members[pd->cclasses[pd->ccount].count]),
+                                    pd->cclasses[pd->ccount].C + pd->cclasses[pd->ccount].count);
+                pd->cclasses[pd->ccount].totwct +=
+                    parent_pd->weights[parent_pd->cclasses[i].members[j]] *
+                    pd->cclasses[pd->ccount].totweight;
                 (pd->cclasses[pd->ccount].count)++;
             }
 
@@ -2112,8 +2629,7 @@ static int transfer_same_cclasses_wide(wctdata *pd,
                                        const Scheduleset *parent_cclasses,
                                        int   parent_ccount,
                                        int   *v1_wide,
-                                       int   *v2_wide)
-{
+                                       int   *v2_wide) {
     int val = 0;
     int i;
     /* Transfer independent sets: */
@@ -2129,8 +2645,10 @@ static int transfer_same_cclasses_wide(wctdata *pd,
         gboolean v2_in;
 
         for (j = 0; j < pd->nb_wide && construct; j++) {
-            v1_in =  g_hash_table_contains(parent_cclasses[i].table, GINT_TO_POINTER(v1_wide[i]));
-            v2_in =  g_hash_table_contains(parent_cclasses[i].table, GINT_TO_POINTER(v2_wide[i]));
+            v1_in =  g_hash_table_contains(parent_cclasses[i].table,
+                                           GINT_TO_POINTER(v1_wide[i]));
+            v2_in =  g_hash_table_contains(parent_cclasses[i].table,
+                                           GINT_TO_POINTER(v2_wide[i]));
 
             if ((v1_in == 1 && v2_in == 0) || (v1_in == 0 && v2_in == 1)) {
                 construct = 0;
@@ -2140,9 +2658,11 @@ static int transfer_same_cclasses_wide(wctdata *pd,
 
         if (construct) {
             Scheduleset_init(pd->cclasses + pd->ccount);
-            pd->cclasses[pd->ccount].members =  CC_SAFE_MALLOC(parent_cclasses[i].count + 1, int);
+            pd->cclasses[pd->ccount].members =  CC_SAFE_MALLOC(parent_cclasses[i].count + 1,
+                                                int);
             pd->cclasses[pd->ccount].C = CC_SAFE_MALLOC(parent_cclasses[i].count, int);
-            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash, g_direct_equal);
+            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash,
+                                             g_direct_equal);
             pd->cclasses[pd->ccount].count = 0;
             pd->cclasses[pd->ccount].age = 0;
             pd->cclasses[pd->ccount].totweight = 0;
@@ -2152,11 +2672,18 @@ static int transfer_same_cclasses_wide(wctdata *pd,
         }
 
         for (j = 0; j < parent_cclasses[i].count; ++j) {
-            pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)] = parent_cclasses[i].members[j];
-            pd->cclasses[pd->ccount].totweight += pd->duration[parent_cclasses[i].members[j]];
-            pd->cclasses[pd->ccount].C[(pd->cclasses[pd->ccount].count)] = pd->cclasses[pd->ccount].totweight;
-            g_hash_table_insert(pd->cclasses[pd->ccount].table, GINT_TO_POINTER(pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)]), pd->cclasses[pd->ccount].C + (pd->cclasses[pd->ccount].count));
-            pd->cclasses[pd->ccount].totwct += pd->weights[parent_cclasses[i].members[j]] * pd->cclasses[pd->ccount].totweight;
+            pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)] =
+                parent_cclasses[i].members[j];
+            pd->cclasses[pd->ccount].totweight +=
+                pd->duration[parent_cclasses[i].members[j]];
+            pd->cclasses[pd->ccount].C[(pd->cclasses[pd->ccount].count)] =
+                pd->cclasses[pd->ccount].totweight;
+            g_hash_table_insert(pd->cclasses[pd->ccount].table,
+                                GINT_TO_POINTER(
+                                    pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)]),
+                                pd->cclasses[pd->ccount].C + (pd->cclasses[pd->ccount].count));
+            pd->cclasses[pd->ccount].totwct += pd->weights[parent_cclasses[i].members[j]] *
+                                               pd->cclasses[pd->ccount].totweight;
             pd->cclasses[pd->ccount].count++;
             /* else 'parent_cclasses[i].members[j] == v2' and we skip it*/
         }
@@ -2197,8 +2724,7 @@ static int transfer_same_cclasses(wctdata *pd,
                                   const Scheduleset *parent_cclasses,
                                   int   parent_ccount,
                                   int   v1,
-                                  int   v2)
-{
+                                  int   v2) {
     int val = 0;
     int i;
     /* Transfer independent sets: */
@@ -2219,9 +2745,11 @@ static int transfer_same_cclasses(wctdata *pd,
             construct = 0;
         } else {
             Scheduleset_init(pd->cclasses + pd->ccount);
-            pd->cclasses[pd->ccount].members =  CC_SAFE_MALLOC(parent_cclasses[i].count + 1, int);
+            pd->cclasses[pd->ccount].members =  CC_SAFE_MALLOC(parent_cclasses[i].count + 1,
+                                                int);
             pd->cclasses[pd->ccount].C = CC_SAFE_MALLOC(parent_cclasses[i].count, int);
-            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash, g_direct_equal);
+            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash,
+                                             g_direct_equal);
             pd->cclasses[pd->ccount].count = 0;
             pd->cclasses[pd->ccount].age = 0;
             pd->cclasses[pd->ccount].totweight = 0;
@@ -2229,11 +2757,18 @@ static int transfer_same_cclasses(wctdata *pd,
         }
 
         for (j = 0; j < parent_cclasses[i].count && construct; ++j) {
-            pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)] = parent_cclasses[i].members[j];
-            pd->cclasses[pd->ccount].totweight += pd->duration[parent_cclasses[i].members[j]];
-            pd->cclasses[pd->ccount].C[(pd->cclasses[pd->ccount].count)] = pd->cclasses[pd->ccount].totweight;
-            g_hash_table_insert(pd->cclasses[pd->ccount].table, GINT_TO_POINTER(pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)]), pd->cclasses[pd->ccount].C + (pd->cclasses[pd->ccount].count));
-            pd->cclasses[pd->ccount].totwct += pd->weights[parent_cclasses[i].members[j]] * pd->cclasses[pd->ccount].totweight;
+            pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)] =
+                parent_cclasses[i].members[j];
+            pd->cclasses[pd->ccount].totweight +=
+                pd->duration[parent_cclasses[i].members[j]];
+            pd->cclasses[pd->ccount].C[(pd->cclasses[pd->ccount].count)] =
+                pd->cclasses[pd->ccount].totweight;
+            g_hash_table_insert(pd->cclasses[pd->ccount].table,
+                                GINT_TO_POINTER(
+                                    pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)]),
+                                pd->cclasses[pd->ccount].C + (pd->cclasses[pd->ccount].count));
+            pd->cclasses[pd->ccount].totwct += pd->weights[parent_cclasses[i].members[j]] *
+                                               pd->cclasses[pd->ccount].totweight;
             pd->cclasses[pd->ccount].count++;
         }
 
@@ -2299,8 +2834,8 @@ CLEAN:
 }
 
 
-static int create_same_wide(wctproblem *problem, wctdata *parent_pd, int *v1_wide, int *v2_wide, int nb_wide)
-{
+static int create_same_wide(wctproblem *problem, wctdata *parent_pd,
+                            int *v1_wide, int *v2_wide, int nb_wide) {
     int val = 0;
     wctdata   *pd = (wctdata *) NULL;
     wctparms *parms = &(problem->parms);
@@ -2347,10 +2882,12 @@ static int create_same_wide(wctproblem *problem, wctdata *parent_pd, int *v1_wid
     pd->ecount_same += nb_wide;
 
     /* Construction of solver*/
-    if (pd->parent && (parms->solver == bdd_solver || parms->solver == zdd_solver)) {
+    if (pd->parent && (parms->solver == bdd_solver ||
+                       parms->solver == zdd_solver)) {
         CCutil_start_resume_time(&(problem->tot_build_dd));
         pd->solver = copySolver(pd->parent->solver);
-        add_conflict_constraints(pd->solver, &(problem->parms), pd->elist_same, pd->nb_wide, NULL, 0);
+        add_conflict_constraints(pd->solver, &(problem->parms), pd->elist_same,
+                                 pd->nb_wide, NULL, 0);
 
         switch (parms->solver) {
         case bdd_solver:
@@ -2401,8 +2938,8 @@ CLEAN:
 }
 
 
-static int create_same_conflict(wctproblem *problem, wctdata *parent_pd, wctdata **child, int v1, int v2)
-{
+static int create_same_conflict(wctproblem *problem, wctdata *parent_pd,
+                                wctdata **child, int v1, int v2) {
     int val = 0;
     wctdata   *pd = (wctdata *) NULL;
     wctparms *parms = &(problem->parms);
@@ -2488,7 +3025,8 @@ static int create_same_conflict(wctproblem *problem, wctdata *parent_pd, wctdata
         CCutil_suspend_timer(&(problem->tot_build_dd));
     }
 
-    val = transfer_same_cclasses(pd, parent_pd->cclasses, parent_pd->ccount, v1, v2);
+    val = transfer_same_cclasses(pd, parent_pd->cclasses, parent_pd->ccount, v1,
+                                 v2);
     CCcheck_val_2(val, "Failed in transfer_same_cclasses");
     *child = pd;
 CLEAN:
@@ -2503,8 +3041,7 @@ CLEAN:
     return val;
 }
 
-int recover_elist(wctdata *pd)
-{
+int recover_elist(wctdata *pd) {
     int val = 0;
     wctdata    **path  = (wctdata **) NULL;
     int            npath = 0;
@@ -2577,8 +3114,8 @@ CLEAN:
     return val;
 }
 
-static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_cd, wctdata **child, int branch_job, int completiontime)
-{
+static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_cd,
+                                  wctdata **child, int branch_job, int completiontime) {
     int val = 0;
     wctparms *parms = &(problem->parms);
     wctdata    *pd = (wctdata *) NULL;
@@ -2621,7 +3158,8 @@ static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_cd, wctda
 
     switch (parms->solver) {
     case bdd_solver:
-        pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+        pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime,
+                               pd->njobs, pd->H_min, pd->H_max);
 
         if ((size_t)pd->njobs != get_numberrows_bdd(pd->solver)) {
             pd->status = infeasible;
@@ -2641,7 +3179,8 @@ static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_cd, wctda
         break;
 
     case zdd_solver:
-        pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+        pd->solver = newSolver(pd->duration, pd->weights, pd->releasetime, pd->duetime,
+                               pd->njobs, pd->H_min, pd->H_max);
 
         if ((size_t)pd->njobs != get_numberrows_zdd(pd->solver)) {
             pd->status = infeasible;
@@ -2661,7 +3200,8 @@ static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_cd, wctda
         break;
 
     case DP_solver:
-        pd->solver = newSolverDP(pd->duration, pd->weights, pd->releasetime, pd->duetime, pd->njobs, pd->H_min, pd->H_max);
+        pd->solver = newSolverDP(pd->duration, pd->weights, pd->releasetime,
+                                 pd->duetime, pd->njobs, pd->H_min, pd->H_max);
         break;
     }
 
@@ -2676,7 +3216,8 @@ static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_cd, wctda
         gboolean construct = 1;
         int *C = (int *) NULL;
 
-        if ((C = (int *) g_hash_table_lookup(parent_cd->cclasses[i].table, GINT_TO_POINTER(branch_job)))) {
+        if ((C = (int *) g_hash_table_lookup(parent_cd->cclasses[i].table,
+                                             GINT_TO_POINTER(branch_job)))) {
             if (pd->releasetime[branch_job] + pd->duration[branch_job] > *C) {
                 construct = 0;
             }
@@ -2685,20 +3226,30 @@ static int create_releasetime_ahv(wctproblem *problem, wctdata *parent_cd, wctda
         if (construct) {
             int j;
             Scheduleset_init(pd->cclasses + pd->ccount);
-            pd->cclasses[pd->ccount].members =  CC_SAFE_MALLOC(parent_cd->cclasses[i].count + 1, int);
+            pd->cclasses[pd->ccount].members =  CC_SAFE_MALLOC(parent_cd->cclasses[i].count
+                                                + 1, int);
             pd->cclasses[pd->ccount].C = CC_SAFE_MALLOC(parent_cd->cclasses[i].count, int);
-            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash, g_direct_equal);
+            pd->cclasses[pd->ccount].table = g_hash_table_new(g_direct_hash,
+                                             g_direct_equal);
             pd->cclasses[pd->ccount].count = 0;
             pd->cclasses[pd->ccount].age = 0;
             pd->cclasses[pd->ccount].totweight = 0;
             pd->cclasses[pd->ccount].totwct = 0;
 
             for (j = 0; j < parent_cd->cclasses[i].count && construct; ++j) {
-                pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)] = parent_cd->cclasses[i].members[j];
-                pd->cclasses[pd->ccount].totweight += pd->duration[parent_cd->cclasses[i].members[j]];
-                pd->cclasses[pd->ccount].C[(pd->cclasses[pd->ccount].count)] = pd->cclasses[pd->ccount].totweight;
-                g_hash_table_insert(pd->cclasses[pd->ccount].table, GINT_TO_POINTER(pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)]), pd->cclasses[pd->ccount].C + (pd->cclasses[pd->ccount].count));
-                pd->cclasses[pd->ccount].totwct += pd->weights[parent_cd->cclasses[i].members[j]] * pd->cclasses[pd->ccount].totweight;
+                pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)] =
+                    parent_cd->cclasses[i].members[j];
+                pd->cclasses[pd->ccount].totweight +=
+                    pd->duration[parent_cd->cclasses[i].members[j]];
+                pd->cclasses[pd->ccount].C[(pd->cclasses[pd->ccount].count)] =
+                    pd->cclasses[pd->ccount].totweight;
+                g_hash_table_insert(pd->cclasses[pd->ccount].table,
+                                    GINT_TO_POINTER(
+                                        pd->cclasses[pd->ccount].members[(pd->cclasses[pd->ccount].count)]),
+                                    pd->cclasses[pd->ccount].C + (pd->cclasses[pd->ccount].count));
+                pd->cclasses[pd->ccount].totwct +=
+                    pd->weights[parent_cd->cclasses[i].members[j]] *
+                    pd->cclasses[pd->ccount].totweight;
                 pd->cclasses[pd->ccount].count++;
             }
 
@@ -2754,8 +3305,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
         wctproblem *problem,
         pmcheap *cand_heap,
         int          *nodepair_refs,
-        double       *nodepair_weights)
-{
+        double       *nodepair_weights) {
     int    val = 0;
     int    max_non_improving_branches  = 4; /* pd->njobs / 100 + 1; */
     int    remaining_branches          = max_non_improving_branches;
@@ -2808,6 +3358,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
                 strongest_dbl_lb = dbl_child_lb;
                 *strongest_v1     = v1;
                 *strongest_v2     = v2;
+
                 //remaining_branches = max_non_improving_branches;
 
                 if (pd->same_children) {
@@ -2879,8 +3430,8 @@ CLEAN:
     return val;
 }
 
-static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd, wctproblem *problem, GList *branchnodes, int *completiontime)
-{
+static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd,
+                                       wctproblem *problem, GList *branchnodes, int *completiontime) {
     int    rval = 0;
     int    max_non_improving_branches  = 3; /* cd->njobs / 100 + 1; */
     int    remaining_branches          = max_non_improving_branches;
@@ -2905,7 +3456,8 @@ static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd, wctproble
             /* Create duetime and releasetime */
             rval = create_duetime_ahv(problem, pd, &duetime_child, v1, completiontime[v1]);
             CCcheck_val_2(rval, "Failed in create_duetime");
-            rval = create_releasetime_ahv(problem, pd, &releasetime_child, v1, completiontime[v1]);
+            rval = create_releasetime_ahv(problem, pd, &releasetime_child, v1,
+                                          completiontime[v1]);
             CCcheck_val_2(rval, "Failed in create_differ");
 
             if (duetime_child->status != infeasible) {
@@ -2918,7 +3470,8 @@ static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd, wctproble
                 compute_lower_bound(problem, releasetime_child);
             }
 
-            dbl_child_lb = (duetime_child->LP_lower_bound_dual < releasetime_child->LP_lower_bound_dual) ?
+            dbl_child_lb = (duetime_child->LP_lower_bound_dual <
+                            releasetime_child->LP_lower_bound_dual) ?
                            duetime_child->LP_lower_bound_dual : releasetime_child->LP_lower_bound_dual;
 
             if (dbl_child_lb > strongest_dbl_lb) {
@@ -2969,10 +3522,12 @@ static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd, wctproble
             printf("Creating branches for v1 = %d, C = %d.\n", v1, completiontime[v1]);
         }
 
-        rval = create_duetime_ahv(problem, pd, &(pd->duetime_child), v1, completiontime[v1]);
+        rval = create_duetime_ahv(problem, pd, &(pd->duetime_child), v1,
+                                  completiontime[v1]);
         CCcheck_val_2(rval, "Failed in create_duetime");
         pd->nduetime = 1;
-        rval = create_releasetime_ahv(problem, pd, &(pd->releasetime_child), v1, completiontime[v1]);
+        rval = create_releasetime_ahv(problem, pd, &(pd->releasetime_child), v1,
+                                      completiontime[v1]);
         CCcheck_val_2(rval, "Failed in create_differ");
         pd->nreleasetime = 1;
         break;
@@ -2982,8 +3537,8 @@ CLEAN:
     return rval;
 }
 
-static void Scheduleset_unify(Scheduleset *cclasses, int *new_ccount, int ccount)
-{
+static void Scheduleset_unify(Scheduleset *cclasses, int *new_ccount,
+                              int ccount) {
     int i;
     Scheduleset temp;
     Scheduleset_quicksort(cclasses, ccount, (*Scheduleset_less));
@@ -3000,7 +3555,8 @@ static void Scheduleset_unify(Scheduleset *cclasses, int *new_ccount, int ccount
     }
 
     for (; i < ccount; ++i) {
-        if (*new_ccount == 0 || Scheduleset_less(&(cclasses[*new_ccount - 1]), &(cclasses[i]))) {
+        if (*new_ccount == 0 ||
+                Scheduleset_less(&(cclasses[*new_ccount - 1]), &(cclasses[i]))) {
             (*new_ccount)++;
 
             if (*new_ccount  < i + 1) {
@@ -3012,8 +3568,7 @@ static void Scheduleset_unify(Scheduleset *cclasses, int *new_ccount, int ccount
     }
 }
 
-int prune_duplicated_sets(wctdata *pd)
-{
+int prune_duplicated_sets(wctdata *pd) {
     int val = 0;
     int i, j;
     Scheduleset_unify(pd->cclasses, &(pd->ccount), pd->ccount);
@@ -3033,8 +3588,7 @@ int prune_duplicated_sets(wctdata *pd)
     return val;
 }
 
-int create_branches_ahv(wctdata *pd, wctproblem *problem)
-{
+int create_branches_ahv(wctdata *pd, wctproblem *problem) {
     int val = 0;
     int status;
     int strongest_v1 = -1;
@@ -3069,7 +3623,8 @@ int create_branches_ahv(wctdata *pd, wctproblem *problem)
         goto CLEAN;
     }
 
-    val = find_strongest_children_ahv(&strongest_v1, pd, problem, branchjobs, min_completiontime);
+    val = find_strongest_children_ahv(&strongest_v1, pd, problem, branchjobs,
+                                      min_completiontime);
     CCcheck_val_2(val, "Failed in find_strongest_children");
 
     val = set_id_and_name(pd->duetime_child, problem->nwctdata++, pd->pname);
@@ -3103,8 +3658,7 @@ CLEAN:
     return val;
 }
 
-double safe_lower_dbl(int numerator, int denominator)
-{
+double safe_lower_dbl(int numerator, int denominator) {
     double result;
     double denom_mult;
     denom_mult = denominator;
@@ -3116,8 +3670,7 @@ double safe_lower_dbl(int numerator, int denominator)
     return result;
 }
 
-static int trigger_lb_changes_ahv(wctdata *child)
-{
+static int trigger_lb_changes_ahv(wctdata *child) {
     int val = 0;
     int i;
     int new_lower_bound = child->lower_bound;
@@ -3156,8 +3709,7 @@ static int trigger_lb_changes_ahv(wctdata *child)
     return val;
 }
 
-static int trigger_lb_changes_conflict(wctdata *child)
-{
+static int trigger_lb_changes_conflict(wctdata *child) {
     int val = 0;
     int i;
     int new_lower_bound = child->lower_bound;
@@ -3196,8 +3748,7 @@ static int trigger_lb_changes_conflict(wctdata *child)
     return val;
 }
 
-static int grab_int_sol(wctdata *pd, double *x, double tolerance)
-{
+static int grab_int_sol(wctdata *pd, double *x, double tolerance) {
     int val = 0;
     double test_incumbent = .0;
     double incumbent;
@@ -3228,9 +3779,11 @@ static int grab_int_sol(wctdata *pd, double *x, double tolerance)
             for (k = 0; k < pd->cclasses[i].count; ++k) {
                 if (!colored[pd->cclasses[i].members[k]]) {
                     colored[pd->cclasses[i].members[k]] = 1;
-                    pd->bestcolors[j].members[pd->bestcolors[j].count++] = pd->cclasses[i].members[k];
+                    pd->bestcolors[j].members[pd->bestcolors[j].count++] =
+                        pd->cclasses[i].members[k];
                     pd->bestcolors[j].totweight += pd->duration[pd->cclasses[i].members[k]];
-                    pd->bestcolors[j].totwct += pd->weights[pd->cclasses[i].members[k]] * pd->bestcolors[j].totweight;
+                    pd->bestcolors[j].totwct += pd->weights[pd->cclasses[i].members[k]] *
+                                                pd->bestcolors[j].totweight;
                 }
             }
 
@@ -3269,47 +3822,68 @@ CLEAN:
 }
 
 MAYBE_UNUSED
-static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines, double error) {
+static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines,
+                            int njobs,
+                            double error) {
     int val = INT_MAX - 1;
-    double error2 = ABS(MEAN_ERROR - dbl_heap_key)/(dbl_heap_key);
-    if (dbl_heap_key >= MEAN_ERROR) {
-        if (dbl_heap_key >= 1.0) {
+
+    double error2 = dbl_heap_key > error ? (ABS(error - dbl_heap_key) + 0.0001) /
+                    (error) : (ABS(error - dbl_heap_key) + 0.0001) / (error);
+    error2 = error2 / njobs;
+
+    if (dbl_heap_key >= error) {
+        if (dbl_heap_key >= 1.0 - lp_int_tolerance()) {
             return val;
         }
-        return x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1) - nmachines) * 0.01));
+
+        // printf("test %f %f %f %f %d %d\n", error,error2,dbl_heap_key,dbl_heap_key + ABS((v2 - v1)) * error2,  v1,v2 );
+        val = x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1)) * error2), error);
+    } else {
+        // printf("test %f %f %f %f %d %d\n",error,error2,dbl_heap_key,dbl_heap_key - ABS((v2 - v1)) * error2,  v1,v2 );
+        val =  x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1)) * error2), error);
     }
 
-    return x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1) - nmachines) * 0.05));
+    return val;
 }
 
 MAYBE_UNUSED
 static int get_int_heap_key_0(double dbl_heap_key, int v1, int v2) {
     int val = INT_MAX - 1;
+
     if (dbl_heap_key >= 0.5) {
         if (dbl_heap_key >= 1.0) {
             return val;
         }
-        return x_frac( dbl_heap_key / ABS((v2 - v1)));
+
+        return x_frac(dbl_heap_key / ABS((v2 - v1)), 0.5);
     }
 
-    return x_frac(dbl_heap_key / ABS((v2 - v1)));
+    return x_frac(dbl_heap_key / ABS((v2 - v1)), 0.5);
 }
 
 static int insert_frac_pairs_into_heap(wctdata *pd, const double x[],
                                        int          *nodepair_refs,
                                        double       *nodepair_weights,
                                        int           npairs,
-                                       pmcheap *heap)
-{
+                                       pmcheap *heap) {
     int val = 0;
     int i;
     int ref_key;
-    double error = 1.0/pd->gallocated;
+    double *mean_error = (double *) NULL;
+    int *mean_counter = (int *) NULL;
+
+    mean_error = CC_SAFE_MALLOC(npairs, double);
+    CCcheck_NULL_2(mean_error, "Failed to allocate memory")
+    fill_dbl(mean_error, npairs, 0.0);
+
+    mean_counter = CC_SAFE_MALLOC(npairs, int);
+    CCcheck_NULL_2(mean_counter, "Failed to allocate memory")
+    fill_int(mean_counter, npairs, 0);
 
     for (i = 0; i < pd->ccount; ++i) {
         int j;
 
-        if (x[i] <= 0.0  || x[i] >= 1.0 - lp_int_tolerance()) {
+        if (x[i] <= 0.0 + lp_int_tolerance()  || x[i] >= 1.0 - lp_int_tolerance()) {
             continue;
         }
 
@@ -3317,14 +3891,17 @@ static int insert_frac_pairs_into_heap(wctdata *pd, const double x[],
             int v1 = pd->cclasses[i].members[j];
             int k;
             ref_key  = nodepair_ref_key(v1, v1);
-            nodepair_weights[ref_key] += /*pd->cclasses[i].totweight**/x[i];
+            nodepair_weights[ref_key] += x[i];
+
 
             for (k = j + 1 ; k < pd->cclasses[i].count; ++k) {
                 assert(k != j);
                 int v2 = pd->cclasses[i].members[k];
                 assert(v1 < v2);
                 ref_key  = nodepair_ref_key(v1, v2);
-                nodepair_weights[ref_key] += /*pd->cclasses[i].totweight**/x[i];
+                mean_error[ref_key]  += 0.5 - ABS(x[i] - floor(x[i]) - 0.5);
+                mean_counter[ref_key]++;
+                nodepair_weights[ref_key] += x[i];
             }
         }
     }
@@ -3336,25 +3913,31 @@ static int insert_frac_pairs_into_heap(wctdata *pd, const double x[],
         if (v1 != v2 && nodepair_weights[ref_key] > 0.0) {
             int v1_key  = nodepair_ref_key(v1, v1);
             int v2_key  = nodepair_ref_key(v2, v2);
+            mean_error[ref_key] = mean_error[ref_key] / mean_counter[ref_key];
             double denom        = (nodepair_weights[v1_key] + nodepair_weights[v2_key]) /
                                   2;
             double dbl_heap_key = nodepair_weights[ref_key] / denom;
-            int    int_heap_key =  get_int_heap_key(dbl_heap_key, v1, v2, pd->nmachines, error);
+            // printf("error %f %d %d %f\n",dbl_heap_key, v1, v2, mean_error[ref_key]);
+            int    int_heap_key =  get_int_heap_key(dbl_heap_key, v1, v2, pd->nmachines,
+                                                    pd->njobs,
+                                                    mean_error[ref_key]);
             val = pmcheap_insert(heap, int_heap_key + 1,
                                  (void *) & (nodepair_refs[ref_key]));
             CCcheck_val_2(val, "Failed in pmcheap_insert");
         }
     }
+
     if (dbg_lvl()) {
         printf("Size of frac heap is %d\n", pmcheap_size(heap));
     }
 
 CLEAN:
+    CC_IFFREE(mean_counter,  int)
+    CC_IFFREE(mean_error, double)
     return val;
 }
 
-int create_branches_conflict(wctdata *pd, wctproblem *problem)
-{
+int create_branches_conflict(wctdata *pd, wctproblem *problem) {
     int val = 0;
     int result = DELEYAD;
     int status;
@@ -3414,7 +3997,8 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem)
     pd->x = CC_SAFE_MALLOC(pd->ccount, double);
     CCcheck_NULL_2(pd->x, "Failed to allocate memory to pd->x");
     memcpy(pd->x, x, pd->ccount * sizeof(double));
-    val = insert_frac_pairs_into_heap(pd, pd->x, nodepair_refs, nodepair_weights, npairs, heap);
+    val = insert_frac_pairs_into_heap(pd, pd->x, nodepair_refs, nodepair_weights,
+                                      npairs, heap);
     CCcheck_val_2(val, "Failed in insert_frac_pairs_into_heap");
 
     if (pmcheap_size(heap) == 0) {
@@ -3456,7 +4040,8 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem)
         printf("Collected %d branching candidates.\n", pmcheap_size(heap));
     }
 
-    val = find_strongest_children_conflict(&strongest_v1, &strongest_v2, pd, problem, heap, nodepair_refs, nodepair_weights);
+    val = find_strongest_children_conflict(&strongest_v1, &strongest_v2, pd,
+                                           problem, heap, nodepair_refs, nodepair_weights);
     CCcheck_val_2(val, "Failed in find_strongest_children");
     // val = create_same_conflict(problem, pd, strongest_v1, strongest_v2);
     // CCcheck_val(val, "Failed in create_same");
@@ -3486,7 +4071,8 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem)
         CCcheck_val_2(val, "Failed in compute_lower_bound");
     }
 
-    if (pd->same_children->status != infeasible && pd->diff_children->status != infeasible) {
+    if (pd->same_children->status != infeasible &&
+            pd->diff_children->status != infeasible) {
         if (pd->same_children->eta_in <= pd->diff_children->eta_in) {
             pd->same_children->choose = 1;
         } else {
@@ -3514,8 +4100,7 @@ CLEAN:
     return val;
 }
 
-int create_branches_wide(wctdata *pd, wctproblem *problem)
-{
+int create_branches_wide(wctdata *pd, wctproblem *problem) {
     int val = 0;
     int result = DELEYAD;
     int status;
@@ -3565,7 +4150,8 @@ int create_branches_wide(wctdata *pd, wctproblem *problem)
     CCcheck_NULL_2(pd->x, "Failed to allocate memory to pd->x");
     val = wctlp_x(pd->LP, pd->x, 0);
     CCcheck_val_2(val, "Failed at wctlp_x");
-    val = insert_frac_pairs_into_heap(pd, pd->x, nodepair_refs, nodepair_weights, npairs, heap);
+    val = insert_frac_pairs_into_heap(pd, pd->x, nodepair_refs, nodepair_weights,
+                                      npairs, heap);
     CCcheck_val_2(val, "Failed in insert_frac_pairs_into_heap");
 
     if (pmcheap_size(heap) == 0) {
@@ -3625,7 +4211,8 @@ int create_branches_wide(wctdata *pd, wctproblem *problem)
     for (i = 0; i < nb_wide; ++i) {
         create_diff_wide(problem, pd, v1_wide[i], v2_wide[i]);
         CCcheck_val_2(val, "Failed in create_differ");
-        val = set_id_and_name(pd->diff_children_wide[i], problem->nwctdata++, pd->pname);
+        val = set_id_and_name(pd->diff_children_wide[i], problem->nwctdata++,
+                              pd->pname);
         CCcheck_val_2(val, "Failed in set_id_and_name");
         val = compute_lower_bound(problem, pd->diff_children_wide[i]);
         CCcheck_val_2(val, "Failed in compute_lower_bound");
@@ -3650,8 +4237,7 @@ CLEAN:
     return val;
 }
 
-int skip_wctdata(wctdata *pd, wctproblem *problem)
-{
+int skip_wctdata(wctdata *pd, wctproblem *problem) {
     BinomialHeap *br_heap = problem->br_heap_a;
 
     if (dbg_lvl() > 0) {
@@ -3666,8 +4252,7 @@ int skip_wctdata(wctdata *pd, wctproblem *problem)
     return 0;
 }
 
-int insert_into_branching_heap(wctdata *pd, wctproblem *problem)
-{
+int insert_into_branching_heap(wctdata *pd, wctproblem *problem) {
     int val = 0;
     int heap_key = 0;
     wctparms *parms = &(problem->parms);
@@ -3704,32 +4289,38 @@ CLEAN:
     return val;
 }
 
-void insert_node_for_exploration(wctdata *pd, wctproblem *problem)
-{
+void insert_node_for_exploration(wctdata *pd, wctproblem *problem) {
     unsigned int level = pd->ecount_same;
     wctparms *parms = &(problem->parms);
 
     if (pd->lower_bound < pd->upper_bound && pd->status != infeasible) {
         while (problem->unexplored_states->len  <= level) {
-            g_ptr_array_add(problem->unexplored_states, (gpointer)  binomial_heap_new(BINOMIAL_HEAP_TYPE_MIN, compare_nodes_bfs));
+            g_ptr_array_add(problem->unexplored_states,
+                            (gpointer)  binomial_heap_new(BINOMIAL_HEAP_TYPE_MIN, compare_nodes_bfs));
         }
 
-        unsigned int wasPrevEmpty = binomial_heap_num_entries((BinomialHeap *)(problem->unexplored_states->pdata[level])) == 0;
-        binomial_heap_insert((BinomialHeap *)(problem->unexplored_states->pdata[level]), pd);
+        unsigned int wasPrevEmpty = binomial_heap_num_entries((BinomialHeap *)(
+                                        problem->unexplored_states->pdata[level])) == 0;
+        binomial_heap_insert((BinomialHeap *)(problem->unexplored_states->pdata[level]),
+                             pd);
 
         if (wasPrevEmpty) {
             if (level == problem->last_explored) {
-                g_queue_push_tail(problem->non_empty_level_pqs, (problem->unexplored_states->pdata[level]));
+                g_queue_push_tail(problem->non_empty_level_pqs,
+                                  (problem->unexplored_states->pdata[level]));
                 return;
             }
 
-            unsigned int isPrevLevelEmpty = (level > 0) ? binomial_heap_num_entries((BinomialHeap *) problem->unexplored_states->pdata[level - 1]) == 0 : TRUE;
+            unsigned int isPrevLevelEmpty = (level > 0) ? binomial_heap_num_entries((
+                                                BinomialHeap *) problem->unexplored_states->pdata[level - 1]) == 0 : TRUE;
 
             if (isPrevLevelEmpty) {
-                g_queue_push_head(problem->non_empty_level_pqs, (problem->unexplored_states->pdata[level]));
+                g_queue_push_head(problem->non_empty_level_pqs,
+                                  (problem->unexplored_states->pdata[level]));
             } else {
                 gpointer data = g_queue_pop_head(problem->non_empty_level_pqs);
-                g_queue_push_head(problem->non_empty_level_pqs, (problem->unexplored_states->pdata[level]));
+                g_queue_push_head(problem->non_empty_level_pqs,
+                                  (problem->unexplored_states->pdata[level]));
                 g_queue_push_head(problem->non_empty_level_pqs, data);
             }
         }
@@ -3750,11 +4341,11 @@ void insert_node_for_exploration(wctdata *pd, wctproblem *problem)
     }
 }
 
-wctdata *get_next_node(wctproblem *problem)
-{
+wctdata *get_next_node(wctproblem *problem) {
     wctdata *pd = (wctdata *) NULL;
     GQueue  *non_empty_level_pqs = problem->non_empty_level_pqs;
-    BinomialHeap *next_level_pq = (BinomialHeap *) g_queue_pop_head(non_empty_level_pqs);
+    BinomialHeap *next_level_pq = (BinomialHeap *) g_queue_pop_head(
+                                      non_empty_level_pqs);
 
     if (next_level_pq == (BinomialHeap *) NULL) {
         return pd;
@@ -3783,8 +4374,7 @@ wctdata *get_next_node(wctproblem *problem)
     return pd;
 }
 
-int branching_msg_wide(wctdata *pd, wctproblem *problem)
-{
+int branching_msg_wide(wctdata *pd, wctproblem *problem) {
     BinomialHeap *heap = problem->br_heap_a;
 
     if (pd->lower_bound < pd->upper_bound) {
@@ -3793,7 +4383,9 @@ int branching_msg_wide(wctdata *pd, wctproblem *problem)
                "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, v1 = %d, v2 = %d, nbdiff = %d, nbsame = %d ).\n",
                pd->lower_bound, pd->LP_lower_bound,
                pd->depth,
-               pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2, pd->ecount_differ, pd->ecount_same
+               pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap),
+               pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1,
+               pd->v2, pd->ecount_differ, pd->ecount_same
               );
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
@@ -3802,17 +4394,20 @@ int branching_msg_wide(wctdata *pd, wctproblem *problem)
     return 0;
 }
 
-int branching_msg(wctdata *pd, wctproblem *problem)
-{
+int branching_msg(wctdata *pd, wctproblem *problem) {
     BinomialHeap *heap = problem->br_heap_a;
+    wctdata *root = &(problem->root_pd);
 
     if (pd->lower_bound < pd->upper_bound) {
         CCutil_suspend_timer(&problem->tot_cputime);
         printf("Branching with lb %d (LP %f) at depth %d (id = %d, "
                "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, v1 = %d, v2 = %d, nbdiff = %d, nbsame = %d, ZDD size= %lu, nb_cols = %d ).\n",
-               pd->lower_bound, pd->LP_lower_bound,
+               pd->lower_bound, pd->LP_lower_bound_BB,
                pd->depth,
-               pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2, pd->ecount_differ, pd->ecount_same, get_datasize(pd->solver),pd->ccount);
+               pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap),
+               pd->njobs, problem->global_upper_bound, root->lower_bound, pd->v1,
+               pd->v2, pd->ecount_differ, pd->ecount_same, get_datasize(pd->solver),
+               pd->ccount);
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
     }
@@ -3820,17 +4415,20 @@ int branching_msg(wctdata *pd, wctproblem *problem)
     return 0;
 }
 
-int branching_msg_ahv(wctdata *pd, wctproblem *problem)
-{
+int branching_msg_ahv(wctdata *pd, wctproblem *problem) {
     BinomialHeap *heap = problem->br_heap_a;
+    wctdata *root = &(problem->root_pd);
 
     if (pd->lower_bound < pd->upper_bound) {
         CCutil_suspend_timer(&problem->tot_cputime);
         printf("Branching with lb %d (LP %f) at depth %d (id = %d, "
-               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, branch_job = %d, completion_time= %d, nbduetime= %d).\n",
+               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, branch_job = %d, completion_time= %d, nbduetime= %d, ZDD size = %lu,  nb_cols = %d).\n",
                pd->lower_bound, pd->LP_lower_bound,
                pd->depth,
-               pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap), pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->branch_job, pd->completiontime, pd->ecount_same);
+               pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap),
+               pd->njobs, problem->global_upper_bound, root->lower_bound,
+               pd->branch_job, pd->completiontime, pd->ecount_same, get_datasize(pd->solver),
+               pd->ccount);
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
     }
@@ -3839,9 +4437,9 @@ int branching_msg_ahv(wctdata *pd, wctproblem *problem)
 }
 
 
-int branching_msg_cbfs(wctdata *pd, wctproblem *problem)
-{
+int branching_msg_cbfs(wctdata *pd, wctproblem *problem) {
     int nb_nodes = 0;
+    wctdata *root = &(problem->root_pd);
 
     for (unsigned int i = 0; i < problem->unexplored_states->len; ++i) {
         BinomialHeap *heap = (BinomialHeap *)(problem->unexplored_states->pdata[i]);
@@ -3851,11 +4449,13 @@ int branching_msg_cbfs(wctdata *pd, wctproblem *problem)
     if (pd->lower_bound < pd->upper_bound) {
         CCutil_suspend_timer(&problem->tot_cputime);
         printf("Branching with lb %d (LP %f) at depth %d (id = %d, "
-               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, v1 = %d, v2 = %d, nbdiff = %d, nbsame = %d ).\n",
+               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, v1 = %d, v2 = %d, nbdiff = %d, nbsame = %d, ZDD size = %lu, nb_cols = %d ).\n",
                pd->lower_bound, pd->LP_lower_bound,
                pd->depth,
-               pd->id, problem->tot_cputime.cum_zeit, nb_nodes, pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->v1, pd->v2, pd->ecount_differ, pd->ecount_same
-              );
+               pd->id, problem->tot_cputime.cum_zeit, nb_nodes, pd->njobs,
+               problem->global_upper_bound, root->lower_bound, pd->v1, pd->v2,
+               pd->ecount_differ, pd->ecount_same, get_datasize(pd->solver),
+               pd->ccount);
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
     }
@@ -3863,9 +4463,9 @@ int branching_msg_cbfs(wctdata *pd, wctproblem *problem)
     return 0;
 }
 
-int branching_msg_cbfs_ahv(wctdata *pd, wctproblem *problem)
-{
+int branching_msg_cbfs_ahv(wctdata *pd, wctproblem *problem) {
     int nb_nodes = 0;
+    wctdata *root = &(problem->root_pd);
 
     for (unsigned int i = 0; i < problem->unexplored_states->len; ++i) {
         BinomialHeap *heap = (BinomialHeap *)(problem->unexplored_states->pdata[i]);
@@ -3875,11 +4475,14 @@ int branching_msg_cbfs_ahv(wctdata *pd, wctproblem *problem)
     if (pd->lower_bound < pd->upper_bound) {
         CCutil_suspend_timer(&problem->tot_cputime);
         printf("Branching with lb %d (LP %f) at depth %d (id = %d, "
-               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, branchjob = %d, completiontime = %d, nbreleasetime = %d, nbduetime = %d ).\n",
+               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, branchjob = %d, completiontime = %d, nbreleasetime = %d, nbduetime = %d, ZDD size = %lu,  nb_cols = %d ).\n",
                pd->lower_bound, pd->LP_lower_bound,
                pd->depth,
-               pd->id, problem->tot_cputime.cum_zeit, nb_nodes, pd->njobs, problem->global_upper_bound, problem->global_lower_bound, pd->branch_job, pd->completiontime, pd->ecount_differ, pd->ecount_same
-              );
+               pd->id, problem->tot_cputime.cum_zeit, nb_nodes, pd->njobs,
+               problem->global_upper_bound, root->lower_bound, pd->branch_job,
+               pd->completiontime, pd->ecount_differ, pd->ecount_same,
+               get_datasize(pd->solver),
+               pd->ccount);
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
     }
@@ -3887,8 +4490,7 @@ int branching_msg_cbfs_ahv(wctdata *pd, wctproblem *problem)
     return 0;
 }
 
-int sequential_branching_ahv(wctproblem *problem)
-{
+int sequential_branching_ahv(wctproblem *problem) {
     int val = 0;
     wctdata *pd;
     BinomialHeap *br_heap = problem->br_heap_a;
@@ -3953,8 +4555,7 @@ CLEAN:
     return val;
 }
 
-int sequential_branching_conflict(wctproblem *problem)
-{
+int sequential_branching_conflict(wctproblem *problem) {
     int val = 0;
     wctdata *pd;
     BinomialHeap *br_heap = problem->br_heap_a;
@@ -4020,8 +4621,7 @@ CLEAN:
     return val;
 }
 
-int sequential_cbfs_branch_and_bound_conflict(wctproblem *problem)
-{
+int sequential_cbfs_branch_and_bound_conflict(wctproblem *problem) {
     int val = 0;
     wctdata *pd;
     wctparms *parms = &(problem->parms);
@@ -4085,8 +4685,7 @@ CLEAN:
     return val;
 }
 
-int sequential_cbfs_branch_and_bound_ahv(wctproblem *problem)
-{
+int sequential_cbfs_branch_and_bound_ahv(wctproblem *problem) {
     int val = 0;
     wctdata *pd;
     wctparms *parms = &(problem->parms);
@@ -4148,8 +4747,7 @@ CLEAN:
 }
 
 
-int sequential_branching_wide(wctproblem *problem)
-{
+int sequential_branching_wide(wctproblem *problem) {
     int val = 0;
     wctdata *pd;
     BinomialHeap *br_heap = problem->br_heap_a;
@@ -4213,8 +4811,7 @@ CLEAN:
 }
 
 MAYBE_UNUSED
-static int grow_ages(wctdata *pd)
-{
+static int grow_ages(wctdata *pd) {
     int val = 0;
     int i;
     int *cstat;
@@ -4244,8 +4841,7 @@ CLEAN:
 }
 
 MAYBE_UNUSED
-static int delete_old_cclasses(wctdata *pd)
-{
+static int delete_old_cclasses(wctdata *pd) {
     int val   = 0;
     int i;
     int min_numdel = pd->njobs * min_ndelrow_ratio;
@@ -4320,8 +4916,7 @@ CLEAN:
     return val;
 }
 
-int build_lp(wctdata *pd, int construct)
-{
+int build_lp(wctdata *pd, int construct) {
     int val = 0;
     int i, j;
     int  *covered = (int *)NULL;
@@ -4333,13 +4928,16 @@ int build_lp(wctdata *pd, int construct)
     CCcheck_val_2(val, "wctlp_init failed");
 
     for (i = 0; i < pd->njobs; i++) {
-        val = wctlp_addrow(pd->LP, 0, (int *)NULL, (double *)NULL, wctlp_GREATER_EQUAL, 1.0,
+        val = wctlp_addrow(pd->LP, 0, (int *)NULL, (double *)NULL, wctlp_GREATER_EQUAL,
+                           1.0,
                            (char *)NULL);
         CCcheck_val_2(val, "Failed wctlp_addrow");
     }
 
-    wctlp_addrow(pd->LP, 0  , (int *)NULL, (double *) NULL, wctlp_LESS_EQUAL, (double)pd->nmachines , NULL);
-    pd->coef = (double *)CCutil_reallocrus(pd->coef, (pd->njobs + 1) * sizeof(double));
+    wctlp_addrow(pd->LP, 0  , (int *)NULL, (double *) NULL, wctlp_LESS_EQUAL,
+                 (double)pd->nmachines , NULL);
+    pd->coef = (double *)CCutil_reallocrus(pd->coef,
+                                           (pd->njobs + 1) * sizeof(double));
     CCcheck_NULL_2(pd->coef, "out of memory for coef");
     fill_dbl(pd->coef, pd->njobs + 1, 1.0);
 
@@ -4385,7 +4983,8 @@ int build_lp(wctdata *pd, int construct)
                 pd->newsets[0].C[0] = pd->duration[i];
                 g_hash_table_insert(pd->newsets[0].table, GINT_TO_POINTER(i), pd->newsets[0].C);
                 pd->newsets->age = 0;
-                val = wctlp_addcol(pd->LP, 2, pd->newsets[0].members, pd->coef, pd->newsets[0].totwct, 0.0, GRB_INFINITY,
+                val = wctlp_addcol(pd->LP, 2, pd->newsets[0].members, pd->coef,
+                                   pd->newsets[0].totwct, 0.0, GRB_INFINITY,
                                    wctlp_CONT, NULL);
                 CCcheck_val_2(val, "Failed in wctlp_addcol");
 
@@ -4442,8 +5041,7 @@ CLEAN:
     return val;
 }
 
-int build_lp_part(wctdata *pd)
-{
+int build_lp_part(wctdata *pd) {
     int val = 0;
     int i, j;
     int  *covered = (int *)NULL;
@@ -4461,27 +5059,28 @@ int build_lp_part(wctdata *pd)
         CCcheck_val_2(val, "Failed wctlp_addrow");
     }
 
-    wctlp_addrow(pd->LP, 0  , (int *)NULL, (double *) NULL, wctlp_EQUAL, (double)pd->nmachines , NULL);
+    wctlp_addrow(pd->LP, 0  , (int *)NULL, (double *) NULL, wctlp_EQUAL,
+                 (double)pd->nmachines , NULL);
     fill_dbl(pd->coef, pd->njobs + 1, 1.0);
 
     /** add constraint about number of machines */
 
-        for (i = 0; i < pd->ccount; i++) {
-            val = wctlp_addcol(pd->LP, pd->cclasses[i].count + 1,
-                               pd->cclasses[i].members,
-                               pd->coef, pd->cclasses[i].totwct, 0.0, GRB_INFINITY, wctlp_CONT, NULL);
+    for (i = 0; i < pd->ccount; i++) {
+        val = wctlp_addcol(pd->LP, pd->cclasses[i].count + 1,
+                           pd->cclasses[i].members,
+                           pd->coef, pd->cclasses[i].totwct, 0.0, GRB_INFINITY, wctlp_CONT, NULL);
 
-            if (val) {
-                wctlp_printerrorcode(val);
-            }
+        if (val) {
+            wctlp_printerrorcode(val);
+        }
 
-            for (j = 0; j < pd->cclasses[i].count && counter < pd->njobs; j++) {
-                if (!covered[pd->cclasses[i].members[j]]) {
-                    covered[pd->cclasses[i].members[j]] = 1;
-                    counter++;
-                }
+        for (j = 0; j < pd->cclasses[i].count && counter < pd->njobs; j++) {
+            if (!covered[pd->cclasses[i].members[j]]) {
+                covered[pd->cclasses[i].members[j]] = 1;
+                counter++;
             }
         }
+    }
 
 
     if (counter < pd->njobs) {
@@ -4506,7 +5105,8 @@ int build_lp_part(wctdata *pd)
                 pd->newsets[0].C[0] = pd->duration[i];
                 g_hash_table_insert(pd->newsets[0].table, GINT_TO_POINTER(i), pd->newsets[0].C);
                 pd->newsets->age = 0;
-                val = wctlp_addcol(pd->LP, 2, pd->newsets[0].members, pd->coef, pd->newsets[0].totwct, 0.0, GRB_INFINITY,
+                val = wctlp_addcol(pd->LP, 2, pd->newsets[0].members, pd->coef,
+                                   pd->newsets[0].totwct, 0.0, GRB_INFINITY,
                                    wctlp_CONT, NULL);
                 CCcheck_val_2(val, "Failed in wctlp_addcol");
 
@@ -4544,8 +5144,7 @@ CLEAN:
 }
 
 
-int compute_lower_bound(wctproblem *problem, wctdata *pd)
-{
+int compute_lower_bound(wctproblem *problem, wctdata *pd) {
     int  j, val = 0;
     int iterations = 0;
     int break_while_loop = 1;
@@ -4570,7 +5169,8 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         solution *new_sol;
         new_sol = new_sol_init(pd->nmachines, pd->njobs);
         construct_wspt(pd->jobarray, pd->njobs, pd->nmachines, new_sol);
-        partlist_to_Scheduleset(new_sol->part, pd->nmachines, pd->njobs, &(pd->cclasses), &(pd->ccount));
+        partlist_to_Scheduleset(new_sol->part, pd->nmachines, pd->njobs,
+                                &(pd->cclasses), &(pd->ccount));
         solution_free(new_sol);
         assert(pd->gallocated >= pd->ccount);
     }
@@ -4693,7 +5293,8 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         CCutil_suspend_timer(&problem->tot_pricing);
 
         for (j = 0; j < pd->nnewsets && pd->update; j++) {
-            val = wctlp_addcol(pd->LP, pd->newsets[j].count + 1, pd->newsets[j].members, pd->coef, pd->newsets[j].totwct, 0.0, GRB_INFINITY, wctlp_CONT, NULL);
+            val = wctlp_addcol(pd->LP, pd->newsets[j].count + 1, pd->newsets[j].members,
+                               pd->coef, pd->newsets[j].totwct, 0.0, GRB_INFINITY, wctlp_CONT, NULL);
             CCcheck_val_2(val, "wctlp_addcol failed");
         }
 
@@ -4717,11 +5318,12 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
             break;
         }
 
-        if(pd->update) {
+        if (pd->update) {
             add_newsets(pd);
         } else {
             Schedulesets_free(&pd->newsets, &pd->nnewsets);
         }
+
         /** Compute LP relaxation */
         cur_cputime = CCutil_zeit();
         val = wctlp_optimize(pd->LP, &status);
@@ -4752,7 +5354,8 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
                 val = compute_objective(pd, parms);
                 CCcheck_val_2(val, "Failed in compute_objective");
                 memcpy(pd->pi_out, pd->pi, sizeof(double) * (pd->njobs + 1));
-                pd->eta_out = pd->LP_lower_bound_dual < pd->LP_lower_bound ? pd->LP_lower_bound:pd->LP_lower_bound_dual;
+                pd->eta_out = pd->LP_lower_bound_dual < pd->LP_lower_bound ? pd->LP_lower_bound
+                              : pd->LP_lower_bound_dual;
             }
 
             break;
@@ -4768,9 +5371,11 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         CCutil_resume_timer(&(problem->tot_cputime));
     }
 
-    if (iterations < pd->maxiterations && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit) {
+    if (iterations < pd->maxiterations &&
+            problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit) {
         switch (status) {
         case GRB_OPTIMAL:
+
             /** change status of problem */
             if (problem->status == no_sol) {
                 problem->status = lp_feasible;
@@ -4797,6 +5402,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd)
         case GRB_OPTIMAL:
             pd->status = LP_bound_estimated;
             break;
+
         case GRB_INFEASIBLE:
             pd->status = infeasible;
             break;
@@ -4816,8 +5422,7 @@ CLEAN:
 
 
 
-MAYBE_UNUSED static int submiping(wctdata *cd)
-{
+MAYBE_UNUSED static int submiping(wctdata *cd) {
     int val = 0;
     double incumbent;
     int status;
@@ -4860,8 +5465,7 @@ CLEAN:
     return val;
 }
 
-static int prefill_heap(wctdata *pd, wctproblem *problem)
-{
+static int prefill_heap(wctdata *pd, wctproblem *problem) {
     int val = 0;
     int insert_into_heap = 0;
 
@@ -4916,8 +5520,7 @@ CLEAN:
     return val;
 }
 
-int compute_schedule(wctproblem *problem)
-{
+int compute_schedule(wctproblem *problem) {
     int val = 0;
     wctdata *root_pd = &(problem->root_pd);
     wctparms *parms = &(problem->parms);
@@ -4928,6 +5531,7 @@ int compute_schedule(wctproblem *problem)
                                         problem->global_lower_bound) / ((double)problem->global_lower_bound);
     prune_duplicated_sets(root_pd);
     init_BB_tree(problem);
+    print_size_to_csv(problem, root_pd);
 
     if (root_pd->status >= LP_bound_computed) {
         val = prefill_heap(root_pd, problem);
@@ -4962,7 +5566,9 @@ int compute_schedule(wctproblem *problem)
         }
     }
 
-    printf("GUB = %d, GLB = %d\n", problem->global_upper_bound, problem->global_lower_bound);
+    printf("GUB = %d, GLB = %d\n", problem->global_upper_bound,
+           problem->global_lower_bound);
+
     if (problem->global_lower_bound != problem->global_upper_bound) {
         CCutil_start_resume_time(&(problem->tot_branch_and_bound));
 
@@ -4989,7 +5595,8 @@ int compute_schedule(wctproblem *problem)
         }
 
         CCutil_stop_timer(&(problem->tot_branch_and_bound), 0);
-        printf("Compute schedule finished with LB %d and UB %d\n", root_pd->lower_bound, problem->global_upper_bound);
+        printf("Compute schedule finished with LB %d and UB %d\n", root_pd->lower_bound,
+               problem->global_upper_bound);
     } else {
         problem->found = 1;
     }

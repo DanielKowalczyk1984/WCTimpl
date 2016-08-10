@@ -15,15 +15,13 @@
 /* #define HEAP_INTEGRITY_CHECKS 1 */
 
 
-static int pmcheap_empty(pmcheap *heap)
-{
+static int pmcheap_empty(pmcheap *heap) {
     assert(heap->end >= 0);
     return !(heap->end);
 }
 
 MAYBE_UNUSED
-static int pmcheap_integrity(pmcheap *heap)
-{
+static int pmcheap_integrity(pmcheap *heap) {
     int val = 0;
     int i;
     int *perm = heap->perm;
@@ -55,8 +53,7 @@ static int pmcheap_integrity(pmcheap *heap)
 #endif
 
 
-int pmcheap_init(pmcheap **heap, int size)
-{
+int pmcheap_init(pmcheap **heap, int size) {
     int val = 0;
 
     if (size == 0) {
@@ -96,8 +93,7 @@ CLEAN:
     return val;
 }
 
-int pmcheap_free(pmcheap  *heap)
-{
+int pmcheap_free(pmcheap  *heap) {
     if (heap) {
         if (heap->perm) {
             free(heap->perm);
@@ -117,8 +113,7 @@ int pmcheap_free(pmcheap  *heap)
     return 0;
 }
 
-int pmcheap_free_all(pmcheap *heap)
-{
+int pmcheap_free_all(pmcheap *heap) {
     if (heap) {
         for (int i = 1; i <= heap->end; ++i) {
             if (heap->elms[heap->perm[i]].obj) {
@@ -135,8 +130,7 @@ int pmcheap_free_all(pmcheap *heap)
     return 0;
 }
 
-void pmcheap_reset_free(pmcheap *heap)
-{
+void pmcheap_reset_free(pmcheap *heap) {
     int i;
 
     for (i = 1; i  <= heap->size; ++i) {
@@ -154,8 +148,7 @@ void pmcheap_reset_free(pmcheap *heap)
     heap->end = 0;
 }
 
-void pmcheap_reset(pmcheap *heap)
-{
+void pmcheap_reset(pmcheap *heap) {
     int i;
     heap->end = 0;
 
@@ -171,8 +164,7 @@ void pmcheap_reset(pmcheap *heap)
 }
 
 static int pmcheap_liftup(pmcheap *heap,
-                          int           pos)
-{
+                          int           pos) {
     int swaps   = 0;
     int href     = heap->perm[pos];
     int *perm   = heap->perm;
@@ -199,8 +191,7 @@ static int pmcheap_liftup(pmcheap *heap,
     return swaps;
 }
 
-static int pmcheap_siftdown(pmcheap *heap, int pos)
-{
+static int pmcheap_siftdown(pmcheap *heap, int pos) {
     int swaps    = 0;
     int end_half = heap->end / 2;
     int *perm  = heap->perm;
@@ -236,8 +227,7 @@ static int pmcheap_siftdown(pmcheap *heap, int pos)
 }
 
 
-int pmcheap_insert(pmcheap *heap, int key, void *obj)
-{
+int pmcheap_insert(pmcheap *heap, int key, void *obj) {
     int val = 0;
     (heap->end)++;
 
@@ -274,8 +264,7 @@ CLEAN:
     return val;
 }
 
-int pmcheap_remove(pmcheap *heap, int href)
-{
+int pmcheap_remove(pmcheap *heap, int href) {
     int rval = 0;
     int heap_pos = heap->iperm[href];
 
@@ -312,8 +301,7 @@ CLEANUP:
     return rval;
 }
 
-void *pmcheap_min(pmcheap *heap)
-{
+void *pmcheap_min(pmcheap *heap) {
     int href;
     void *obj;
 #ifdef HEAP_INTEGRITY_CHECKS
@@ -343,19 +331,16 @@ void *pmcheap_min(pmcheap *heap)
     return obj;
 }
 
-int pmcheap_get_key(const pmcheap *heap, int href)
-{
+int pmcheap_get_key(const pmcheap *heap, int href) {
     assert(href < heap->size);
     return heap->elms[href].key;
 }
 
-int pmcheap_size(const pmcheap *heap)
-{
+int pmcheap_size(const pmcheap *heap) {
     return heap->end;
 }
 
-void *pmcheap_get_obj(const pmcheap *heap, int href)
-{
+void *pmcheap_get_obj(const pmcheap *heap, int href) {
     assert(href < heap->size);
     return heap->elms[href].obj;
 }
@@ -363,8 +348,7 @@ void *pmcheap_get_obj(const pmcheap *heap, int href)
 
 
 
-int pmcheap_decrease_key(pmcheap *heap, int href, int new_key)
-{
+int pmcheap_decrease_key(pmcheap *heap, int href, int new_key) {
     int rval = 0;
     int heap_pos = heap->iperm[href];
 
@@ -383,8 +367,7 @@ CLEANUP:
     return rval;
 }
 
-int pmcheap_relabel(pmcheap *heap, int href, int new_key)
-{
+int pmcheap_relabel(pmcheap *heap, int href, int new_key) {
     int rval = 0;
     int heap_pos = heap->iperm[href];
     heap->elms[href].key = new_key;

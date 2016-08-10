@@ -7,8 +7,7 @@ gint compare_func(const void *a, const void *b);
 gint order_weight(gconstpointer a, gconstpointer b, void *data);
 
 
-void solution_init(solution *sol)
-{
+void solution_init(solution *sol) {
     if (sol) {
         sol->part     = (partlist *)NULL;
         sol->vlist    = (joblist *)NULL;
@@ -22,8 +21,7 @@ void solution_init(solution *sol)
     }
 }
 
-void solution_free(solution *sol)
-{
+void solution_free(solution *sol) {
     int i;
 
     if (sol) {
@@ -43,8 +41,7 @@ void solution_free(solution *sol)
     }
 }
 
-int solution_alloc(solution *sol, int nmachines, int njobs)
-{
+int solution_alloc(solution *sol, int nmachines, int njobs) {
     int val = 0;
     sol->nmachines  = nmachines;
     sol->njobs = njobs;
@@ -95,16 +92,14 @@ CLEAN:
     return val;
 }
 
-gint comparefunc(const void *a, const void *b, void *data)
-{
+gint comparefunc(const void *a, const void *b, void *data) {
     (void) data;
     const int *v = &(((const Job *)a)->job);
     const int *w = &(((const Job *)b)->job);
     return *v - *w;
 }
 
-gint compare_func(const void *a, const void *b)
-{
+gint compare_func(const void *a, const void *b) {
     const int *v = &(((const partlist *)a)->completiontime);
     const int *w = &(((const partlist *)b)->completiontime);
 
@@ -121,16 +116,14 @@ gint compare_func(const void *a, const void *b)
     }
 }
 
-gint order_weight(gconstpointer a, gconstpointer b, void *data)
-{
+gint order_weight(gconstpointer a, gconstpointer b, void *data) {
     (void) data;
     const int *v = &(((const Job *)a)->weight);
     const int *w = &(((const Job *)b)->weight);
     return -(*v - *w);
 }
 
-void solution_max(solution *sol)
-{
+void solution_max(solution *sol) {
     int max = 0;
 
     for (int i = 0; i < sol->nmachines; ++i) {
@@ -142,8 +135,7 @@ void solution_max(solution *sol)
     sol->totalweightcomptime = max;
 }
 
-void solution_unique(solution *sol)
-{
+void solution_unique(solution *sol) {
     int i;
     int nmachines = sol->nmachines;
     GList *it = (GList *) NULL;
@@ -168,8 +160,7 @@ void solution_unique(solution *sol)
     }
 }
 
-void solution_print(solution *sol)
-{
+void solution_print(solution *sol) {
     for (int i = 0; i < sol->nmachines; ++i) {
         printf("Machine %d: ", sol->part[i].key);
 
@@ -177,15 +168,15 @@ void solution_print(solution *sol)
             printf("%d ", ((Job *)it->data)->job);
         }
 
-        printf("with C =  %d, wC = %d and %d jobs\n", sol->part[i].completiontime, sol->part[i].totcompweight
+        printf("with C =  %d, wC = %d and %d jobs\n", sol->part[i].completiontime,
+               sol->part[i].totcompweight
                , g_queue_get_length(sol->part[i].list));
     }
 
     printf("with total weighted completion time %d\n", sol->totalweightcomptime);
 }
 
-void test_SOLUTION(solution *sol)
-{
+void test_SOLUTION(solution *sol) {
     int i;
 
     for (i = 0; i <  sol->njobs; i++) {
@@ -199,8 +190,7 @@ void test_SOLUTION(solution *sol)
     }
 }
 
-int solution_copy(solution *dest, solution src)
-{
+int solution_copy(solution *dest, solution src) {
     int val = 0;
     int counter = 0;
     solution_init(dest);
@@ -220,7 +210,8 @@ int solution_copy(solution *dest, solution src)
         dest->part[i].list = (GQueue *) NULL;
         dest->part[i].list = g_queue_copy(src.part[i].list);
         memcpy(dest->part[i].sumtimes, src.part[i].sumtimes, sizeof(int)*dest->njobs);
-        memcpy(dest->part[i].sumweights, src.part[i].sumweights, sizeof(int)*dest->njobs);
+        memcpy(dest->part[i].sumweights, src.part[i].sumweights,
+               sizeof(int)*dest->njobs);
         dest->part[i].completiontime = src.part[i].completiontime;
 
         for (GList *it = dest->part[i].list->head; it; it = it->next) {
@@ -240,8 +231,7 @@ CLEAN:
     return val;
 }
 
-int solution_update(solution *dest, solution src)
-{
+int solution_update(solution *dest, solution src) {
     int val = 0;
     int counter = 0;
     dest->dist     = src.dist;
@@ -257,7 +247,8 @@ int solution_update(solution *dest, solution src)
         dest->part[i].list = g_queue_copy(src.part[i].list);
         dest->part[i].completiontime = src.part[i].completiontime;
         memcpy(dest->part[i].sumtimes, src.part[i].sumtimes, sizeof(int)*dest->njobs);
-        memcpy(dest->part[i].sumweights, src.part[i].sumweights, sizeof(int)*dest->njobs);
+        memcpy(dest->part[i].sumweights, src.part[i].sumweights,
+               sizeof(int)*dest->njobs);
 
         for (GList *it = dest->part[i].list->head; it; it = it->next) {
             dest->perm[counter] = ((Job *)it->data)->job;
@@ -269,8 +260,7 @@ int solution_update(solution *dest, solution src)
     return val;
 }
 
-void solution_calc(solution *sol, Job *jobarray)
-{
+void solution_calc(solution *sol, Job *jobarray) {
     int i, j;
     int njobs = sol->njobs;
     int nmachines = sol->nmachines;
@@ -288,7 +278,8 @@ void solution_calc(solution *sol, Job *jobarray)
         for (it = temp_partlist->list->head; it; it = g_list_next(it)) {
             temp_job = ((Job *)it->data);
             temp_partlist->completiontime += temp_job->processingime ;
-            temp_partlist->totcompweight += temp_job->weight * temp_partlist->completiontime;
+            temp_partlist->totcompweight += temp_job->weight *
+                                            temp_partlist->completiontime;
             sol->totalweightcomptime += temp_partlist->completiontime * temp_job->weight;
         }
     }
@@ -312,7 +303,8 @@ void solution_calc(solution *sol, Job *jobarray)
             temp_partlist = sol->part + i;
 
             if (sol->vlist[j].part == temp_partlist) {
-                temp_partlist->sumtimes[j] = temp_partlist->sumtimes[j - 1] + jobarray[j].processingime;
+                temp_partlist->sumtimes[j] = temp_partlist->sumtimes[j - 1] +
+                                             jobarray[j].processingime;
             } else {
                 temp_partlist->sumtimes[j] = temp_partlist->sumtimes[j - 1];
             }
@@ -324,7 +316,8 @@ void solution_calc(solution *sol, Job *jobarray)
             temp_partlist = sol->part + i;
 
             if (sol->vlist[j].part == temp_partlist) {
-                temp_partlist->sumweights[j - 1] = temp_partlist->sumweights[j] + jobarray[j].weight;
+                temp_partlist->sumweights[j - 1] = temp_partlist->sumweights[j] +
+                                                   jobarray[j].weight;
             } else {
                 temp_partlist->sumweights[j - 1] = temp_partlist->sumweights[j];
             }
@@ -332,8 +325,7 @@ void solution_calc(solution *sol, Job *jobarray)
     }
 }
 
-void solution_wct(solution *sol)
-{
+void solution_wct(solution *sol) {
     int i;
     int nmachines = sol->nmachines;
     GList *it = (GList *) NULL;
@@ -356,8 +348,7 @@ void solution_wct(solution *sol)
 }
 
 void partlist_permquicksort(int *perm, partlist *part, int nbpart,
-                            int (*functionPtr)(partlist *, partlist *))
-{
+                            int (*functionPtr)(partlist *, partlist *)) {
     int i, j, temp;
     partlist t;
 

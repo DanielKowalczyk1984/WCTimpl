@@ -64,7 +64,8 @@ typedef struct _pair_build_LP {
     LP_data_CG_heur *data;
 } pair_build_LP;
 
-void pair_build_LP_init(pair_build_LP *user_data, int *covered, LP_data_CG_heur *data, int *val);
+void pair_build_LP_init(pair_build_LP *user_data, int *covered,
+                        LP_data_CG_heur *data, int *val);
 /** help functions for CG heuristics */
 double *update_rhs(double *a, int njobs, GHashTable *rounded_sol);
 void update_rhs_iterator(gpointer key, gpointer value, gpointer user_data);
@@ -79,7 +80,8 @@ void print_columns_iterator(gpointer key, gpointer value, gpointer user_data);
 void LP_data_CG_heur_init(LP_data_CG_heur *data , wctdata *pd);
 void LP_data_CG_heur_free(LP_data_CG_heur *data);
 int build_lp_CG(LP_data_CG_heur *data);
-int pure_diving(wctproblem *problem, wctdata *pd, GHashTable *G, double *a, int njobs, double K, GHashTable *part_sol, GHashTable *rounded_sol);
+int pure_diving(wctproblem *problem, wctdata *pd, GHashTable *G, double *a,
+                int njobs, double K, GHashTable *part_sol, GHashTable *rounded_sol);
 int execute_CG_heur(wctproblem *problem, wctdata *pd);
 int compute_lower_bound_CG_heur(wctproblem *problem, LP_data_CG_heur *data);
 int solve_stab_CG_heur(wctproblem *problem, LP_data_CG_heur *data);

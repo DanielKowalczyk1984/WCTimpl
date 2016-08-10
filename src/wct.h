@@ -21,9 +21,12 @@ struct _pair_job_machine {
 typedef struct _pair_job_machine pair_job_machine;
 
 
-int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution *new_sol, GRand *rand_);
-int construct_wspt(Job *jobarray, int njobs, int  nmachines, solution  *new_sol);
-int random_assignment(Job *jobarray, int njobs, int nmachines, solution *new_sol, GRand *rand_);
+int random_rcl_assignment(Job *jobarray, int njobs, int nmachines,
+                          solution *new_sol, GRand *rand_);
+int construct_wspt(Job *jobarray, int njobs, int  nmachines,
+                   solution  *new_sol);
+int random_assignment(Job *jobarray, int njobs, int nmachines,
+                      solution *new_sol, GRand *rand_);
 
 void update_bestschedule(wctproblem *problem, solution *new_sol);
 solution *new_sol_init(int nmachines, int vcount);
@@ -145,9 +148,12 @@ int update_distance(SS *scatter_search, solution *sol);
 /**
  * Combination functions
  */
-int combine_GPX(SS *scatter_search, GPtrArray *list, int *subsetsol, int nbelements, solution *new_sol);
-int combine_PM(SS *scatter_search, GPtrArray *list, int *subsetsol, int nbelements, solution *new_sol);
-int combinePathRelinking(SS *scatter_search, GPtrArray *array, int *subsetsol, int *found);
+int combine_GPX(SS *scatter_search, GPtrArray *list, int *subsetsol,
+                int nbelements, solution *new_sol);
+int combine_PM(SS *scatter_search, GPtrArray *list, int *subsetsol,
+               int nbelements, solution *new_sol);
+int combinePathRelinking(SS *scatter_search, GPtrArray *array, int *subsetsol,
+                         int *found);
 
 
 int SSCreate_refset(SS *scatter_search);
@@ -188,15 +194,19 @@ int compare_max(const void *, const void *);
 int compare_min(const void *, const void *);
 LS_data *construct_data(void *data, int key);
 void free_LS(void *data);
-int k_l_move_general(Job **K_jobs, Job **L_jobs, partlist *m_k, partlist *m_l, solution *sol, int k, int l);
+int k_l_move_general(Job **K_jobs, Job **L_jobs, partlist *m_k, partlist *m_l,
+                     solution *sol, int k, int l);
 
 /**
  * localsearch functions
  */
 
-int k_l_move_general(Job **K_jobs, Job **L_jobs, partlist *m_k, partlist *m_l, solution *sol, int k, int l);
-int local_search_machine_general_best(solution *sol, int lowerbound, int k, int l);
-int local_search_machine_general_first(solution *sol, int lowerbound, int k, int l);
+int k_l_move_general(Job **K_jobs, Job **L_jobs, partlist *m_k, partlist *m_l,
+                     solution *sol, int k, int l);
+int local_search_machine_general_best(solution *sol, int lowerbound, int k,
+                                      int l);
+int local_search_machine_general_first(solution *sol, int lowerbound, int k,
+                                       int l);
 void localsearch_wrap(solution *sol, int lowerbound, int best);
 
 /**
@@ -288,9 +298,11 @@ int read_problem(char *f, int *njobs, int **duration, int **weights);
 
 /** Preprocess data */
 gint compare_readytime(gconstpointer a, gconstpointer b);
-int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines, double Hmin);
+int calculate_ready_due_times(Job *jobarray, int njobs, int nmachines,
+                              double Hmin);
 int calculate_Hmax(int *durations, int nmachines, int njobs);
-int calculate_Hmin(int *durations, int nmachines, int njobs, int *perm, double *H);
+int calculate_Hmin(int *durations, int nmachines, int njobs, int *perm,
+                   double *H);
 int Preprocessdata(wctproblem *problem, wctdata *pd);
 
 

@@ -15,19 +15,24 @@ extern "C" {
  */
 
 typedef struct PricerSolver PricerSolver;
-PricerSolver *newSolver(int *p, int *w, int *r, int *d, int nbjobs, int Hmin, int Hmax);
-PricerSolver *newSolverDP(int *p, int *w, int *r, int *d, int nbjobs, int Hmin, int Hmax);
+PricerSolver *newSolver(int *p, int *w, int *r, int *d, int nbjobs, int Hmin,
+                        int Hmax);
+PricerSolver *newSolverDP(int *p, int *w, int *r, int *d, int nbjobs, int Hmin,
+                          int Hmax);
 PricerSolver *copySolver(PricerSolver *src);
 void freeSolver(PricerSolver *src);
 int calculate_table(PricerSolver *solver, wctparms *parms);
 void deletePricerSolver(PricerSolver *solver);
-int add_conflict_constraints(PricerSolver *solver, wctparms *parms, int *elist_same, int ecount_same, int *elist_differ, int  ecount_differ);
-int free_conflict_constraints(PricerSolver *solver, wctparms *parms, int ecount_same, int ecount_differ);
+int add_conflict_constraints(PricerSolver *solver, wctparms *parms,
+                             int *elist_same, int ecount_same, int *elist_differ, int  ecount_differ);
+int free_conflict_constraints(PricerSolver *solver, wctparms *parms,
+                              int ecount_same, int ecount_differ);
 void iterate_dd(PricerSolver *solver);
 void iterate_zdd(PricerSolver *solver);
 size_t get_datasize(PricerSolver *solver);
 void copy_solver(PricerSolver **dest, PricerSolver *src);
-int add_one_conflict(PricerSolver *solver, wctparms *parms, int v1, int v2, int same);
+int add_one_conflict(PricerSolver *solver, wctparms *parms, int v1, int v2,
+                     int same);
 int init_tables(PricerSolver *solver);
 size_t get_numberrows_zdd(PricerSolver *solver);
 size_t get_numberrows_bdd(PricerSolver *solver);
@@ -156,6 +161,7 @@ struct wctdata {
     double LP_lower_bound;
     double LP_lower_bound_heur;
     double LP_lower_bound_dual;
+    double LP_lower_bound_BB;
     double *rhs;
     int nnonimprovements;
     /** Wentges smoothing technique */

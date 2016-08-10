@@ -58,33 +58,33 @@ enum construct_solutions {
     no_construct = 0,
 };
 
-enum diving_heur{
+enum diving_heur {
     min_diving_heur = 0,
     select_diving_heur = 1,
 };
 
-enum test_ahv{
+enum test_ahv {
     min_use_test = 0,
     use_test = 1,
 };
 
-enum print{
+enum print {
     min_print_size = 0,
     use_print = 1,
 };
 
-enum BranchandBoundStrat{
+enum BranchandBoundStrat {
     min_bb_strategy = 0,
     conflict_strategy = min_bb_strategy,
     ahv_strategy = 1,
     cbfs_conflict_strategy = 2,
-    cbfs_ahv_strategy =3,
+    cbfs_ahv_strategy = 3,
 };
 
-enum Strong_Branching{
+enum Strong_Branching {
     min_strong_branching = 0,
     use_strong_branching = min_strong_branching,
-    no_strong_branching =1,
+    no_strong_branching = 1,
 };
 
 

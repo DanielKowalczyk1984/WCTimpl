@@ -3,22 +3,21 @@
 
 int move(Job *j, partlist *m_j, partlist *m_i);
 
-int sort_jobs(gconstpointer a, gconstpointer b)
-{
+int sort_jobs(gconstpointer a, gconstpointer b) {
     int aa = (((const Job *)a)->job);
     int bb = (((const Job *)b)->job);
     return aa - bb;
 }
 
-int move(Job *j, partlist *m_j, partlist *m_i)
-{
+int move(Job *j, partlist *m_j, partlist *m_i) {
     int nb_job = j->job;
     return j->processingime * (m_j->sumweights[nb_job] - m_i->sumweights[nb_job])
-           + j->weight * (m_j->sumtimes[nb_job] - m_i->sumtimes[nb_job] - j->processingime);
+           + j->weight * (m_j->sumtimes[nb_job] - m_i->sumtimes[nb_job] -
+                          j->processingime);
 }
 
-int k_l_move_general(Job **K_jobs, Job **L_jobs, partlist *m_k, partlist *m_l, solution *sol, int k, int l)
-{
+int k_l_move_general(Job **K_jobs, Job **L_jobs, partlist *m_k, partlist *m_l,
+                     solution *sol, int k, int l) {
     int i, val = 0;
     Job *ptr_job = (Job *) NULL;
     Job *ptr_job2 = (Job *) NULL;
@@ -85,8 +84,8 @@ int k_l_move_general(Job **K_jobs, Job **L_jobs, partlist *m_k, partlist *m_l, s
     return val;
 }
 
-int local_search_machine_general_best(solution *sol, int lowerbound, int k, int l)
-{
+int local_search_machine_general_best(solution *sol, int lowerbound, int k,
+                                      int l) {
     int i, j, n1, n2, it1, it2, K_flag, L_flag, moved, val = 0;
     int nbiter = 0;
     int njobs = sol->njobs;
@@ -285,7 +284,9 @@ int local_search_machine_general_best(solution *sol, int lowerbound, int k, int 
     CCutil_stop_timer(&time_move, 0);
 
     if (dbg_lvl()) {
-        printf("local search %d  - %d -> number of iterations = %d, objective = %d, time = %f, time per iteration = %f, improvement = %d\n", k, l, nbiter, sol->totalweightcomptime, time_move.cum_zeit, time_move.cum_zeit / nbiter, improvement);
+        printf("local search %d  - %d -> number of iterations = %d, objective = %d, time = %f, time per iteration = %f, improvement = %d\n",
+               k, l, nbiter, sol->totalweightcomptime, time_move.cum_zeit,
+               time_move.cum_zeit / nbiter, improvement);
     }
 
     CC_IFFREE(L_jobs, Job *);
@@ -297,8 +298,8 @@ int local_search_machine_general_best(solution *sol, int lowerbound, int k, int 
     return val;
 }
 
-int local_search_machine_general_first(solution *sol, int lowerbound, int k, int l)
-{
+int local_search_machine_general_first(solution *sol, int lowerbound, int k,
+                                       int l) {
     int i, j, n1, n2, it1, it2, K_flag, L_flag, moved, val = 0;
     int nbiter = 0;
     int njobs = sol->njobs;
@@ -496,7 +497,9 @@ int local_search_machine_general_first(solution *sol, int lowerbound, int k, int
     CCutil_stop_timer(&time_move, 0);
 
     if (dbg_lvl()) {
-        printf("local search %d  - %d -> number of iterations = %d, objective = %d, time = %f, time per iteration = %f, improvement = %d\n", k, l, nbiter, sol->totalweightcomptime, time_move.cum_zeit, time_move.cum_zeit / nbiter, improvement);
+        printf("local search %d  - %d -> number of iterations = %d, objective = %d, time = %f, time per iteration = %f, improvement = %d\n",
+               k, l, nbiter, sol->totalweightcomptime, time_move.cum_zeit,
+               time_move.cum_zeit / nbiter, improvement);
     }
 
     CC_IFFREE(L_jobs, Job *);
@@ -508,8 +511,7 @@ int local_search_machine_general_first(solution *sol, int lowerbound, int k, int
     return val;
 }
 
-void localsearch_wrap(solution *sol, int lowerbound, int best)
-{
+void localsearch_wrap(solution *sol, int lowerbound, int best) {
     if (best) {
         local_search_machine_general_best(sol, lowerbound, 1, 0);
         local_search_machine_general_best(sol, lowerbound, 1, 1);
@@ -523,8 +525,7 @@ void localsearch_wrap(solution *sol, int lowerbound, int best)
     }
 }
 
-void localsearch_random_k(solution *sol, int lowerbound, int nb)
-{
+void localsearch_random_k(solution *sol, int lowerbound, int nb) {
     int i, j, l, k, tot;
     int **matrix = (int **) NULL;
     matrix = CC_SAFE_MALLOC(nb, int *);

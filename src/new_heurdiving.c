@@ -1,7 +1,6 @@
 #include "new_heurdiving.h"
 
-int execute_CG_heur(wctproblem *problem, wctdata *pd)
-{
+int execute_CG_heur(wctproblem *problem, wctdata *pd) {
     int val = 0;
     GHashTable *G_0 = g_hash_table_new(g_direct_hash, g_direct_equal);
     GHashTable *part_sol = g_hash_table_new(g_direct_hash, g_direct_equal);
@@ -12,7 +11,8 @@ int execute_CG_heur(wctproblem *problem, wctdata *pd)
         g_hash_table_insert(G_0, pd->cclasses + i, pd->cclasses + i);
     }
 
-    val = pure_diving(problem, pd, G_0, pd->rhs, pd->njobs, (double) pd->nmachines, part_sol, rounded_sol);
+    val = pure_diving(problem, pd, G_0, pd->rhs, pd->njobs, (double) pd->nmachines,
+                      part_sol, rounded_sol);
 
     g_hash_table_destroy(G_0);
     g_hash_table_destroy(part_sol);
@@ -20,8 +20,8 @@ int execute_CG_heur(wctproblem *problem, wctdata *pd)
     return val;
 }
 
-int pure_diving(wctproblem *problem, wctdata *pd, GHashTable *G, double *a, int njobs, double K, GHashTable *part_sol, GHashTable *rounded_sol)
-{
+int pure_diving(wctproblem *problem, wctdata *pd, GHashTable *G, double *a,
+                int njobs, double K, GHashTable *part_sol, GHashTable *rounded_sol) {
     int val = 0;
     LP_data_CG_heur *data = CC_SAFE_MALLOC(1, LP_data_CG_heur);
     CCcheck_NULL_2(data, "Failed to allocate memory");
@@ -40,14 +40,17 @@ int pure_diving(wctproblem *problem, wctdata *pd, GHashTable *G, double *a, int 
     /** step 2: create the proper column pool */
     //g_hash_table_foreach(G,  update_column_iterator, &user_data);
     g_hash_table_iter_init(&iter, G);
+
     while (g_hash_table_iter_next(&iter, &key, &value)) {
         int add = 1;
         gpointer key_test, value_test;
         GHashTableIter iter_test;
         Scheduleset *set = (Scheduleset *) key;
         g_hash_table_iter_init(&iter_test, rounded_sol);
+
         while (g_hash_table_iter_next(&iter_test, &key_test, &value_test) && add) {
             Scheduleset *set_test = (Scheduleset *) key_test;
+
             for (int i = 0; i < set_test->count && add; ++i) {
                 if (g_hash_table_lookup(set->table, GINT_TO_POINTER(i))) {
                     add = 0;
@@ -65,6 +68,7 @@ int pure_diving(wctproblem *problem, wctdata *pd, GHashTable *G, double *a, int 
     CCcheck_val_2(val, "Failed to build the LP");
     /** Compute LP, find lambda_t, check if feasible or LP lower bound is bigger than upper bound*/
     compute_lower_bound_CG_heur(problem, data);
+
     /** F = g_ptr_array of all columns with non-integral value + check if partsol with G min F is primal  solution and record this solution*/
     if (data->status != LP_bound_computed) {
         goto CLEAN;
@@ -83,8 +87,7 @@ CLEAN:
     return val;
 }
 
-double *update_rhs(double *a, int njobs, GHashTable *rounded_sol)
-{
+double *update_rhs(double *a, int njobs, GHashTable *rounded_sol) {
     double *new_a = CC_SAFE_MALLOC(njobs, double);
     CCcheck_NULL_3(new_a, "Failed to allocate memory to a_new");
     memcpy(new_a, a, njobs * sizeof(double));
@@ -93,8 +96,7 @@ CLEAN:
     return new_a;
 }
 
-void update_rhs_iterator(gpointer key, gpointer value, gpointer user_data)
-{
+void update_rhs_iterator(gpointer key, gpointer value, gpointer user_data) {
     Scheduleset *column = (Scheduleset *) key;
     double *x = (double *) value;
     double *a = (double *) user_data;
@@ -104,8 +106,7 @@ void update_rhs_iterator(gpointer key, gpointer value, gpointer user_data)
     }
 }
 
-void update_K_iterator(gpointer key, gpointer value, gpointer user_data)
-{
+void update_K_iterator(gpointer key, gpointer value, gpointer user_data) {
     double *new_K = (double *) user_data;
     double *x = (double *) value;
     *new_K -= *x;
@@ -119,8 +120,7 @@ void update_partsol_iterator(gpointer key, gpointer value, gpointer user_data) {
 
 }
 
-void test_column_iterator(gpointer key, gpointer value, gpointer user_data)
-{
+void test_column_iterator(gpointer key, gpointer value, gpointer user_data) {
     int *add = &(((pair_test_column *)user_data)->add);
     Scheduleset *set = ((pair_test_column *) user_data)->set;
     Scheduleset *test_set = (Scheduleset *) key;
@@ -132,18 +132,18 @@ void test_column_iterator(gpointer key, gpointer value, gpointer user_data)
     }
 }
 
-void add_column_iterator(gpointer key, gpointer value, gpointer user_data)
-{
+void add_column_iterator(gpointer key, gpointer value, gpointer user_data) {
     int *val = ((pair_build_LP *) user_data)->val;
     int j;
     Scheduleset *set = (Scheduleset *) key;
     LP_data_CG_heur *data = ((pair_build_LP *) user_data)->data;
     int *covered = ((pair_build_LP *) user_data)->covered;
-    int *counter = &(((pair_build_LP*) user_data)->counter);
+    int *counter = &(((pair_build_LP *) user_data)->counter);
     double rounded_sol = ((pair_build_LP *) user_data)->rounded_sol;
 
     wctlp *LP = data->LP;
-    *val = wctlp_addcol(LP, set->count + 1, set->members, data->coef, set->totwct, rounded_sol, GRB_INFINITY, wctlp_CONT, NULL);
+    *val = wctlp_addcol(LP, set->count + 1, set->members, data->coef, set->totwct,
+                        rounded_sol, GRB_INFINITY, wctlp_CONT, NULL);
     set->id = data->nb_cols++;
 
     if (*val) {
@@ -165,11 +165,13 @@ void complete_RM_iterator(gpointer key, gpointer value, gpointer user_data) {
     LP_data_CG_heur *data = ((pair_build_LP *) user_data)->data;
     wctlp *LP = data->LP;
     int *covered = ((pair_build_LP *) user_data)->covered;
-    int *counter = &(((pair_build_LP*) user_data)->counter);
+    int *counter = &(((pair_build_LP *) user_data)->counter);
     double rhs = 1.0;
-    *val = wctlp_addrow(LP, 0, (int *) NULL, (double *) NULL, wctlp_EQUAL, rhs, (char *) NULL);
+    *val = wctlp_addrow(LP, 0, (int *) NULL, (double *) NULL, wctlp_EQUAL, rhs,
+                        (char *) NULL);
     double coef = 1.0;
-    *val = wctlp_addcol(LP, 1 , &data->nb_rows, &coef, set->totwct, 0.0, GRB_INFINITY, wctlp_CONT, NULL);
+    *val = wctlp_addcol(LP, 1 , &data->nb_rows, &coef, set->totwct, 0.0,
+                        GRB_INFINITY, wctlp_CONT, NULL);
     data->nb_rows++;
     set->id = data->nb_cols++;
 
@@ -189,15 +191,15 @@ void complete_RM_iterator(gpointer key, gpointer value, gpointer user_data) {
 void print_columns_iterator(gpointer key, gpointer value, gpointer user_data) {
     Scheduleset *set = (Scheduleset *) key;
 
-    for (int i = 0; i < set->count; ++i)
-    {
+    for (int i = 0; i < set->count; ++i) {
         printf("%d ", set->members[i]);
     }
-    printf("number of jobs =%d, Completion time %d, Cost %d\n", set->count, set->totweight, set->totwct);
+
+    printf("number of jobs =%d, Completion time %d, Cost %d\n", set->count,
+           set->totweight, set->totwct);
 }
 
-int build_lp_CG(LP_data_CG_heur *data)
-{
+int build_lp_CG(LP_data_CG_heur *data) {
     int val = 0;
     int i, j;
     wctdata *pd = data->pd;
@@ -214,32 +216,38 @@ int build_lp_CG(LP_data_CG_heur *data)
     int counter = 0;
     val = wctlp_init(&(data->LP), NULL);
     CCcheck_val_2(val, "wctlp_init failed");
-    data->coef = (double *)CCutil_reallocrus(data->coef, (njobs + 1) * sizeof(double));
+    data->coef = (double *)CCutil_reallocrus(data->coef,
+                 (njobs + 1) * sizeof(double));
     CCcheck_NULL_2(data->coef, "out of memory for coef");
     fill_dbl(data->coef, njobs + 1, 1.0);
     GHashTable *G = data->G;
 
     /** add the set covering constraints */
     for (i = 0; i < njobs; i++) {
-        val = wctlp_addrow(data->LP, 0, (int *)NULL, (double *)NULL, wctlp_GREATER_EQUAL, a[i],
+        val = wctlp_addrow(data->LP, 0, (int *)NULL, (double *)NULL,
+                           wctlp_GREATER_EQUAL, a[i],
                            (char *)NULL);
         CCcheck_val_2(val, "Failed wctlp_addrow");
         data->nb_rows++;
     }
 
     /** add the number of machines constraints */
-    wctlp_addrow(data->LP, 0  , (int *)NULL, (double *) NULL, wctlp_LESS_EQUAL, K , NULL);
+    wctlp_addrow(data->LP, 0  , (int *)NULL, (double *) NULL, wctlp_LESS_EQUAL, K ,
+                 NULL);
     data->nb_rows++;
 
     /** Write the columns */
     g_hash_table_iter_init(&iter, G);
+
     while (g_hash_table_iter_next(&iter, &key, &value)) {
         Scheduleset *set = (Scheduleset *) key;
         wctlp *LP = data->LP;
-        val = wctlp_addcol(LP, set->count + 1, set->members, data->coef, set->totwct, 0.0, GRB_INFINITY, wctlp_CONT, NULL);
+        val = wctlp_addcol(LP, set->count + 1, set->members, data->coef, set->totwct,
+                           0.0, GRB_INFINITY, wctlp_CONT, NULL);
         CCcheck_val_2(val, "failed to add the column");
         set->id = data->nb_cols++;
         g_hash_table_iter_replace(&iter, &(set->id));
+
         for (j = 0; j < set->count && counter < data->pd->njobs; j++) {
             if (!covered[set->members[j]]) {
                 covered[set->members[j]] = 1;
@@ -253,7 +261,8 @@ int build_lp_CG(LP_data_CG_heur *data)
     // CCcheck_val_2(val, "Failed to the partial solution");
 
 
-    data->pi = (double *)CCutil_reallocrus(data->pi, (data->nb_rows) * sizeof(double));
+    data->pi = (double *)CCutil_reallocrus(data->pi,
+                                           (data->nb_rows) * sizeof(double));
     CCcheck_NULL_2(data->pi, "Failed to allocate memory to data->pi");
     data->pi_in = CC_SAFE_MALLOC(data->nb_rows , double);
     CCcheck_NULL_2(data->pi_in, "Failed to allocate memory");
@@ -292,8 +301,7 @@ CLEAN:
     return val;
 }
 
-void LP_data_CG_heur_init(LP_data_CG_heur *data, wctdata *pd)
-{
+void LP_data_CG_heur_init(LP_data_CG_heur *data, wctdata *pd) {
     /*Initialization  of the LP*/
     data->LP = (wctlp *)NULL;
     data->x = (double *)NULL;
@@ -318,8 +326,7 @@ void LP_data_CG_heur_init(LP_data_CG_heur *data, wctdata *pd)
     data->pd = pd;
 }
 
-void LP_data_CG_heur_free(LP_data_CG_heur *data)
-{
+void LP_data_CG_heur_free(LP_data_CG_heur *data) {
     wctlp_free(&(data->LP));
     CC_IFFREE(data->x, double);
     CC_IFFREE(data->coef, double);
@@ -335,7 +342,8 @@ void LP_data_CG_heur_free(LP_data_CG_heur *data)
     CC_IFFREE(data->a, double);
 }
 
-void pair_build_LP_init(pair_build_LP *user_data, int *covered, LP_data_CG_heur *data, int *val) {
+void pair_build_LP_init(pair_build_LP *user_data, int *covered,
+                        LP_data_CG_heur *data, int *val) {
     user_data->counter = 0;
     user_data->covered = covered;
     user_data->data = data;
@@ -343,8 +351,7 @@ void pair_build_LP_init(pair_build_LP *user_data, int *covered, LP_data_CG_heur 
     user_data->rounded_sol = 0.0;
 }
 
-int compute_objective_CG_heur(LP_data_CG_heur *data)
-{
+int compute_objective_CG_heur(LP_data_CG_heur *data) {
     int val = 0;
     int i;
 
@@ -358,14 +365,15 @@ int compute_objective_CG_heur(LP_data_CG_heur *data)
     /** Get the LP lower bound and compute the lower bound of WCT */
     val = wctlp_objval(data->LP, &(data->LP_lower_bound));
     CCcheck_val_2(val, "wctlp_objval failed");
-    data->lower_bound = ((int) ceil(data->LP_lower_bound_dual) < (int) ceil(data->LP_lower_bound)) ? (int) ceil(data->LP_lower_bound_dual) : (int) ceil(data->LP_lower_bound) ;
+    data->lower_bound = ((int) ceil(data->LP_lower_bound_dual) < (int) ceil(
+                             data->LP_lower_bound)) ? (int) ceil(data->LP_lower_bound_dual) : (int) ceil(
+                            data->LP_lower_bound) ;
 
 CLEAN:
     return val;
 }
 
-int compute_lower_bound_CG_heur(wctproblem *problem, LP_data_CG_heur *data)
-{
+int compute_lower_bound_CG_heur(wctproblem *problem, LP_data_CG_heur *data) {
     int  j, val = 0;
     int iterations = 0;
     int break_while_loop = 1;
@@ -459,6 +467,7 @@ int compute_lower_bound_CG_heur(wctproblem *problem, LP_data_CG_heur *data)
                 switch (parms->stab_technique) {
                 case stab_wentgnes:
                     solve_stab_CG_heur(problem, data);
+
                 case stab_dynamic:
 
                 case no_stab:
@@ -478,7 +487,8 @@ int compute_lower_bound_CG_heur(wctproblem *problem, LP_data_CG_heur *data)
         CCutil_suspend_timer(&problem->tot_pricing);
 
         for (j = 0; j < pd->nnewsets; j++) {
-            val = wctlp_addcol(data->LP, pd->newsets[j].count + 1, pd->newsets[j].members, data->coef, pd->newsets[j].totwct, 0.0, GRB_INFINITY, wctlp_CONT, NULL);
+            val = wctlp_addcol(data->LP, pd->newsets[j].count + 1, pd->newsets[j].members,
+                               data->coef, pd->newsets[j].totwct, 0.0, GRB_INFINITY, wctlp_CONT, NULL);
             CCcheck_val_2(val, "wctlp_addcol failed");
         }
 
@@ -516,6 +526,7 @@ int compute_lower_bound_CG_heur(wctproblem *problem, LP_data_CG_heur *data)
 
         switch (status) {
         case GRB_OPTIMAL:
+
             /** get the dual variables and make them feasible */
             /** Compute the objective function */
 
@@ -541,7 +552,8 @@ int compute_lower_bound_CG_heur(wctproblem *problem, LP_data_CG_heur *data)
         CCutil_resume_timer(&(problem->tot_cputime));
     }
 
-    if (iterations < pd->maxiterations && problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit) {
+    if (iterations < pd->maxiterations &&
+            problem->tot_cputime.cum_zeit <= problem->parms.branching_cpu_limit) {
         switch (status) {
         case GRB_OPTIMAL:
 
@@ -582,8 +594,7 @@ CLEAN:
 }
 
 
-int add_newsets_CG_heur(LP_data_CG_heur *data)
-{
+int add_newsets_CG_heur(LP_data_CG_heur *data) {
     int val = 0;
     Scheduleset *tmpsets = (Scheduleset *) NULL;
     wctdata *pd = data->pd;
@@ -604,21 +615,23 @@ int add_newsets_CG_heur(LP_data_CG_heur *data)
         free(pd->cclasses);
         pd->cclasses = tmpsets;
         data->nb_cols = 0;
-        for (i = 0; i < pd->ccount; ++i)
-        {
+
+        for (i = 0; i < pd->ccount; ++i) {
             g_hash_table_insert(G, pd->cclasses + i, pd->cclasses + i);
             pd->cclasses[i].id = data->nb_cols++;
         }
+
         tmpsets = NULL;
     }
 
     memcpy(pd->cclasses + pd->ccount, pd->newsets,
            pd->nnewsets * sizeof(Scheduleset));
-    for (i = pd->ccount; i < pd->ccount + pd->nnewsets; ++i)
-    {
+
+    for (i = pd->ccount; i < pd->ccount + pd->nnewsets; ++i) {
         g_hash_table_insert(G, pd->cclasses + i, pd->cclasses + i);
         pd->cclasses[i].id = data->nb_cols++;
     }
+
     pd->ccount += pd->nnewsets;
 
     for (i = pd->ccount; i < pd->gallocated; i++) {

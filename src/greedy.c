@@ -6,8 +6,7 @@ static int add_feasible_solution(wctproblem *problem, solution *new_sol);
  * comparefunctions
  */
 
-int compare_func1(gconstpointer a, gconstpointer b, void *user_data)
-{
+int compare_func1(gconstpointer a, gconstpointer b, void *user_data) {
     const int *v = &(((const partlist *)a)->completiontime);
     const int *w = &(((const partlist *)b)->completiontime);
 
@@ -28,8 +27,8 @@ int compare_func1(gconstpointer a, gconstpointer b, void *user_data)
  * greedy constructions
  */
 
-int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution *new_sol, GRand *rand_)
-{
+int random_rcl_assignment(Job *jobarray, int njobs, int nmachines,
+                          solution *new_sol, GRand *rand_) {
     int i;
     double max;
     double min;
@@ -103,8 +102,8 @@ int random_rcl_assignment(Job *jobarray, int njobs, int nmachines, solution *new
     return 0;
 }
 
-int random_assignment(Job *jobarray, int njobs, int nmachines, solution *new_sol, GRand *rand_)
-{
+int random_assignment(Job *jobarray, int njobs, int nmachines,
+                      solution *new_sol, GRand *rand_) {
     int i, val = 0;
     double n;
     partlist *temp = (partlist *) NULL;
@@ -138,8 +137,8 @@ CLEAN:
     return val;
 }
 
-int construct_wspt(Job *jobarray, int njobs, int  nmachines, solution  *new_sol)
-{
+int construct_wspt(Job *jobarray, int njobs, int  nmachines,
+                   solution  *new_sol) {
     int i, val = 0;
     pmcheap *heap = (pmcheap *) NULL;
     partlist *temp = (partlist *) NULL;
@@ -171,8 +170,7 @@ CLEAN:
 
 /** Construct feasible solutions */
 
-void update_bestschedule(wctproblem *problem, solution *new_sol)
-{
+void update_bestschedule(wctproblem *problem, solution *new_sol) {
     if (new_sol == NULL) {
         return;
     }
@@ -181,7 +179,8 @@ void update_bestschedule(wctproblem *problem, solution *new_sol)
         problem->global_upper_bound = new_sol->totalweightcomptime;
         problem->rel_error = (double)(problem->global_upper_bound -
                                       problem->global_lower_bound) / (problem->global_lower_bound);
-        partlist_to_Scheduleset(new_sol->part, new_sol->nmachines, new_sol->njobs, &(problem->bestschedule), &(problem->nbestschedule));
+        partlist_to_Scheduleset(new_sol->part, new_sol->nmachines, new_sol->njobs,
+                                &(problem->bestschedule), &(problem->nbestschedule));
     }
 
     if (problem->global_upper_bound == problem->global_lower_bound) {
@@ -189,8 +188,7 @@ void update_bestschedule(wctproblem *problem, solution *new_sol)
     }
 }
 
-static int add_feasible_solution(wctproblem *problem, solution *new_sol)
-{
+static int add_feasible_solution(wctproblem *problem, solution *new_sol) {
     int val = 0;
     wctdata *root_pd = &(problem->root_pd);
     SS *scatter_search = &(problem->scatter_search);
@@ -204,10 +202,12 @@ static int add_feasible_solution(wctproblem *problem, solution *new_sol)
         scatter_search->p->PSize++;
 
         if (root_pd->ccount == 0 && problem->parms.construct != 0) {
-            update_Schedulesets(&root_pd->cclasses, &root_pd->ccount, problem->bestschedule, problem->nbestschedule);
+            update_Schedulesets(&root_pd->cclasses, &root_pd->ccount, problem->bestschedule,
+                                problem->nbestschedule);
             root_pd->gallocated = root_pd->ccount;
         } else if (problem->parms.construct != 0) {
-            partlist_to_Scheduleset(new_sol->part, new_sol->nmachines, new_sol->njobs, &(root_pd->newsets), &(root_pd->nnewsets));
+            partlist_to_Scheduleset(new_sol->part, new_sol->nmachines, new_sol->njobs,
+                                    &(root_pd->newsets), &(root_pd->nnewsets));
             add_newsets(root_pd);
         }
     } else {
@@ -218,8 +218,7 @@ static int add_feasible_solution(wctproblem *problem, solution *new_sol)
     return val;
 }
 
-solution *new_sol_init(int nmachines, int vcount)
-{
+solution *new_sol_init(int nmachines, int vcount) {
     int val = 0;
     solution *sol = (solution *) NULL;
     sol = CC_SAFE_MALLOC(1, solution);
@@ -237,8 +236,7 @@ CLEAN:
     return sol;
 }
 
-int construct_feasible_solutions(wctproblem *problem)
-{
+int construct_feasible_solutions(wctproblem *problem) {
     int val = 0;
     int iterations = 0;
     wctdata *pd = &(problem->root_pd);
@@ -248,7 +246,8 @@ int construct_feasible_solutions(wctproblem *problem)
     GRand *rand1 = g_rand_new_with_seed(1984);
     GRand *rand2 = g_rand_new_with_seed(1654651);
     CCutil_start_timer(timer);
-    val = SSproblem_definition(scatter_search, 10, 8, parms->scatter_search_cpu_limit, parms->combine_method,
+    val = SSproblem_definition(scatter_search, 10, 8,
+                               parms->scatter_search_cpu_limit, parms->combine_method,
                                pd->njobs, pd->nmachines, pd->jobarray, problem->global_lower_bound);
     CCcheck_val_2(val, "Failed in SSproblem_definition");
 
@@ -274,8 +273,10 @@ int construct_feasible_solutions(wctproblem *problem)
     }
 
     CCutil_suspend_timer(timer);
-    printf("We needed %f seconds to construct %d solutions in %d iterations\n", timer->cum_zeit, parms->nb_feas_sol, iterations);
-    printf("upperbound = %d, lowerbound = %d\n", problem->global_upper_bound, problem->global_lower_bound);
+    printf("We needed %f seconds to construct %d solutions in %d iterations\n",
+           timer->cum_zeit, parms->nb_feas_sol, iterations);
+    printf("upperbound = %d, lowerbound = %d\n", problem->global_upper_bound,
+           problem->global_lower_bound);
     CCutil_resume_timer(timer);
 
     if (parms->scatter_search) {
@@ -289,8 +290,10 @@ int construct_feasible_solutions(wctproblem *problem)
         }
 
         for (unsigned i = 0; i < scatter_search->rs->list1->len ; i++) {
-            solution *new_sol = (solution *)g_ptr_array_index(scatter_search->rs->list1 , i);
-            partlist_to_Scheduleset(new_sol->part, pd->nmachines, pd->njobs, &(pd->newsets), &(pd->nnewsets));
+            solution *new_sol = (solution *)g_ptr_array_index(scatter_search->rs->list1 ,
+                                i);
+            partlist_to_Scheduleset(new_sol->part, pd->nmachines, pd->njobs, &(pd->newsets),
+                                    &(pd->nnewsets));
             add_newsets(pd);
         }
     }

@@ -2,16 +2,14 @@
 #include "datastructsol.h"
 #include "util.h"
 
-int partition_order(const void *a, const void *b, void *data)
-{
+int partition_order(const void *a, const void *b, void *data) {
     (void) data;
     const int *v1 = (const int *) & (((const Job *)a)->job);
     const int *w1 = (const int *) & (((const Job *)b)->job);
     return (*v1 - *w1);
 }
 
-void partlist_free(partlist *part)
-{
+void partlist_free(partlist *part) {
     if (part) {
         if (part->list != (GQueue *) NULL) {
             g_queue_free(part->list);
@@ -23,8 +21,7 @@ void partlist_free(partlist *part)
     }
 }
 
-void partlist_init(partlist *part)
-{
+void partlist_init(partlist *part) {
     if (part) {
         part->list = g_queue_new();
         part->sumtimes = (int *) NULL;
@@ -34,15 +31,13 @@ void partlist_init(partlist *part)
     }
 }
 
-void joblist_init(joblist *jlist)
-{
+void joblist_init(joblist *jlist) {
     if (jlist) {
         jlist->part = (partlist *) NULL;
     }
 }
 
-void partition_init(partlist *part, joblist *jlist, int nbpart, int njobs)
-{
+void partition_init(partlist *part, joblist *jlist, int nbpart, int njobs) {
     int i;
 
     for (i = 0; i < nbpart; i++) {
@@ -57,8 +52,7 @@ void partition_init(partlist *part, joblist *jlist, int nbpart, int njobs)
     }
 }
 
-int partlist_insert_order(partlist *part, joblist *jlist, Job *job, int njobs)
-{
+int partlist_insert_order(partlist *part, joblist *jlist, Job *job, int njobs) {
     int val = 0;
     int i;
 
@@ -79,14 +73,14 @@ int partlist_insert_order(partlist *part, joblist *jlist, Job *job, int njobs)
         part->sumweights[i] += job->weight;
     }
 
-    part->totcompweight += job->weight * part->sumtimes[job->job] + job->processingime * part->sumweights[job->job];
+    part->totcompweight += job->weight * part->sumtimes[job->job] +
+                           job->processingime * part->sumweights[job->job];
     part->completiontime += job->processingime;
 CLEAN:
     return val;
 }
 
-int partlist_insert(partlist *part, joblist *jlist, Job *job)
-{
+int partlist_insert(partlist *part, joblist *jlist, Job *job) {
     int val = 0;
 
     if (jlist[job->job].part != NULL) {
@@ -98,13 +92,12 @@ int partlist_insert(partlist *part, joblist *jlist, Job *job)
     jlist[job->job].part = part;
     g_queue_push_tail(part->list, job);
     part->completiontime += job->processingime;
-    part->totcompweight += part->completiontime*job->weight;
+    part->totcompweight += part->completiontime * job->weight;
 CLEAN:
     return val;
 }
 
-int partlist_delete_custom(joblist *jlist, Job *job, int njobs)
-{
+int partlist_delete_custom(joblist *jlist, Job *job, int njobs) {
     int i, val = 0;
     partlist *p = (partlist *)NULL;
 
@@ -118,7 +111,8 @@ int partlist_delete_custom(joblist *jlist, Job *job, int njobs)
 
     if (g_queue_remove(p->list, job)) {
         jlist[job->job].part = (partlist *)NULL;
-        p->totcompweight -= job->weight * p->sumtimes[job->job] + job->processingime * p->sumweights[job->job];
+        p->totcompweight -= job->weight * p->sumtimes[job->job] + job->processingime *
+                            p->sumweights[job->job];
         p->completiontime -= job->processingime;
 
         for (i = job->job; i < njobs; ++i) {
@@ -136,8 +130,7 @@ CLEAN:
     return val;
 }
 
-int partlist_delete(joblist *jlist, Job *job)
-{
+int partlist_delete(joblist *jlist, Job *job) {
     int val = 0;
     partlist *p = NULL;
 
@@ -155,8 +148,7 @@ CLEAN:
     return val;
 }
 
-void partlist_move(partlist *part, joblist *jlist, Job *job)
-{
+void partlist_move(partlist *part, joblist *jlist, Job *job) {
     if (jlist[job->job].part != NULL) {
         partlist_delete(jlist, job);
         partlist_insert(part, jlist, job);
@@ -165,8 +157,7 @@ void partlist_move(partlist *part, joblist *jlist, Job *job)
     }
 }
 
-void partlist_move_order(partlist *part, joblist *jlist, Job *job, int njobs)
-{
+void partlist_move_order(partlist *part, joblist *jlist, Job *job, int njobs) {
     if (jlist[job->job].part != NULL) {
         partlist_delete_custom(jlist, job, njobs);
         partlist_insert_order(part, jlist, job, njobs);

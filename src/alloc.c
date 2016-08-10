@@ -10,8 +10,7 @@
 
 #include "util.h"
 
-void *CCutil_allocrus(size_t size)
-{
+void *CCutil_allocrus(size_t size) {
     void *mem = (void *) NULL;
 
     if (size == 0) {
@@ -29,8 +28,7 @@ void *CCutil_allocrus(size_t size)
     return mem;
 }
 
-void CCutil_freerus(void *p)
-{
+void CCutil_freerus(void *p) {
     if (!p) {
         fprintf(stderr, "Warning: null pointer freed\n");
         return;
@@ -39,8 +37,7 @@ void CCutil_freerus(void *p)
     free(p);
 }
 
-void *CCutil_reallocrus(void *ptr, size_t size)
-{
+void *CCutil_reallocrus(void *ptr, size_t size) {
     void *newptr;
 
     if (!ptr) {
@@ -58,8 +55,7 @@ void *CCutil_reallocrus(void *ptr, size_t size)
 }
 
 int CCutil_reallocrus_scale(void **pptr, int *pnnum, int count, double scale,
-                            size_t size)
-{
+                            size_t size) {
     int newsize = (int)(((double) * pnnum) * scale);
     void *p;
 
@@ -82,8 +78,7 @@ int CCutil_reallocrus_scale(void **pptr, int *pnnum, int count, double scale,
     }
 }
 
-int CCutil_reallocrus_count(void **pptr, int count, size_t size)
-{
+int CCutil_reallocrus_count(void **pptr, int count, size_t size) {
     void *p = CCutil_reallocrus(*pptr, count * size);
 
     if (!p) {

@@ -378,7 +378,8 @@ typedef struct ksubset_rec {
 
 int ksubset_rec_init(ksubset_rec *set, ulong n);
 void ksubset_rec_free(ksubset_rec *set);
-void ksubset_rec_generate(void *data, ksubset_rec *set, ulong kmin, ulong kmax, ulong rq, ulong nq, void (*visit)(const void *, const void *, ulong));
+void ksubset_rec_generate(void *data, ksubset_rec *set, ulong kmin, ulong kmax,
+                          ulong rq, ulong nq, void (*visit)(const void *, const void *, ulong));
 void ksubset_next_rec(void *data, ksubset_rec *set, ulong d);
 
 

@@ -4,8 +4,7 @@
 
 
 
-int heur_exec(wctproblem *problem, wctdata *pd, int *result)
-{
+int heur_exec(wctproblem *problem, wctdata *pd, int *result) {
     int i, status, val = 0;
     int searchbound;
     double objval;
@@ -168,7 +167,8 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
             CCutil_resume_timer(&(problem->tot_cputime));
 
             if (cutoff && !backtracked && heur->backtrack
-                    && *result != FOUNDSOL && problem->tot_cputime.cum_zeit < problem->parms.branching_cpu_limit) {
+                    && *result != FOUNDSOL &&
+                    problem->tot_cputime.cum_zeit < problem->parms.branching_cpu_limit) {
                 int discrepencie = 0;
 
                 do {
@@ -203,7 +203,8 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result)
         CCutil_suspend_timer(&(problem->tot_cputime));
         CCutil_resume_timer(&(problem->tot_cputime));
 
-        if (!lperror && !cutoff && status == GRB_OPTIMAL && problem->tot_cputime.cum_zeit < problem->parms.branching_cpu_limit) {
+        if (!lperror && !cutoff && status == GRB_OPTIMAL &&
+                problem->tot_cputime.cum_zeit < problem->parms.branching_cpu_limit) {
             val = wctlp_objval(pd->LP , &objval);
             objval = pd->LP_lower_bound_dual + pd->partial_sol;
             WCTbranchcand_free(&branchcand);
@@ -245,8 +246,7 @@ CLEAN:
     return val;
 }
 
-int branchcandlp(wctdata *pd, WCTbranchcand *branchcand)
-{
+int branchcandlp(wctdata *pd, WCTbranchcand *branchcand) {
     int i, status, val = 0;
     wctlp *LP = pd->LP;
     val = wctlp_status(LP, &status);
@@ -312,8 +312,7 @@ CLEAN:
     return val;
 }
 
-void WCTbranchcand_free(WCTbranchcand *branchcand)
-{
+void WCTbranchcand_free(WCTbranchcand *branchcand) {
     if (branchcand) {
         CC_IFFREE(branchcand->lpcands, int);
         CC_IFFREE(branchcand->lpcandssol, double);
@@ -323,8 +322,7 @@ void WCTbranchcand_free(WCTbranchcand *branchcand)
     WCTbranchcand_init(branchcand);
 }
 
-void WCTbranchcand_init(WCTbranchcand *branchcand)
-{
+void WCTbranchcand_init(WCTbranchcand *branchcand) {
     if (branchcand) {
         branchcand->lpcandssize = 0;
         branchcand->nlpcands = 0;
@@ -334,8 +332,7 @@ void WCTbranchcand_init(WCTbranchcand *branchcand)
     }
 }
 
-int WCTbranchcand_alloc(WCTbranchcand *branchcand, int ncol)
-{
+int WCTbranchcand_alloc(WCTbranchcand *branchcand, int ncol) {
     int val = 0;
 
     if (ncol) {
@@ -355,8 +352,7 @@ CLEAN:
 }
 
 int heur_divingselect_var(wctdata *pd, int *tabulist, int tabulistsize,
-                          int *bestcand, int *bestcandmayround, WCTbranchcand *branchcand)
-{
+                          int *bestcand, int *bestcandmayround, WCTbranchcand *branchcand) {
     int val = 0;
     double bestobjgain;
     double bestfrac;
@@ -442,8 +438,7 @@ CLEAN:
 }
 
 
-int constructsolution(wctdata *pd, int nmachines, int *success)
-{
+int constructsolution(wctdata *pd, int nmachines, int *success) {
     int i, j, k, val = 0;
     int *perm = (int *) NULL;
     int *covered = (int *) NULL;
@@ -530,7 +525,8 @@ int constructsolution(wctdata *pd, int nmachines, int *success)
                         pd->bestcolors[tmp].members[pd->bestcolors[tmp].count++] =
                             pd->cclasses[i].members[k];
                         pd->bestcolors[tmp].totweight += pd->duration[pd->cclasses[i].members[k]];
-                        pd->bestcolors[tmp].totwct += pd->weights[pd->cclasses[i].members[k]] * pd->bestcolors[tmp].totweight;
+                        pd->bestcolors[tmp].totwct += pd->weights[pd->cclasses[i].members[k]] *
+                                                      pd->bestcolors[tmp].totweight;
                         counter++;
                     }
                 }
@@ -555,8 +551,7 @@ CLEAN:
     return val;
 }
 
-int heur_compute_lower_bound(wctproblem *problem, wctdata *pd)
-{
+int heur_compute_lower_bound(wctproblem *problem, wctdata *pd) {
     int j, val = 0;
     int iterations = 0;
     int break_while_loop = 1;
@@ -633,7 +628,8 @@ int heur_compute_lower_bound(wctproblem *problem, wctdata *pd)
     } while ((iterations < pd->maxiterations) && !break_while_loop
              && lb_cputime <= problem->parms.branching_cpu_limit);
 
-    if (iterations < pd->maxiterations && lb_cputime <= problem->parms.branching_cpu_limit) {
+    if (iterations < pd->maxiterations &&
+            lb_cputime <= problem->parms.branching_cpu_limit) {
         val = wctlp_optimize(pd->LP, &status);
         CCcheck_val_2(val, "wctlp_optimize failed");
         val = compute_objective_heur(pd);
@@ -665,8 +661,7 @@ CLEAN:
 }
 
 
-void heur_init(wctdata *pd)
-{
+void heur_init(wctdata *pd) {
     heur_diving *heur_data = &(pd->heur_data);
     heur_data->backtrack = 1;
     heur_data->usefarkasonly = 0;
@@ -678,15 +673,13 @@ void heur_init(wctdata *pd)
     heur_data->sol = (double *) NULL;
 }
 
-void heur_free(wctdata *pd)
-{
+void heur_free(wctdata *pd) {
     heur_diving *heur_data = &(pd->heur_data);
     CC_IFFREE(heur_data->roundedsol, double);
     CC_IFFREE(heur_data->sol, double);
 }
 
-int adjustLP_ceil(wctdata *pd, int bestcand, double bestcandsol)
-{
+int adjustLP_ceil(wctdata *pd, int bestcand, double bestcandsol) {
     int i, val = 0;
     double *value = (double *) NULL;
     double *rhs = (double *) NULL;
@@ -697,7 +690,8 @@ int adjustLP_ceil(wctdata *pd, int bestcand, double bestcandsol)
     CCcheck_val(val, "Failed to set bound");
     rhs = CC_SAFE_MALLOC(pd->njobs + 1, double);
     CCcheck_NULL_2(rhs, "Failed to allocate memory");
-    val = GRBgetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs + 1, rhs);
+    val = GRBgetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs + 1,
+                             rhs);
     CHECK_VAL_GRB(val, "Failed in getting the RHS", pd->LP->env);
 
     for (i = 0; i < pd->cclasses[bestcand].count + 1 ; i++) {
@@ -720,7 +714,8 @@ int adjustLP_ceil(wctdata *pd, int bestcand, double bestcandsol)
         //}
     }
 
-    val = GRBsetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs , pd->rhs);
+    val = GRBsetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs ,
+                             pd->rhs);
     CHECK_VAL_GRB(val, "Failed at GRB_DBL_ATTR_RHS", pd->LP->env);
     val = GRBupdatemodel(pd->LP->model);
     CHECK_VAL_GRB(val, "Failed to update model", pd->LP->env);
@@ -734,8 +729,7 @@ CLEAN:
     return val;
 }
 
-int adjustLP_floor(wctdata *pd, int var)
-{
+int adjustLP_floor(wctdata *pd, int var) {
     int val = 0;
     double *value = (double *) NULL;
     double *rhs = (double *) NULL;
@@ -758,7 +752,8 @@ int adjustLP_floor(wctdata *pd, int var)
     vind = CC_SAFE_MALLOC(pd->cclasses[var].count, int);
     CCcheck_NULL_2(vind, "Failed to allocate memory");
     fill_int(vind, pd->cclasses[var].count, var);
-    val = GRBsetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs, pd->rhs);
+    val = GRBsetdblattrarray(pd->LP->model, GRB_DBL_ATTR_RHS, 0, pd->njobs,
+                             pd->rhs);
     CHECK_VAL_GRB2(val, "Failed to update RHS", LP->env);
     val = GRBchgcoeffs(LP->model, pd->cclasses[var].count,
                        pd->cclasses[var].members, vind, value);
@@ -772,8 +767,7 @@ CLEAN:
 }
 
 
-int compute_objective_heur(wctdata *pd)
-{
+int compute_objective_heur(wctdata *pd) {
     int val = 0;
     val = wctlp_objval(pd->LP, &(pd->LP_lower_bound_heur));
     CCcheck_val_2(val, "wctlp_objval failed");

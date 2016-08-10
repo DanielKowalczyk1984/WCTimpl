@@ -29,7 +29,8 @@ enum resultdiving {
     FOUNDSOL = 3,
 };
 
-int heur_divingselect_var(wctdata *pd, int *tabulist, int tabulistsize, int *bestcand, int *bestcanmayround, WCTbranchcand *branchcand);
+int heur_divingselect_var(wctdata *pd, int *tabulist, int tabulistsize,
+                          int *bestcand, int *bestcanmayround, WCTbranchcand *branchcand);
 int branchcandlp(wctdata *pd, WCTbranchcand *branchcand);
 int constructsolution(wctdata *pd, int nmachines, int *success);
 int heur_compute_lower_bound(wctproblem *, wctdata *);

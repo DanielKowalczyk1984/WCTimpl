@@ -30,8 +30,7 @@
  * The returned real time is only useful for computing an elapsed time
  * between two calls to this function.
  */
-double getRealTime()
-{
+double getRealTime() {
 #if defined(_WIN32)
     FILETIME tm;
     ULONGLONG t;
