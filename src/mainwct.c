@@ -30,7 +30,7 @@ static void usage(char *f) {
     fprintf(stderr,
             "   -r int  Scatter search use: 0 = no scatter search(default), 1 = scatter search\n");
     fprintf(stderr,
-            "   -B int  Branch and Bound use: 0 = no branch and bound(default), 1 = use branch and bound\n");
+            "   -B int  Branch and Bound use: 0 = no branch and bound, 1 = use branch and bound(default)\n");
     fprintf(stderr,
             "   -S int  Stabilization technique: 0 = no stabilization(default), 1 = stabilization wentgnes, 2 = stabilization dynamic\n");
     fprintf(stderr,
