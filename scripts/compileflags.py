@@ -8,18 +8,20 @@ import pickle
 import sys
 import json
 
-compilation_database_pattern = re.compile('(?<=\s)-[DIOUWfgs][^=\s]+(?:=\\"[^"]+\\"|=[^"]\S+)?')
+compilation_database_pattern = re.compile(
+    '(?<=\s)-[DIOUWfgs][^=\s]+(?:=\\"[^"]+\\"|=[^"]\S+)?')
+
 
 def load_db(filename):
     compilation_database = {}
     with open(filename) as compilation_database_file:
         compilation_database_entries = json.load(compilation_database_file)
 
-    total = len(compilation_database_entries)
     entry = 0
     for compilation_entry in compilation_database_entries:
         entry = entry + 1
-        compilation_database[compilation_entry["file"]] = [ p.strip() for p in compilation_database_pattern.findall(compilation_entry["command"]) ]
+        compilation_database[compilation_entry["file"]] = [p.strip(
+        ) for p in compilation_database_pattern.findall(compilation_entry["command"])]
     return compilation_database
 
 scriptpath = os.path.dirname(os.path.abspath(sys.argv[1]))
