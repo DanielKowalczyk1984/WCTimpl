@@ -57,8 +57,8 @@ static const double min_ndelrow_ratio = 0.5;
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b) {
     wctdata *x = (wctdata *)a;
     wctdata *y = (wctdata *)b;
-    double lp_a = (x->LP_lower_bound_BB - x->depth * 10000 - 0.5 * (x->id % 2));
-    double lp_b = (y->LP_lower_bound_BB - y->depth * 10000 - 0.5 * (y->id % 2));
+    double lp_a = (x->LP_lower_bound_BB - x->depth * 10000 - (x->id % 2));
+    double lp_b = (y->LP_lower_bound_BB - y->depth * 10000 - (y->id % 2));
 
     if (lp_a < lp_b) {
         return -1;
