@@ -30,4 +30,4 @@ SET(GLOB headers "src/*.h" ${GUROBI_INCLUDE_DIR} "src/*.hpp")
 
 add_executable(wct ${SOURCE} ${headers})
 
-target_link_libraries(wct ${GUROBI_LIBRARY} ${GLIB_LIBRARIES} ${Boost_LIBRARIES} -lm -lpthread -lgurobi60)
+target_link_libraries(wct ${GUROBI_LIBRARY} ${GLIB_LIBRARIES} ${Boost_LIBRARIES} -lm -lpthread)
