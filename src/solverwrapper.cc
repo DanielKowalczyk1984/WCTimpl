@@ -65,6 +65,10 @@ extern "C" {
         return new PricerSolver(*src);
     }
 
+    void print_dot_file(PricerSolver *solver, char* name){
+        solver->create_dot_zdd(name);
+    }
+
     void freeSolver(PricerSolver *src) {
         delete src;
         src = (PricerSolver *) NULL;
