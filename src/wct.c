@@ -343,6 +343,7 @@ void wctproblem_init(wctproblem *problem) {
     problem->nbinitsets = 0;
     problem->gallocated = 0;
     problem->initsets = (Scheduleset *)NULL;
+    problem->br_heap_a = (BinomialHeap *) NULL;
     /*data of the problem*/
     wctdata_init(&(problem->root_pd));
     /*parms of the problem*/
