@@ -335,6 +335,7 @@ int solve_weight_dbl_zdd(wctdata *pd);
 int solve_pricing(wctdata *pd, wctparms *parms);
 int solve_farkas_dbl(wctdata *pd);
 int solve_farkas_dbl_DP(wctdata *pd);
+void print_dot_file(PricerSolver *solver, char *name);
 
 #ifdef __cplusplus
 }
