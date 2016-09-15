@@ -4,11 +4,11 @@ project(WCTproject)
 
 MESSAGE("${PMCproject_BINARY_DIR}")
 
-SET(Cmake ${WCTproject_DIR}/Cmake)
+SET(cmake ${WCTproject_DIR}/cmake)
 
-include(Cmake/FindGlib.cmake)
+include(cmake/FindGlib.cmake)
 
-include(Cmake/FindGurobi.cmake)
+include(cmake/FindGurobi.cmake)
 
 find_package(Boost)
 
