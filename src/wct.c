@@ -57,8 +57,8 @@ static const double min_ndelrow_ratio = 0.5;
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b) {
     wctdata *x = (wctdata *)a;
     wctdata *y = (wctdata *)b;
-    double lp_a = (x->LP_lower_bound_BB - x->depth * 10000 - (x->id % 2));
-    double lp_b = (y->LP_lower_bound_BB - y->depth * 10000 - (y->id % 2));
+    double lp_a = (x->LP_lower_bound_BB - x->depth * 10000 - 0.05*(x->id % 2));
+    double lp_b = (y->LP_lower_bound_BB - y->depth * 10000 - 0.05*(y->id % 2));
 
     if (lp_a < lp_b) {
         return -1;
@@ -3832,17 +3832,19 @@ static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines,
                     (error) : (ABS(error - dbl_heap_key) + 0.0001) / (error);
     error2 = error2 / njobs;
 
-    if (dbl_heap_key >= error) {
-        if (dbl_heap_key >= 1.0 - lp_int_tolerance()) {
-            return val;
-        }
+    if (dbl_heap_key >= 1.0 - lp_int_tolerance()) {
+        return val;
+    }
+    
+    val = x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1)) * error2), error);
+    //if (dbl_heap_key >= 0.5) {
 
         // printf("test %f %f %f %f %d %d\n", error,error2,dbl_heap_key,dbl_heap_key + ABS((v2 - v1)) * error2,  v1,v2 );
-        val = x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1)) * error2), error);
-    } else {
-        // printf("test %f %f %f %f %d %d\n",error,error2,dbl_heap_key,dbl_heap_key - ABS((v2 - v1)) * error2,  v1,v2 );
-        val =  x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1)) * error2), error);
-    }
+        // getchar();
+    //} else {
+        //printf("test %f %f %f %f %d %d\n",error,error2,dbl_heap_key,dbl_heap_key - ABS((v2 - v1)) * error2,  v1,v2 );
+        //val =  x_frac(MIN(1.0,  dbl_heap_key + ABS((v2 - v1)) * error2), error);
+    //}
 
     return val;
 }
