@@ -71,6 +71,10 @@ class PricerSpec: public tdzdd::DdSpec<PricerSpec, int, 2> {
             _j = min_job(job, sum);
 
             if (_j < nbjobs) {
+                if (state + sum_p[_j] < Hmin) {
+                    return 0;
+                }
+  
                 if ((sum >= Hmin && sum <= Hmax) && (sum + min_p[_j] > Hmax)) {
                     return -1;
                 }
@@ -103,11 +107,11 @@ class PricerSpec: public tdzdd::DdSpec<PricerSpec, int, 2> {
             }
         }
 
-        if (_j == nbjobs && state >= Hmin && state <= Hmax) {
-            return -1;
-        } else if (_j == nbjobs) {
-            return 0;
-        }
+        // if (_j == nbjobs && state >= Hmin && state <= Hmax) {
+        //     return -1;
+        // } else if (_j == nbjobs) {
+        //     return 0;
+        // }
 
         assert(_j < nbjobs);
         return nbjobs - _j;
