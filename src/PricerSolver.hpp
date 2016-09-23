@@ -55,6 +55,7 @@ class PricerSolver {
         zdd_table.init();
         dd_table.init();
         farkas_table.init();
+        use_zdd = true;
     }
 
     void init_tables() {
