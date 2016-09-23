@@ -144,8 +144,8 @@ def main():
 
     if args.class_inst is None:
         for cl in range(1, 7):
-            for m in args.machines:
-                for n in args.jobs:
+            for n in args.jobs:
+                for m in args.machines:
                     try:
                         fname = '%s_%d_%d.csv' % (args.branch, m, n)
                         inst = Summary(fname, m, n, cl,
@@ -157,8 +157,8 @@ def main():
                         inst.compute()
                         inst.print_to_screen()
     else:
-        for m in args.machines:
-            for n in args.jobs:
+        for n in args.jobs:
+            for m in args.machines:
                 try:
                     fname = '%s_%d_%d.csv' % (args.branch, m, n)
                     inst = Summary(fname, m, n, args.class_inst,

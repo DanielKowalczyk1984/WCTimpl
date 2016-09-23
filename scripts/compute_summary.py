@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 import csv     # imports the csv module
 import sys      # imports the sys module
 import re
@@ -126,8 +126,8 @@ def main():
         header += ",%s" % it
     print header
 
-    for n in args.jobs:
-        for m in args.machines:
+    for m in args.machines:
+        for n in args.jobs:
             try:
                 fname = 'WCT_%s_%d_%d.csv' % (args.branch, m, n)
                 f = open(fname, 'rb+')
