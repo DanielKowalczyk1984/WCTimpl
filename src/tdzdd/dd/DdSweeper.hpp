@@ -78,7 +78,7 @@ namespace tdzdd
              * @param child the level at which edges from this level are completed.
              * @param count the number of dead nodes at this level.
              */
-            void update(int current, int child, size_t count)
+            void update(size_t current, int child, size_t count)
             {
                 if (current <= 1) {
                     return;
@@ -89,7 +89,7 @@ namespace tdzdd
                     deadCount.resize(current + 2);
                 }
 
-                for (int i = child; i <= current; ++i) {
+                for (size_t i = child; i <= current; ++i) {
                     if (sweepLevel[i] > 0) {
                         break;
                     }
