@@ -21,7 +21,7 @@ class PricerSolver {
     tdzdd::DataTable<PricerFarkasZDD<double> > farkas_table;
     bool use_zdd;
 
-    PricerSolver(int *_p, int *_w,  int *_r, int *_d, int njobs, int Hmin, int Hmax,
+    PricerSolver(int *_p, int *_w,  int *_r, int *_d, int &njobs, int &Hmin, int &Hmax,
                  bool _use_zdd = true): p(_p), w(_w), r(_r), d(_d), nbjobs(njobs), H_min(Hmin),
         H_max(Hmax), use_zdd(_use_zdd) {
         if (use_zdd) {
@@ -156,9 +156,9 @@ class PricerSolver {
         }
 
         /** init root */
-        zdd_table[root.row()][root.col()].add_weight(0);
+        zdd_table[root.row()][root.col()].add_weight(0,0);
 
-        for (size_t i = root.row(); i >= 1 ; i--) {
+        for (int i = root.row(); i > 0 ; i--) {
             size_t const m = zdd_table[i].size();
             int cur_job = nbjobs - i;
 
@@ -166,9 +166,14 @@ class PricerSolver {
                 tdzdd::NodeId cur_node_0 = handler.privateEntity().child(i, j, 0);
                 tdzdd::NodeId cur_node_1 = handler.privateEntity().child(i, j, 1);
 
-                for (auto &it : zdd_table[i][j].info_node) {
-                    zdd_table[cur_node_0.row()][cur_node_0.col()].add_weight(it.first);
-                    zdd_table[cur_node_1.row()][cur_node_1.col()].add_weight(it.first + p[cur_job]);
+                // for (auto &it : zdd_table[i][j].info_node) {
+                //     zdd_table[cur_node_0.row()][cur_node_0.col()].add_weight(it.first);
+                //     zdd_table[cur_node_1.row()][cur_node_1.col()].add_weight(it.first + p[cur_job]);
+                // }
+
+                for( my_iterator<double> it = zdd_table[i][j].list.begin(); it != zdd_table[i][j].list.end();it++){
+                        (*it)->n = zdd_table[cur_node_0.row()][cur_node_0.col()].add_weight((*it)->weight, nbjobs - cur_node_0.row());
+                        (*it)->y = zdd_table[cur_node_1.row()][cur_node_1.col()].add_weight((*it)->weight + p[cur_job], nbjobs - cur_node_1.row());
                 }
             }
         }
@@ -177,7 +182,7 @@ class PricerSolver {
         size_t const mm = handler.privateEntity()[0].size();
 
         for (size_t j = 0; j < mm ; j++) {
-            zdd_table[0][j].init_terminal_node(j, H_max);
+            zdd_table[0][j].init_terminal_node(j);
         }
     }
 
