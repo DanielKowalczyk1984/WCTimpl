@@ -7,12 +7,37 @@
 #include <array>
 #include <unordered_map>
 #include <boost/dynamic_bitset.hpp>
-#include <boost/unordered_map.hpp>
 
 template<typename T>
-struct node {
+class node {
+  public:
+    int job;
+    int weight;
     T obj;
     bool take;
+    node<T> *y;
+    node<T> *n;
+
+    node(): job(0), weight(0), obj(0.0), take(false), y(nullptr), n(nullptr) {
+
+    };
+
+    friend std::ostream &operator<<(std::ostream &os,
+                                    node<T> const &o) {
+        os << "job = " << o.job << ", weight = " << o.weight << ", obj = " << o.obj <<
+           std::endl;
+
+        return os;
+    };
+
+    node<T> (const node<T> &other) {
+        job = other.job;
+        weight = other.weight;
+        obj = other.obj;
+        take = other.take;
+        y = other.y;
+        n = other.n;
+    };
 };
 
 /**
@@ -92,7 +117,7 @@ class PricerInfoBDD {
     friend std::ostream &operator<<(std::ostream &os, PricerInfoBDD<T> const &o) {
         os << "max = " << o.obj << "," << std::endl << "cost = " << o.cost << std::endl;
         return os;
-    }
+    };
 };
 
 template<typename T>
@@ -131,38 +156,50 @@ class PricerWeightBDD {
         obj = 0.0;
         sum_p = weight;
         take = false;
-    }
-
-
+    };
 };
+
+template<typename T>
+using my_iterator = typename std::vector<node<T>*>::iterator;
 
 template<typename T>
 class PricerWeightZDD {
   public:
-    std::unordered_map<int, node<T> > info_node;
+    std::vector<node<T>*> list;
 
     PricerWeightZDD() {
     };
 
     ~PricerWeightZDD() {
-    }
-
-    void add_weight(int _weight) {
-        if (info_node.find(_weight) == info_node.end()) {
-            info_node[_weight].obj = 0.0;
-            info_node[_weight].take = false;
+        for (my_iterator<T> it = list.begin(); it != list.end(); it++) {
+            delete *it;
         }
     }
 
-    void init_terminal_node(int j, int H_max) {
-        int end = j ? H_max + 1 : 2 * H_max;
-
-        for (int i = 0; i < end; i++) {
-            info_node[i].obj = j ? 0.0 : -1871286761.0;
-            info_node[i].take = false;
+    node<T> *add_weight(int _weight, int job) {
+        for (my_iterator<T> it = list.begin(); it != list.end(); it++) {
+            if ((*it)->weight == _weight) {
+                return (*it);
+            }
         }
+
+        node<T> *p = new node<T>();
+        p->job = job;
+        p->weight = _weight;
+        p->obj = 0.0;
+        p->take = false;
+        list.push_back(p);
+
+        return (list.back());
+
     }
 
+    void init_terminal_node(int j) {
+        for (my_iterator<T> it = list.begin(); it != list.end(); it++) {
+            (*it)->obj = j ? 0.0 : -1871286761.0;
+            (*it)->take = false;
+        }
+    }
 };
 
 template<typename T>
@@ -242,7 +279,7 @@ class Optimal_Solution {
 
         std::cout << std::endl;
         return os;
-    }
+    };
 };
 
 template<typename E, typename T>
@@ -407,14 +444,14 @@ class WeightBDD: public
                   tdzdd::DdValues<PricerWeightBDD<T>, 2>    &values) const {
         int j = nbjobs - i;
         assert(j >= 0 && j <= nbjobs - 1);
-        PricerWeightBDD<T> n0 = values.get(0);
-        PricerWeightBDD<T> n1 = values.get(1);
+        PricerWeightBDD<T> *n0 = values.get_ptr(0);
+        PricerWeightBDD<T> *n1 = values.get_ptr(1);
 
-        if (n0.obj >= n1.obj - (T) w[j] * (n->sum_p + p[j]) + pi[j]) {
-            n->obj = n0.obj;
+        if (n0->obj >= n1->obj - (T) w[j] * (n->sum_p + p[j]) + pi[j]) {
+            n->obj = n0->obj;
             n->take = false;
         } else {
-            n->obj = n1.obj - (T) w[j] * (n->sum_p + p[j]) + pi[j];
+            n->obj = n1->obj - (T) w[j] * (n->sum_p + p[j]) + pi[j];
             n->take = true;
         }
     }
@@ -436,9 +473,9 @@ class WeightBDD: public
             if ((*data_table)[cur_node.row()][cur_node.col()].take &&  r[j] <= sol.C_max &&
                     sol.C_max + p[j] <= d[j]) {
                 sol.jobs.push_back(j);
-                cur_node = diagram.privateEntity().child(cur_node, 1);
                 sol.C_max += p[j];
                 sol.cost += w[j] * sol.C_max;
+                cur_node = diagram.privateEntity().child(cur_node, 1);
                 j = nbjobs - cur_node.row();
             } else {
                 cur_node = diagram.privateEntity().child(cur_node, 0);
@@ -470,8 +507,8 @@ class WeightZDD: public
     };
 
     void evalTerminal(PricerWeightZDD<T> &n) {
-        for (auto &it : n.info_node) {
-            it.second.obj = pi[nbjobs];
+        for (my_iterator<T> it = n.list.begin(); it != n.list.end(); it++) {
+            (*it)->obj = pi[nbjobs];
         }
     }
 
@@ -479,30 +516,29 @@ class WeightZDD: public
                   tdzdd::DdValues<PricerWeightZDD<T>, 2>    &values) const {
         int j = nbjobs - i;
         assert(j >= 0 && j <= nbjobs - 1);
-        PricerWeightZDD<T> *n0 = values.get_ptr(0);
-        PricerWeightZDD<T> *n1 = values.get_ptr(1);
 
-
-        for (auto &it : n->info_node) {
-            int weight = (it.first);
-            T obj0 = n0->info_node[weight].obj;
-            T obj1 = n1->info_node[weight + p[j]].obj;
+        for (my_iterator<T> it = n->list.begin(); it != n->list.end(); it++) {
+            int weight = ((*it)->weight);
+            node<T> *p0 = (*it)->n;
+            node<T> *p1 = (*it)->y;
+            T obj0 = p0->obj;
+            T obj1 = p1->obj;
 
             if (obj0 >= obj1 - w[j] * (weight + p[j]) + pi[j]) {
-                it.second.obj = obj0;
-                it.second.take = false;
+                (*it)->obj = obj0;
+                (*it)->take = false;
             } else {
-                it.second.obj = obj1 - w[j] * (weight + p[j]) + pi[j];
-                it.second.take = true;
-            }
+                (*it)->obj = obj1 - w[j] * (weight + p[j]) + pi[j];
+                (*it)->take = true;
+            };
         }
     }
 
     void initializenode(PricerWeightZDD<T> &n) {
 
-        for (auto &it : n.info_node) {
-            it.second.obj = 0.0;
-            it.second.take = false;
+        for (my_iterator<T> it = n.list.begin(); it != n.list.end(); it++) {
+            (*it)->obj = 0.0;
+            (*it)->take = false;
         }
     }
 
@@ -510,22 +546,21 @@ class WeightZDD: public
                                       tdzdd::DataTable<PricerWeightZDD<T>> *data_table, const tdzdd::NodeId *f) {
         Optimal_Solution<T> sol;
         sol.C_max = 0;
-        sol.obj = (*data_table)[f->row()][f->col()].info_node[sol.C_max].obj;
+        node<T> *ptr = (*data_table)[f->row()][f->col()].list[sol.C_max];
+        sol.obj = (*data_table)[f->row()][f->col()].list[sol.C_max]->obj;
         sol.cost = 0;
-        tdzdd::NodeId cur_node = *f;
-        int j = nbjobs - cur_node.row();
+        int j = ptr->job;
 
-        while (cur_node.row() != 0) {
-            if ((*data_table)[cur_node.row()][cur_node.col()].info_node[sol.C_max].take &&
-                    r[j] <= sol.C_max && sol.C_max + p[j] <= d[j]) {
-                sol.jobs.push_back(j);
-                cur_node = diagram.privateEntity().child(cur_node, 1);
+        while (ptr->job != nbjobs) {
+            if (ptr->take && r[j] <= sol.C_max && sol.C_max + p[j] <= d[j]) {
+                sol.jobs.push_back(ptr->job);
                 sol.C_max += p[j];
                 sol.cost += w[j] * sol.C_max;
-                j = nbjobs - cur_node.row();
+                ptr = ptr->y;
+                j = ptr->job;
             } else {
-                cur_node = diagram.privateEntity().child(cur_node, 0);
-                j = nbjobs - cur_node.row();
+                ptr = ptr->n;
+                j = ptr->job;
             }
         }
 
@@ -641,9 +676,9 @@ class FarkasZDD: public
             if ((*data_table)[cur_node.row()][cur_node.col()].take &&  r[j] <= sol.C_max &&
                     sol.C_max + p[j] <= d[j]) {
                 sol.jobs.push_back(j);
-                cur_node = diagram.privateEntity().child(cur_node, 1);
                 sol.C_max += p[j];
                 sol.cost += w[j] * sol.C_max;
+                cur_node = diagram.privateEntity().child(cur_node, 1);
                 j = nbjobs - cur_node.row();
             } else {
                 cur_node = diagram.privateEntity().child(cur_node, 0);
