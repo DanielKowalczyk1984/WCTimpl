@@ -3826,25 +3826,32 @@ MAYBE_UNUSED
 static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines,
                             int njobs,
                             double error) {
+    // int val = INT_MAX - 1;
+
+    // double error2 = dbl_heap_key > error ? (ABS(error - dbl_heap_key) + 0.0001) /
+    //                 (error) : (ABS(error - dbl_heap_key) + 0.0001) / (error);
+    // error2 = error2 / njobs;
+
+    // if (dbl_heap_key >= 1.0 - lp_int_tolerance()) {
+    //     return val;
+    // }
+    
+    // val = x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1)) * error2), error);
     int val = INT_MAX - 1;
 
     double error2 = dbl_heap_key > error ? (ABS(error - dbl_heap_key) + 0.0001) /
                     (error) : (ABS(error - dbl_heap_key) + 0.0001) / (error);
     error2 = error2 / njobs;
 
-    if (dbl_heap_key >= 1.0 - lp_int_tolerance()) {
-        return val;
-    }
-    
-    val = x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1)) * error2), error);
-    //if (dbl_heap_key >= 0.5) {
+    if (dbl_heap_key >= error) {
+        if (dbl_heap_key >= 1.0 - lp_int_tolerance()) {
+            return val;
+        }
 
-        // printf("test %f %f %f %f %d %d\n", error,error2,dbl_heap_key,dbl_heap_key + ABS((v2 - v1)) * error2,  v1,v2 );
-        // getchar();
-    //} else {
-        //printf("test %f %f %f %f %d %d\n",error,error2,dbl_heap_key,dbl_heap_key - ABS((v2 - v1)) * error2,  v1,v2 );
-        //val =  x_frac(MIN(1.0,  dbl_heap_key + ABS((v2 - v1)) * error2), error);
-    //}
+        val = x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1)) * error2), error);
+    } else {
+        val =  x_frac(MAX(0.0,  dbl_heap_key - ABS((v2 - v1)) * error2), error);
+    }
 
     return val;
 }
