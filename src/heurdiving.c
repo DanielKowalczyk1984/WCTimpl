@@ -16,7 +16,6 @@ int heur_exec(wctproblem *problem, wctdata *pd, int *result) {
     int *discrepancies = (int *) NULL;
     int nlpcands;
     int startnlpcands;
-    int depth = 0;
     //int maxdepth;
     int divedepth;
     int maxdivedepth;
