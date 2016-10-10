@@ -57,8 +57,8 @@ static const double min_ndelrow_ratio = 0.5;
 int compare_nodes_dfs(BinomialHeapValue a, BinomialHeapValue b) {
     wctdata *x = (wctdata *)a;
     wctdata *y = (wctdata *)b;
-    double lp_a = (x->LP_lower_bound_BB - x->depth * 10000 - 0.05*(x->id % 2));
-    double lp_b = (y->LP_lower_bound_BB - y->depth * 10000 - 0.05*(y->id % 2));
+    double lp_a = (x->LP_lower_bound_BB - x->depth * 10000 - (x->id % 2));
+    double lp_b = (y->LP_lower_bound_BB - y->depth * 10000 - (y->id % 2));
 
     if (lp_a < lp_b) {
         return -1;
@@ -4432,12 +4432,12 @@ int branching_msg_ahv(wctdata *pd, wctproblem *problem) {
     if (pd->lower_bound < pd->upper_bound) {
         CCutil_suspend_timer(&problem->tot_cputime);
         printf("Branching with lb %d (LP %f) at depth %d (id = %d, "
-               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, branch_job = %d, completion_time= %d, nbduetime= %d, ZDD size = %lu,  nb_cols = %d).\n",
+               "time = %f, unprocessed nodes = %d, nbjobs= %d, upper bound = %d, lower bound = %d, branch_job = %d, completion_time= %d, nbduetime= %d,  nb_cols = %d).\n",
                pd->lower_bound, pd->LP_lower_bound,
                pd->depth,
                pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap),
                pd->njobs, problem->global_upper_bound, root->lower_bound,
-               pd->branch_job, pd->completiontime, pd->ecount_same, get_datasize(pd->solver),
+               pd->branch_job, pd->completiontime, pd->ecount_same, 
                pd->ccount);
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
