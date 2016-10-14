@@ -564,14 +564,27 @@ void children_data_free(wctdata *pd) {
         wctdata_free(&(pd->same_children[i]));
     }
 
+    for (i = 0; i < pd->nduetime; ++i)
+    {
+        wctdata_free(&(pd->duetime_child[i]));
+    }
+
     CC_IFFREE(pd->same_children, wctdata);
+    CC_IFFREE(pd->duetime_child, wctdata);
 
     for (i = 0; i < pd->ndiff; ++i) {
         wctdata_free(&(pd->diff_children[i]));
     }
 
+    for (i = 0; i < pd->nreleasetime; ++i)
+    {
+        wctdata_free(&(pd->releasetime_child[i]));
+    }
+
+    CC_IFFREE(pd->releasetime_child, wctdata);
     CC_IFFREE(pd->diff_children, wctdata);
     pd->nsame = pd->ndiff = 0;
+    pd->nreleasetime = pd->nduetime = 0;
 }
 
 void temporary_data_free(wctdata *pd) {
