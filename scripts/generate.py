@@ -63,7 +63,7 @@ def main():
             for c in args.class_inst:
                 for i in xrange(0, 10):
                     try:
-                        f = open(directory + '/instance%d_%d_%d_%d.txt' %
+                        f = open(directory + '/instance%d_%d_%d_1%d.txt' %
                                  (c, n, m, i), 'w')
                     except IOError, (ErrorNumber, ErrorMessage):
                         print ErrorMessage
