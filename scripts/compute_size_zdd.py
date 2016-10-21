@@ -1,6 +1,5 @@
 #!/usr/bin/env python3.5
 import sys      # imports the sys module
-import re
 import os
 import argparse
 import pandas as pd
