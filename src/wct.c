@@ -1528,6 +1528,10 @@ static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
     int val = 0;
     int i, j;
     int *temp_completiontime = (int *) NULL;
+    double *tmp_dbl = CC_SAFE_MALLOC(pd->njobs, double);
+    int *tmp_int = CC_SAFE_MALLOC(pd->njobs, int);
+    fill_dbl(tmp_dbl, pd->njobs, 0.0);
+    fill_int(tmp_int, pd->njobs, 0.0);
     GList *temp_branchjobs = (GList *) NULL;
     temp_completiontime = CC_SAFE_MALLOC(pd->njobs, int);
     CCcheck_NULL_2(temp_completiontime, "Failed to allocate memory");
@@ -1535,6 +1539,8 @@ static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
 
     for (j = 0; j < pd->njobs; ++j) {
         int *C = (int *) NULL;
+        int count = 0;
+        GHashTable *table = g_hash_table_new(g_direct_hash, g_direct_equal);
 
         for (i = 0; i < pd->ccount; ++i) {
             C = (int *) g_hash_table_lookup(pd->cclasses[i].table, GINT_TO_POINTER(j));
@@ -1543,10 +1549,44 @@ static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
                 continue;
             }
 
+            tmp_dbl[j] += (*C)*pd->x[i];
+
+
+            //printf("job = %d C = %d\n", j, *C);
             if (*C < temp_completiontime[j]) {
                 temp_completiontime[j] = *C;
+
             }
+
+            if(*C > tmp_int[j]) {
+                tmp_int[j] = *C;
+            }
+            // if (!g_hash_table_lookup_extended(table, GINT_TO_POINTER(*C),NULL, NULL))
+            // {
+            //     g_hash_table_insert(table, GINT_TO_POINTER(*C), NULL);
+            //     count++;
+            // }
+
         }
+
+        // printf("count = %d\n", count);
+
+        // if(count > 1) {
+        //     GHashTableIter iter;
+        //     gpointer key, val;
+        //     g_hash_table_iter_init(&iter, table);
+        //     while(g_hash_table_iter_next(&iter, &key, &val)){
+        //         if(GPOINTER_TO_INT(key) < temp_completiontime[j]) {
+        //             temp_completiontime[j] = GPOINTER_TO_INT(key);
+        //             printf("%d\n", GPOINTER_TO_INT(key));
+        //         }
+        //     }
+        //     temp_branchjobs = g_list_append(temp_branchjobs, GINT_TO_POINTER(j));
+        // }
+
+        g_hash_table_destroy(table);
+
+
     }
 
     for (j = 0; j < pd->njobs; ++j) {
@@ -1565,6 +1605,9 @@ static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
                 found = 1;
             }
         }
+
+        //printf("test %d %f %d\n", temp_completiontime[j], tmp_dbl[j], tmp_int[j]);
+        temp_completiontime[j] = (int) floor(tmp_dbl[j]);
     }
 
 CLEAN:
@@ -1574,6 +1617,8 @@ CLEAN:
         g_list_free(*branchjobs);
     }
 
+    CC_IFFREE(tmp_dbl, double);
+    CC_IFFREE(tmp_int, int);
     *min_completiontime = temp_completiontime;
     *branchjobs = temp_branchjobs;
     return val;
@@ -3351,7 +3396,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
             CCcheck_val_2(val, "Failed in create_same");
 
             if (same_children->status != infeasible) {
-                same_children->maxiterations = 20;
+                //same_children->maxiterations = pd->njobs;
                 compute_lower_bound(problem, same_children);
             }
 
@@ -3359,7 +3404,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
             CCcheck_val_2(val, "Failed in create_differ");
 
             if (diff_children->status != infeasible) {
-                diff_children->maxiterations = 20;
+                //diff_children->maxiterations = pd->njobs;
                 compute_lower_bound(problem, diff_children);
             }
 
@@ -3452,7 +3497,7 @@ static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd,
     double strongest_dbl_lb = 0.0;
     wctparms *parms = &(problem->parms);
     *strongest_v1 = -1;
-    GList *it = branchnodes;
+    GList *it = g_list_first(branchnodes);
     int v1;
 
     switch (parms->strong_branching) {
@@ -3475,12 +3520,12 @@ static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd,
             CCcheck_val_2(rval, "Failed in create_differ");
 
             if (duetime_child->status != infeasible) {
-                duetime_child->maxiterations = 5;
+                duetime_child->maxiterations = pd->njobs;
                 compute_lower_bound(problem, duetime_child);
             }
 
             if (releasetime_child->status != infeasible) {
-                releasetime_child->maxiterations = 5;
+                releasetime_child->maxiterations = pd->njobs;
                 compute_lower_bound(problem, releasetime_child);
             }
 
@@ -3848,7 +3893,7 @@ static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines,
     // if (dbl_heap_key >= 1.0 - lp_int_tolerance()) {
     //     return val;
     // }
-    
+
     // val = x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1)) * error2), error);
     int val = INT_MAX - 1;
 
@@ -4450,7 +4495,7 @@ int branching_msg_ahv(wctdata *pd, wctproblem *problem) {
                pd->depth,
                pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap),
                pd->njobs, problem->global_upper_bound, root->lower_bound,
-               pd->branch_job, pd->completiontime, pd->ecount_same, 
+               pd->branch_job, pd->completiontime, pd->ecount_same,
                pd->ccount);
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
