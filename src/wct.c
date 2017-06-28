@@ -3519,12 +3519,12 @@ static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd,
             CCcheck_val_2(rval, "Failed in create_differ");
 
             if (duetime_child->status != infeasible) {
-                duetime_child->maxiterations = pd->njobs;
+                //duetime_child->maxiterations = pd->njobs;
                 compute_lower_bound(problem, duetime_child);
             }
 
             if (releasetime_child->status != infeasible) {
-                releasetime_child->maxiterations = pd->njobs;
+                //releasetime_child->maxiterations = pd->njobs;
                 compute_lower_bound(problem, releasetime_child);
             }
 
