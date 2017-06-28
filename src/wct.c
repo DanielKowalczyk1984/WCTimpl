@@ -1539,7 +1539,7 @@ static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
 
     for (j = 0; j < pd->njobs; ++j) {
         int *C = (int *) NULL;
-        int count = 0;
+        //int count = 0;
         GHashTable *table = g_hash_table_new(g_direct_hash, g_direct_equal);
 
         for (i = 0; i < pd->ccount; ++i) {
@@ -1550,7 +1550,6 @@ static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
             }
 
             tmp_dbl[j] += (*C)*pd->x[i];
-
 
             //printf("job = %d C = %d\n", j, *C);
             if (*C < temp_completiontime[j]) {
@@ -1607,7 +1606,7 @@ static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
         }
 
         //printf("test %d %f %d\n", temp_completiontime[j], tmp_dbl[j], tmp_int[j]);
-        temp_completiontime[j] = (int) floor(tmp_dbl[j]);
+        // temp_completiontime[j] = (int) floor(tmp_dbl[j]);
     }
 
 CLEAN:
