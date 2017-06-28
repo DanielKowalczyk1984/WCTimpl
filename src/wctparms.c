@@ -14,7 +14,7 @@ void wctparms_init(wctparms *parms) {
     parms->nb_feas_sol = 10;
     parms->combine_method = min_combine_method;
     parms->scatter_search = 0;
-    parms->branchandbound = no;
+    parms->branchandbound = yes;
     parms->dual_var_type = Dbl;
     parms->stab_technique = no_stab;
     parms->solver = min_solver;

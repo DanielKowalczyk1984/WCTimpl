@@ -202,8 +202,6 @@ static int print_to_csv(wctproblem *problem) {
     int size;
     GDate date;
     g_date_set_time_t(&date, time(NULL));
-    problem->real_time = getRealTime() - problem->real_time;
-    CCutil_stop_timer(&(problem->tot_cputime), 0);
 
     switch (parms->bb_branch_strategy) {
     case conflict_strategy:
@@ -373,6 +371,8 @@ int main(int ac, char **av) {
     /** Compute Schedule with Branch and Price */
     compute_schedule(&problem);
 
+    problem.real_time = getRealTime() - problem.real_time;
+    CCutil_stop_timer(&(problem.tot_cputime), 0);
     /** Print all the information to screen and csv */
     if (problem.parms.print) {
         print_to_csv(&problem);
