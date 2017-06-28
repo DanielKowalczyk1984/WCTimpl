@@ -124,7 +124,11 @@ int random_assignment(Job *jobarray, int njobs, int nmachines,
         } else if (n >= 0.8 && n < 0.95) {
             temp = (partlist *) g_queue_pop_nth(queue, 1);
         } else {
-            temp = (partlist *)g_queue_pop_nth(queue, 2);
+            if(nmachines > 2) {
+                temp = (partlist *)g_queue_pop_nth(queue, 2);
+            } else {
+                temp = (partlist *)g_queue_pop_nth(queue, 1);
+            }
         }
 
         val = partlist_insert(temp, new_sol->vlist, j);
