@@ -5681,7 +5681,7 @@ int compute_schedule(wctproblem *problem) {
     } else {
         problem->global_lower_bound = root_pd->lower_bound;
         problem->rel_error = (double)(problem->global_upper_bound -
-                                      problem->global_lower_bound) / ((double)problem->global_lower_bound);
+                                      problem->global_lower_bound) / ((double)problem->global_upper_bound + EPSILON);
         problem->status = meta_heur;
         problem->global_lower_bound = root_pd->lower_bound;
         printf("The suboptimal schedule is given by:\n");
