@@ -1342,9 +1342,9 @@ int compute_objective(wctdata *pd, wctparms *parms) {
     /** Get the LP lower bound and compute the lower bound of WCT */
     val = wctlp_objval(pd->LP, &(pd->LP_lower_bound));
     CCcheck_val_2(val, "wctlp_objval failed");
-    // pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual) < (int) ceil(
-    //                        pd->LP_lower_bound)) ? (int) ceil(pd->LP_lower_bound_dual) : (int) ceil(
-    //                       pd->LP_lower_bound) ;
+    pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual) < (int) ceil(
+                           pd->LP_lower_bound)) ? (int) ceil(pd->LP_lower_bound_dual) : (int) ceil(
+                          pd->LP_lower_bound) ;
     pd->LP_lower_bound_BB = CC_MIN(pd->LP_lower_bound, pd->LP_lower_bound);
 
     if (parms->stab_technique == stab_wentgnes ||
@@ -1528,10 +1528,6 @@ static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
     int val = 0;
     int i, j;
     int *temp_completiontime = (int *) NULL;
-    double *tmp_dbl = CC_SAFE_MALLOC(pd->njobs, double);
-    int *tmp_int = CC_SAFE_MALLOC(pd->njobs, int);
-    fill_dbl(tmp_dbl, pd->njobs, 0.0);
-    fill_int(tmp_int, pd->njobs, 0.0);
     GList *temp_branchjobs = (GList *) NULL;
     temp_completiontime = CC_SAFE_MALLOC(pd->njobs, int);
     CCcheck_NULL_2(temp_completiontime, "Failed to allocate memory");
@@ -1539,8 +1535,6 @@ static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
 
     for (j = 0; j < pd->njobs; ++j) {
         int *C = (int *) NULL;
-        //int count = 0;
-        GHashTable *table = g_hash_table_new(g_direct_hash, g_direct_equal);
 
         for (i = 0; i < pd->ccount; ++i) {
             C = (int *) g_hash_table_lookup(pd->cclasses[i].table, GINT_TO_POINTER(j));
@@ -1549,50 +1543,18 @@ static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
                 continue;
             }
 
-            tmp_dbl[j] += (*C)*pd->x[i];
-
-            //printf("job = %d C = %d\n", j, *C);
             if (*C < temp_completiontime[j]) {
                 temp_completiontime[j] = *C;
 
             }
-
-            if(*C > tmp_int[j]) {
-                tmp_int[j] = *C;
-            }
-            // if (!g_hash_table_lookup_extended(table, GINT_TO_POINTER(*C),NULL, NULL))
-            // {
-            //     g_hash_table_insert(table, GINT_TO_POINTER(*C), NULL);
-            //     count++;
-            // }
-
         }
-
-        // printf("count = %d\n", count);
-
-        // if(count > 1) {
-        //     GHashTableIter iter;
-        //     gpointer key, val;
-        //     g_hash_table_iter_init(&iter, table);
-        //     while(g_hash_table_iter_next(&iter, &key, &val)){
-        //         if(GPOINTER_TO_INT(key) < temp_completiontime[j]) {
-        //             temp_completiontime[j] = GPOINTER_TO_INT(key);
-        //             printf("%d\n", GPOINTER_TO_INT(key));
-        //         }
-        //     }
-        //     temp_branchjobs = g_list_append(temp_branchjobs, GINT_TO_POINTER(j));
-        // }
-
-        g_hash_table_destroy(table);
-
-
     }
 
     for (j = 0; j < pd->njobs; ++j) {
         int *C = (int *) NULL;
         int found = 0;
 
-        for (i = 0; i < pd->ccount; ++i) {
+        for (i = 0; i < pd->ccount && !found; ++i) {
             C = (int *) g_hash_table_lookup(pd->cclasses[i].table, GINT_TO_POINTER(j));
 
             if (pd->x[i] <= 0.0  || !C) {
@@ -1604,9 +1566,6 @@ static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
                 found = 1;
             }
         }
-
-        //printf("test %d %f %d\n", temp_completiontime[j], tmp_dbl[j], tmp_int[j]);
-        // temp_completiontime[j] = (int) floor(tmp_dbl[j]);
     }
 
 CLEAN:
@@ -1616,8 +1575,6 @@ CLEAN:
         g_list_free(*branchjobs);
     }
 
-    CC_IFFREE(tmp_dbl, double);
-    CC_IFFREE(tmp_int, int);
     *min_completiontime = temp_completiontime;
     *branchjobs = temp_branchjobs;
     return val;
@@ -5370,7 +5327,7 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd) {
             switch (parms->stab_technique) {
             case stab_wentgnes:
             case stab_dynamic:
-                break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.00001) || CC_OURABS((double)pd->upper_bound- pd->lower_bound)/((double) pd->upper_bound + EPSILON) < 0.001;
+                break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.00001);
                 break;
 
             case no_stab:
@@ -5600,6 +5557,7 @@ int compute_schedule(wctproblem *problem) {
     init_BB_tree(problem);
     print_size_to_csv(problem, root_pd);
     root_pd->upper_bound = problem->global_upper_bound;
+    root_pd->lower_bound = problem->global_lower_bound;
     update_Schedulesets(&root_pd->bestcolors, &root_pd->nbbest, problem->bestschedule, problem->nbestschedule);
 
     if (root_pd->status >= LP_bound_computed) {
