@@ -1342,16 +1342,12 @@ int compute_objective(wctdata *pd, wctparms *parms) {
     /** Get the LP lower bound and compute the lower bound of WCT */
     val = wctlp_objval(pd->LP, &(pd->LP_lower_bound));
     CCcheck_val_2(val, "wctlp_objval failed");
-    pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual) < (int) ceil(
-                           pd->LP_lower_bound)) ? (int) ceil(pd->LP_lower_bound_dual) : (int) ceil(
-                          pd->LP_lower_bound) ;
-    pd->LP_lower_bound_BB = CC_MIN(pd->LP_lower_bound, pd->LP_lower_bound);
+    pd->LP_lower_bound_BB = CC_MIN(pd->LP_lower_bound, pd->LP_lower_bound_dual);
 
     if (parms->stab_technique == stab_wentgnes ||
             parms->stab_technique == stab_dynamic) {
-        pd->lower_bound = (int) ceil(pd->eta_in - 0.001);
+        pd->lower_bound = CC_MAX((int) ceil(pd->eta_in - 0.001),pd->lower_bound);
         pd->LP_lower_bound_BB = CC_MIN(pd->LP_lower_bound_BB, pd->eta_in);
-
     }
 
     if (dbg_lvl() > 0) {
@@ -5327,11 +5323,11 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd) {
             switch (parms->stab_technique) {
             case stab_wentgnes:
             case stab_dynamic:
-                break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.00001);
+                break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.00001) || ((double)(pd->upper_bound - pd->lower_bound)/(pd->upper_bound) < 0.001 && parms->lowerbound_exact);
                 break;
 
             case no_stab:
-                break_while_loop = (pd->nnewsets == 0 || nnonimprovements > 5);
+                break_while_loop = (pd->nnewsets == 0 || nnonimprovements > 5 || ((double)(pd->upper_bound - pd->lower_bound)/(pd->upper_bound) < 0.001 && parms->lowerbound_exact));
                 break;
             }
 

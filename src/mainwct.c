@@ -44,6 +44,8 @@ static void usage(char *f) {
             "   -b int  Branching strategy: 0 = conflict(default), 1 = ahv\n");
     fprintf(stderr,
             "   -Z int  Use strong branching: 0 = use strong branching(default), 1 = no strong branching\n");
+    fprintf(stderr,
+            "   -a int  Use strong exact computation lowerbound: 0 = yes(default), 1 = no\n");
 }
 
 
@@ -131,6 +133,10 @@ static int parseargs(int ac, char **av, wctparms *parms) {
 
         case 'Z':
             val = wctparms_set_strong_branching(parms, atoi(optarg));
+            CCcheck_val(val, "Failed in set strong branching");
+            break;
+        case 'a':
+            val = wctparms_set_lowerbound_exact(parms, atoi(optarg));
             CCcheck_val(val, "Failed in set strong branching");
             break;
 
