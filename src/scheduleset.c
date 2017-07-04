@@ -42,8 +42,7 @@ static int copy_Schedulesets(Scheduleset *dst, Scheduleset *src, int nsrc);
             dst->C = (int *) NULL;                                          \
             dst->table = (GHashTable *) NULL;                               \
         } else {                                                            \
-            dst->members = src->members;                                    \
-            src->members = (int *) NULL;                                    \
+            memcpy(dst->members, src->members, (dst->count + 1)*sizeof(int));                                    \
             dst->C = src->C;                                                \
             src->C = (int *) NULL;                                         \
             dst->table = src->table;                                       \
@@ -61,8 +60,7 @@ static int copy_Schedulesets(Scheduleset *dst, Scheduleset *src, int nsrc);
         if(dst[x].count == 0){                                              \
             dst[x].members = (int*)NULL;                                    \
         } else {                                                            \
-            dst[x].members = src[x].members;                                \
-            src[x].members = (int *) NULL;                                  \
+            memcpy(dst[x].members, src[x].members, (dst[x].count + 1)*sizeof(int));                                    \
             dst[x].C = src[x].C;                                            \
             src[x].C = (int *) NULL;                                        \
             dst[x].table = src[x].table;                                    \
@@ -119,7 +117,7 @@ int COLORcopy_sets(Scheduleset **s, int *nsets,  Scheduleset *src_s,
                    int src_nsets) {
     int val = 0;
 
-    //int i;
+    int i;
     if (src_nsets == 0) {
         return val;
     }
@@ -128,18 +126,18 @@ int COLORcopy_sets(Scheduleset **s, int *nsets,  Scheduleset *src_s,
     *nsets = src_nsets;
     *s = (Scheduleset *) CC_SAFE_MALLOC(src_nsets, Scheduleset);
     CCcheck_NULL_2(*s, "Failed to allocate memory *s");
-    /*for (i = 0; i < src_nsets; ++i) {
+    for (i = 0; i < src_nsets; ++i) {
         (*s)[i].count = src_s[i].count;
         (*s)[i].totweight = src_s[i].totweight;
         if((*s)[i].count == 0){
             (*s)[i].members = (int*) NULL;
         } else {
-            (*s)[i].members = (int*) CC_SAFE_MALLOC(src_s[i].count,int);
+            (*s)[i].members = (int*) CC_SAFE_MALLOC(src_s[i].count + 1,int);
             CCcheck_NULL((*s)[i].members,"Failed to allocate (*s)[i].members");
-             memcpy((*s)[i].members,src_s[i].members,src_s[i].count * sizeof(int));
+             memcpy((*s)[i].members,src_s[i].members,(src_s[i].count + 1)* sizeof(int));
         }
         (*s)[i].age = src_s[i].age;
-    }*/
+    }
     copy_Schedulesets(*s, src_s, src_nsets);
 CLEAN:
     return val;

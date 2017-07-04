@@ -22,7 +22,7 @@ SET(CMAKE_C_FLAGS_RELEASE "-O5 -Wall -D_XOPEN_SOURCE=500 -pedantic -std=c99")
 
 SET(CMAKE_CXX_FLAGS_DEBUG "-std=c++11 -O5 -g -Wall -D_XOPEN_SOURCE=500 ")
 
-SET(CMAKE_C_FLAGS_DEBUG "-O5 -g -Wall -D_XOPEN_SOURCE=500 -pedantic -std=c99")
+SET(CMAKE_C_FLAGS_DEBUG "-g -Wall -D_XOPEN_SOURCE=500 -pedantic -std=c99")
 
 FILE(GLOB SOURCE  "src/*.c" "src/*.cc")
 

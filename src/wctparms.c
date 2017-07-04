@@ -11,10 +11,11 @@ void wctparms_init(wctparms *parms) {
     parms->bb_branch_strategy = min_bb_strategy;
     parms->bb_search_strategy = min_search_strategy;
     parms->strong_branching = min_strong_branching;
+    parms->lowerbound_exact = min_lowerbound_exact;
     parms->nb_feas_sol = 10;
     parms->combine_method = min_combine_method;
     parms->scatter_search = 0;
-    parms->branchandbound = no;
+    parms->branchandbound = yes;
     parms->dual_var_type = Dbl;
     parms->stab_technique = no_stab;
     parms->solver = min_solver;
@@ -167,6 +168,11 @@ int wctparms_set_test_ahv(wctparms *parms, int use) {
 
 int wctparms_set_print(wctparms *parms, int print) {
     parms->print = print;
+    return 0;
+}
+
+int wctparms_set_lowerbound_exact(wctparms *parms, int exact) {
+    parms->lowerbound_exact = exact;
     return 0;
 }
 
