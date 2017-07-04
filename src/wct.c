@@ -3,8 +3,6 @@
 #include <assert.h>
 #include "wct.h"
 #include "wctparms.h"
-#include "heurdiving.h"
-#include "new_heurdiving.h"
 
 #define MEAN_ERROR 0.5
 
@@ -515,7 +513,6 @@ void wctdata_init(wctdata *pd) {
     pd->nb_wide = 0;
     pd->same_children_wide = (wctdata **) NULL;
     pd->diff_children_wide = (wctdata **) NULL;
-    heur_init(pd);
 }
 
 static void free_elist(wctdata *cd, wctparms *parms) {
@@ -545,7 +542,6 @@ void lpwctdata_free(wctdata *pd) {
     CC_IFFREE(pd->rhs, double);
     CC_IFFREE(pd->releasetime, int);
     CC_IFFREE(pd->duetime, int);
-    heur_free(pd);
 
     if (pd->solver) {
         freeSolver(pd->solver);
@@ -2817,34 +2813,6 @@ CLEAN:
     return val;
 }
 
-MAYBE_UNUSED
-static int mark_neighborhood(int *neighbor_marker,
-                             int vcount, int ecount, int elist[],
-                             int v)
-
-{
-    int val = 0;
-    int i;
-    adjGraph G;
-    adjGraph_init(&G);
-    val = adjGraph_buildquick(&G, vcount, ecount, elist);
-    CCcheck_val_2(val, "COLORadjgraph_build");
-
-    for (i = 0; i < vcount; ++i) {
-        neighbor_marker[i] = 0;
-    }
-
-    for (i = 0; i < G.nodelist[v].degree; ++i) {
-        int v_i = G.nodelist[v].adj[i];
-        neighbor_marker[v_i] = 1;
-    }
-
-    adjGraph_freequick(&G);
-CLEAN:
-    return val;
-}
-
-
 static int create_same_wide(wctproblem *problem, wctdata *parent_pd,
                             int *v1_wide, int *v2_wide, int nb_wide) {
     int val = 0;
@@ -3959,7 +3927,6 @@ CLEAN:
 
 int create_branches_conflict(wctdata *pd, wctproblem *problem) {
     int val = 0;
-    int result = DELEYAD;
     int status;
     int i;
     double *x = (double *)NULL;
@@ -4042,20 +4009,6 @@ int create_branches_conflict(wctdata *pd, wctproblem *problem) {
         }
     }
 
-    if (pd->depth % 5 == 0 && parms->diving_heuristic) {
-        //parms->stab_technique = no_stab;
-        printf("starting heur\n");
-        getchar();
-        val = heur_exec(problem, pd, &result);
-        CCcheck_val_2(val, "Failed at heur_exec");
-
-        if (result == FOUNDSOL) {
-            printf("Heuristic found solution\n");
-        }
-
-        parms->stab_technique = stab_wentgnes;
-    }
-
     if (dbg_lvl() > 1) {
         printf("Collected %d branching candidates.\n", pmcheap_size(heap));
     }
@@ -4122,7 +4075,6 @@ CLEAN:
 
 int create_branches_wide(wctdata *pd, wctproblem *problem) {
     int val = 0;
-    int result = DELEYAD;
     int status;
     int i;
     int *v1_wide = (int *) NULL;
@@ -4180,17 +4132,6 @@ int create_branches_wide(wctdata *pd, wctproblem *problem) {
         CCcheck_val_2(val, "Failed in grab_int_sol");
         assert(pd->status = finished);
         goto CLEAN;
-    }
-
-    if (pd->depth % 5 == 0 && parms->diving_heuristic) {
-        val = heur_exec(problem, pd, &result);
-        CCcheck_val_2(val, "Failed at heur_exec");
-
-        if (result == FOUNDSOL) {
-            printf("Heuristic found solution\n");
-            assert(pd->status = finished);
-            goto CLEAN;
-        }
     }
 
     if (dbg_lvl() > 1) {
@@ -5627,7 +5568,7 @@ int compute_schedule(wctproblem *problem) {
     if (root_pd->lower_bound == problem->global_upper_bound) {
         problem->global_lower_bound = root_pd->lower_bound;
         problem->rel_error = (double)(problem->global_upper_bound -
-                                      problem->global_lower_bound) / ((double)problem->global_upper_bound + EPSILON);
+                                      problem->global_lower_bound) / ((double)problem->global_upper_bound);
         problem->status = optimal;
         printf("The optimal schedule is given by:\n");
         print_schedule(root_pd->bestcolors, root_pd->nbbest);
@@ -5635,7 +5576,7 @@ int compute_schedule(wctproblem *problem) {
     } else {
         problem->global_lower_bound = root_pd->lower_bound;
         problem->rel_error = (double)(problem->global_upper_bound -
-                                      problem->global_lower_bound) / ((double)problem->global_upper_bound + EPSILON);
+                                      problem->global_lower_bound) / ((double)problem->global_upper_bound);
         problem->status = meta_heur;
         problem->global_lower_bound = root_pd->lower_bound;
         printf("The suboptimal schedule is given by:\n");

@@ -8,6 +8,7 @@ else (GUROBI_INCLUDE_DIR)
 find_path(GUROBI_INCLUDE_DIR
           NAMES  gurobi_c++.h
           PATHS   
+          "/opt/gurobi702/linux64/include"
           "/opt/gurobi652/linux64/include"
           "/opt/gurobi650/linux64/include/"
                 "$ENV{GUROBI_HOME}/include"
@@ -20,7 +21,8 @@ find_path(GUROBI_INCLUDE_DIR
 
 find_library( GUROBI_LIBRARY
               NAMES
-              gurobi65
+              gurobi70
+              gurobi66
               gurobi60
               gurobi
               gurobi45
@@ -33,6 +35,7 @@ find_library( GUROBI_LIBRARY
               gurobi60
               gurobi563
               PATHS
+              "/opt/gurobi702/linux64/lib/"
               "/opt/gurobi652/linux64/lib/"
               "/opt/gurobi650/linux64/lib/"
                     "/Library/gurobi604/mac64/lib/"
@@ -49,8 +52,10 @@ find_library( GUROBI_CXX_LIBRARY
               gurobi_c++
               libgurobi56
               libgurobi
+              libgurobi70
 
               PATHS
+              "/opt/gurobi702/linux64/lib/lib"
               "/opt/gurobi652/linux64/lib/"
               "/opt/gurobi650/linux64/lib/"
                     "$ENV{GUROBI_HOME}/lib"
