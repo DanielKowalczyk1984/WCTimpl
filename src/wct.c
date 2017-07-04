@@ -1342,16 +1342,12 @@ int compute_objective(wctdata *pd, wctparms *parms) {
     /** Get the LP lower bound and compute the lower bound of WCT */
     val = wctlp_objval(pd->LP, &(pd->LP_lower_bound));
     CCcheck_val_2(val, "wctlp_objval failed");
-    pd->lower_bound = ((int) ceil(pd->LP_lower_bound_dual) < (int) ceil(
-                           pd->LP_lower_bound)) ? (int) ceil(pd->LP_lower_bound_dual) : (int) ceil(
-                          pd->LP_lower_bound) ;
-    pd->LP_lower_bound_BB = CC_MIN(pd->LP_lower_bound, pd->LP_lower_bound);
+    pd->LP_lower_bound_BB = CC_MIN(pd->LP_lower_bound, pd->LP_lower_bound_dual);
 
     if (parms->stab_technique == stab_wentgnes ||
             parms->stab_technique == stab_dynamic) {
-        pd->lower_bound = (int) ceil(pd->eta_in - 0.001);
+        pd->lower_bound = CC_MAX((int) ceil(pd->eta_in - 0.001),pd->lower_bound);
         pd->LP_lower_bound_BB = CC_MIN(pd->LP_lower_bound_BB, pd->eta_in);
-
     }
 
     if (dbg_lvl() > 0) {
@@ -1545,6 +1541,7 @@ static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
 
             if (*C < temp_completiontime[j]) {
                 temp_completiontime[j] = *C;
+
             }
         }
     }
@@ -1553,7 +1550,7 @@ static int test_theorem_ahv(wctdata *pd, GList **branchjobs,
         int *C = (int *) NULL;
         int found = 0;
 
-        for (i = 0; i < pd->ccount; ++i) {
+        for (i = 0; i < pd->ccount && !found; ++i) {
             C = (int *) g_hash_table_lookup(pd->cclasses[i].table, GINT_TO_POINTER(j));
 
             if (pd->x[i] <= 0.0  || !C) {
@@ -3351,7 +3348,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
             CCcheck_val_2(val, "Failed in create_same");
 
             if (same_children->status != infeasible) {
-                same_children->maxiterations = 20;
+                //same_children->maxiterations = pd->njobs;
                 compute_lower_bound(problem, same_children);
             }
 
@@ -3359,7 +3356,7 @@ static int find_strongest_children_conflict(int *strongest_v1,
             CCcheck_val_2(val, "Failed in create_differ");
 
             if (diff_children->status != infeasible) {
-                diff_children->maxiterations = 20;
+                //diff_children->maxiterations = pd->njobs;
                 compute_lower_bound(problem, diff_children);
             }
 
@@ -3452,7 +3449,7 @@ static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd,
     double strongest_dbl_lb = 0.0;
     wctparms *parms = &(problem->parms);
     *strongest_v1 = -1;
-    GList *it = branchnodes;
+    GList *it = g_list_first(branchnodes);
     int v1;
 
     switch (parms->strong_branching) {
@@ -3475,12 +3472,12 @@ static int find_strongest_children_ahv(int *strongest_v1, wctdata *pd,
             CCcheck_val_2(rval, "Failed in create_differ");
 
             if (duetime_child->status != infeasible) {
-                duetime_child->maxiterations = 5;
+                //duetime_child->maxiterations = pd->njobs;
                 compute_lower_bound(problem, duetime_child);
             }
 
             if (releasetime_child->status != infeasible) {
-                releasetime_child->maxiterations = 5;
+                //releasetime_child->maxiterations = pd->njobs;
                 compute_lower_bound(problem, releasetime_child);
             }
 
@@ -3848,7 +3845,7 @@ static int get_int_heap_key(double dbl_heap_key, int v1, int v2, int nmachines,
     // if (dbl_heap_key >= 1.0 - lp_int_tolerance()) {
     //     return val;
     // }
-    
+
     // val = x_frac(MIN(1.0, dbl_heap_key + ABS((v2 - v1)) * error2), error);
     int val = INT_MAX - 1;
 
@@ -4450,7 +4447,7 @@ int branching_msg_ahv(wctdata *pd, wctproblem *problem) {
                pd->depth,
                pd->id, problem->tot_cputime.cum_zeit, binomial_heap_num_entries(heap),
                pd->njobs, problem->global_upper_bound, root->lower_bound,
-               pd->branch_job, pd->completiontime, pd->ecount_same, 
+               pd->branch_job, pd->completiontime, pd->ecount_same,
                pd->ccount);
         CCutil_resume_timer(&problem->tot_cputime);
         problem->nb_explored_nodes++;
@@ -5326,11 +5323,11 @@ int compute_lower_bound(wctproblem *problem, wctdata *pd) {
             switch (parms->stab_technique) {
             case stab_wentgnes:
             case stab_dynamic:
-                break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.00001);
+                break_while_loop = (CC_OURABS(pd->eta_out - pd->eta_in) < 0.00001) || ((double)(pd->upper_bound - pd->lower_bound)/(pd->upper_bound) < 0.001 && parms->lowerbound_exact);
                 break;
 
             case no_stab:
-                break_while_loop = (pd->nnewsets == 0 || nnonimprovements > 5);
+                break_while_loop = (pd->nnewsets == 0 || nnonimprovements > 5 || ((double)(pd->upper_bound - pd->lower_bound)/(pd->upper_bound) < 0.001 && parms->lowerbound_exact));
                 break;
             }
 
@@ -5555,6 +5552,9 @@ int compute_schedule(wctproblem *problem) {
     prune_duplicated_sets(root_pd);
     init_BB_tree(problem);
     print_size_to_csv(problem, root_pd);
+    root_pd->upper_bound = problem->global_upper_bound;
+    root_pd->lower_bound = problem->global_lower_bound;
+    update_Schedulesets(&root_pd->bestcolors, &root_pd->nbbest, problem->bestschedule, problem->nbestschedule);
 
     if (root_pd->status >= LP_bound_computed) {
         val = prefill_heap(root_pd, problem);
@@ -5592,7 +5592,7 @@ int compute_schedule(wctproblem *problem) {
     printf("GUB = %d, GLB = %d\n", problem->global_upper_bound,
            problem->global_lower_bound);
 
-    if (problem->global_lower_bound != problem->global_upper_bound) {
+    if (problem->global_lower_bound != problem->global_upper_bound && parms->branchandbound == yes) {
         CCutil_start_resume_time(&(problem->tot_branch_and_bound));
 
         switch (parms->bb_branch_strategy) {
@@ -5627,7 +5627,7 @@ int compute_schedule(wctproblem *problem) {
     if (root_pd->lower_bound == problem->global_upper_bound) {
         problem->global_lower_bound = root_pd->lower_bound;
         problem->rel_error = (double)(problem->global_upper_bound -
-                                      problem->global_lower_bound) / ((double)problem->global_lower_bound);
+                                      problem->global_lower_bound) / ((double)problem->global_upper_bound + EPSILON);
         problem->status = optimal;
         printf("The optimal schedule is given by:\n");
         print_schedule(root_pd->bestcolors, root_pd->nbbest);
@@ -5635,7 +5635,7 @@ int compute_schedule(wctproblem *problem) {
     } else {
         problem->global_lower_bound = root_pd->lower_bound;
         problem->rel_error = (double)(problem->global_upper_bound -
-                                      problem->global_lower_bound) / ((double)problem->global_lower_bound);
+                                      problem->global_lower_bound) / ((double)problem->global_upper_bound + EPSILON);
         problem->status = meta_heur;
         problem->global_lower_bound = root_pd->lower_bound;
         printf("The suboptimal schedule is given by:\n");

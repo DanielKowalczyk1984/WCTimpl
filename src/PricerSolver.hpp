@@ -34,8 +34,6 @@ class PricerSolver {
             init_zdd_table();
             init_bdd_table();
             init_table_farkas();
-            delete [] ps.sum_p;
-            delete [] ps.min_p;
         }
     };
 

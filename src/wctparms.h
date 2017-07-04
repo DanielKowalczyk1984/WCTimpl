@@ -87,6 +87,12 @@ enum Strong_Branching {
     no_strong_branching = 1,
 };
 
+enum lowerbound_exact{
+    min_lowerbound_exact=0,
+    yes_exact = min_lowerbound_exact,
+    no_exact = 1,
+};
+
 
 
 typedef struct wctparms {
@@ -100,6 +106,7 @@ typedef struct wctparms {
     int parallel_branching;
     int nb_feas_sol;
     double branching_cpu_limit;
+    int lowerbound_exact;
     /**
      * scatter search
      */
@@ -156,6 +163,7 @@ int wctparms_set_construct(wctparms *parms, int construct);
 int wctparms_set_diving_heuristic(wctparms *parms, int diving);
 int wctparms_set_test_ahv(wctparms *parms, int use);
 int wctparms_set_print(wctparms *parms, int print);
+int wctparms_set_lowerbound_exact(wctparms *parms, int exact);
 
 /**
  * scatter search

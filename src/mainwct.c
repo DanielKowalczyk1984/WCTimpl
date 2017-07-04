@@ -44,6 +44,8 @@ static void usage(char *f) {
             "   -b int  Branching strategy: 0 = conflict(default), 1 = ahv\n");
     fprintf(stderr,
             "   -Z int  Use strong branching: 0 = use strong branching(default), 1 = no strong branching\n");
+    fprintf(stderr,
+            "   -a int  Use strong exact computation lowerbound: 0 = yes(default), 1 = no\n");
 }
 
 
@@ -133,6 +135,10 @@ static int parseargs(int ac, char **av, wctparms *parms) {
             val = wctparms_set_strong_branching(parms, atoi(optarg));
             CCcheck_val(val, "Failed in set strong branching");
             break;
+        case 'a':
+            val = wctparms_set_lowerbound_exact(parms, atoi(optarg));
+            CCcheck_val(val, "Failed in set strong branching");
+            break;
 
         default:
             usage(av[0]);
@@ -202,8 +208,6 @@ static int print_to_csv(wctproblem *problem) {
     int size;
     GDate date;
     g_date_set_time_t(&date, time(NULL));
-    problem->real_time = getRealTime() - problem->real_time;
-    CCutil_stop_timer(&(problem->tot_cputime), 0);
 
     switch (parms->bb_branch_strategy) {
     case conflict_strategy:
@@ -373,6 +377,8 @@ int main(int ac, char **av) {
     /** Compute Schedule with Branch and Price */
     compute_schedule(&problem);
 
+    problem.real_time = getRealTime() - problem.real_time;
+    CCutil_stop_timer(&(problem.tot_cputime), 0);
     /** Print all the information to screen and csv */
     if (problem.parms.print) {
         print_to_csv(&problem);

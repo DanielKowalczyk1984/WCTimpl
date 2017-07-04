@@ -74,4 +74,5 @@ macdebug/*
 linuxrelease/*
 linuxdebug/*
 build_arch/*
-
+build/*
+build*

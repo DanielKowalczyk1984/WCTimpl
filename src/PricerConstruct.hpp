@@ -26,11 +26,8 @@ class PricerSpec: public tdzdd::DdSpec<PricerSpec, int, 2> {
   public:
     int *sum_p;
     int *min_p;
-    PricerSpec(int *_p, int *_r, int *_d, int njobs, int Hmin, int Hmax): p(_p),
-        r(_r), d(_d), Hmin(Hmin), Hmax(Hmax) {
-        nbjobs = njobs;
-        sum_p = new int [nbjobs];
-        min_p = new int [nbjobs];
+    PricerSpec(int *_p, int *_r, int *_d, int njobs, int Hmin, int Hmax): nbjobs(njobs), p(_p),
+        r(_r), d(_d), Hmin(Hmin), Hmax(Hmax), sum_p(new int[njobs]), min_p(new int[njobs]) {
         int end = nbjobs - 1;
         sum_p[end] = p[end];
         min_p[end] = p[end];
@@ -46,7 +43,32 @@ class PricerSpec: public tdzdd::DdSpec<PricerSpec, int, 2> {
         }
     }
 
-    ~PricerSpec() {
+    ~PricerSpec(){
+        delete [] this->min_p;
+        delete [] this->sum_p;
+    };
+
+    PricerSpec(PricerSpec const &s): nbjobs(s.nbjobs), p(s.p),r(s.r), d(s.d), Hmin(s.Hmin), Hmax(s.Hmax), sum_p(new int[s.nbjobs]), min_p(new int[s.nbjobs]){
+            memcpy(sum_p, s.sum_p, nbjobs*sizeof(int));
+            memcpy(min_p, s.min_p, nbjobs*sizeof(int));
+    }
+
+    PricerSpec& operator=(PricerSpec const & s){
+        if(this != &s) {
+            delete[] sum_p;
+            delete[] min_p;
+            nbjobs = s.nbjobs;
+            p =s.p;
+            r = s.r;
+            d =s.d;
+            Hmin = s.Hmin;
+            Hmax = s.Hmax;
+            sum_p = new int[nbjobs];
+            min_p = new int[nbjobs];
+            memcpy(sum_p, s.sum_p, nbjobs*sizeof(int));
+            memcpy(min_p,s.min_p, nbjobs*sizeof(int));
+        }
+        return *this;
     }
 
     int getRoot(int &state) const {
@@ -74,7 +96,7 @@ class PricerSpec: public tdzdd::DdSpec<PricerSpec, int, 2> {
                 if (state + sum_p[_j] < Hmin) {
                     return 0;
                 }
-  
+
                 if ((sum >= Hmin && sum <= Hmax) && (sum + min_p[_j] > Hmax)) {
                     return -1;
                 }
